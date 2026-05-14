@@ -1,0 +1,16 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: afterhours_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: afterhours
+      POSTGRES_USER: afterhours
+      POSTGRES_PASSWORD: afterhours
+    ports:
+      - "5433:5432"
+    volumes:
+      - afterhours_pgdata:/var/lib/postgresql/data
+
+volumes:
+  afterhours_pgdata:
