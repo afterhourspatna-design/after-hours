@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -12,24 +12,19 @@ export async function DELETE(
   const actorRole = (session.user as any).role;
   if (actorRole !== "ADMIN") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
-  const { id } = params;
+  const { id } = await params;
 
   try {
-    // Check if user exists
     const user = await prisma.appUser.findUnique({ where: { id } });
     if (!user) return NextResponse.json({ error: "User not found" }, { status: 404 });
 
-    // Prevent deleting self
     if (user.id === (session.user as any).id) {
       return NextResponse.json({ error: "You cannot delete your own account" }, { status: 400 });
     }
 
-    // Instead of hard delete, we could deactivate, but user asked for "remove"
-    // To be safe with referential integrity (bookings), we'll check if they have bookings
     const bookingsCount = await prisma.booking.count({ where: { userId: id } });
     
     if (bookingsCount > 0) {
-      // If they have bookings, just deactivate them
       await prisma.appUser.update({
         where: { id },
         data: { isActive: false },
@@ -47,7 +42,7 @@ export async function DELETE(
 
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -55,7 +50,7 @@ export async function PATCH(
   const actorRole = (session.user as any).role;
   if (actorRole !== "ADMIN") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
-  const { id } = params;
+  const { id } = await params;
   const body = await req.json();
 
   try {

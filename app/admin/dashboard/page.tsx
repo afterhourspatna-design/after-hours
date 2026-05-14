@@ -289,7 +289,7 @@ export default async function AdminDashboard({
                     </div>
                   </div>
                   <div className="text-[11px] font-mono text-zinc-500 group-hover:text-zinc-300">
-                    {Math.floor(Math.random() * 50)}:{Math.floor(Math.random() * 60).toString().padStart(2, '0')}
+                    Just now
                   </div>
                 </div>
               )) : (

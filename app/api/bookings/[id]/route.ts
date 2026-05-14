@@ -82,8 +82,8 @@ export async function PUT(
   }
 
   if (role === "STAFF") {
-    const allowedStaffStatuses = [BookingStatus.CONFIRMED, BookingStatus.CANCELLED];
-    if (data.bookingStatus && !allowedStaffStatuses.includes(data.bookingStatus)) {
+    const allowedStaffStatuses: BookingStatus[] = [BookingStatus.CONFIRMED, BookingStatus.CANCELLED];
+    if (data.bookingStatus && !allowedStaffStatuses.includes(data.bookingStatus as BookingStatus)) {
       return NextResponse.json({ error: "Staff can only confirm or cancel bookings" }, { status: 403 });
     }
     delete updateData.startDateTime;
