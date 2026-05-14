@@ -14,6 +14,7 @@ interface Game {
   basePrice: number;
   minTimeMinutes: number;
   maxTimeMinutes: number;
+  isActive: boolean;
   resourceUnits: { id: string; unitName: string }[];
 }
 

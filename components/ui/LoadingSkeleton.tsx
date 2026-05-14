@@ -61,7 +61,7 @@ export function CalendarSkeleton() {
         {Array.from({ length: 12 }).map((_, i) => (
           <div key={i} className="flex gap-2">
             <Skeleton className="h-12 w-12 rounded-lg flex-shrink-0" />
-            <Skeleton className="h-12 flex-1 rounded-lg" style={{ opacity: Math.random() > 0.6 ? 1 : 0.3 }} />
+            <Skeleton className="h-12 flex-1 rounded-lg" />
           </div>
         ))}
       </div>
