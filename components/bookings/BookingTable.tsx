@@ -96,6 +96,24 @@ function BookingTableInner({ role = "ADMIN" }: BookingTableProps) {
     }
   }
 
+  async function handleBookingAction(id: string, actionName: "CHECK_IN" | "CHECK_OUT") {
+    setActionLoading(id);
+    try {
+      const res = await fetch(`/api/bookings/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: actionName }),
+      });
+      if (!res.ok) throw new Error();
+      toast.success(actionName === "CHECK_IN" ? "Customer checked in (time updated to now)" : "Customer checked out (booking completed)");
+      fetchBookings();
+    } catch {
+      toast.error("Action failed");
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
   async function handleDelete() {
     if (!deleteId) return;
     setDeleting(true);
@@ -124,7 +142,7 @@ function BookingTableInner({ role = "ADMIN" }: BookingTableProps) {
       Status: b.bookingStatus,
       Payment: b.paymentStatus,
       Amount: b.finalAmount,
-      Source: SOURCE_LABELS[b.source] ?? b.source,
+      Source: SOURCE_LABELS[b.source as keyof typeof SOURCE_LABELS] ?? b.source,
       Notes: b.notes ?? "",
     }));
     generateCSV(rows, "bookings");
@@ -209,7 +227,7 @@ function BookingTableInner({ role = "ADMIN" }: BookingTableProps) {
                   <th>Status</th>
                   <th>Payment</th>
                   <th>Source</th>
-                  <th className="text-right">Actions</th>
+                  <th className="text-right min-w-[200px]">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -246,21 +264,39 @@ function BookingTableInner({ role = "ADMIN" }: BookingTableProps) {
                       </td>
                       <td><BookingStatusBadge status={b.bookingStatus as any} /></td>
                       <td><PaymentStatusBadge status={b.paymentStatus as any} /></td>
-                      <td className="text-xs text-zinc-500">{SOURCE_LABELS[b.source] ?? b.source}</td>
+                      <td className="text-xs text-zinc-500">{SOURCE_LABELS[b.source as keyof typeof SOURCE_LABELS] ?? b.source}</td>
                       <td>
-                        <div className="flex items-center gap-1 justify-end">
+                        <div className="flex items-center gap-1 justify-end flex-wrap">
+                          {b.bookingStatus === "CONFIRMED" && (
+                            <>
+                              <button
+                                onClick={() => handleBookingAction(b.id, "CHECK_IN")}
+                                disabled={isLoading}
+                                className="px-2 py-1 text-[10px] uppercase font-bold rounded bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 border border-blue-600/20 transition-all"
+                              >
+                                In
+                              </button>
+                              <button
+                                onClick={() => handleBookingAction(b.id, "CHECK_OUT")}
+                                disabled={isLoading}
+                                className="px-2 py-1 text-[10px] uppercase font-bold rounded bg-violet-600/20 text-violet-400 hover:bg-violet-600/30 border border-violet-600/20 transition-all"
+                              >
+                                Out
+                              </button>
+                            </>
+                          )}
                           {isHold && (
                             <button
                               onClick={() => handleStatusChange(b.id, "CONFIRMED")}
                               disabled={isLoading}
-                              className="px-2 py-1 text-xs rounded-lg bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600/30 border border-emerald-600/20 transition-all"
+                              className="px-2 py-1 text-[10px] uppercase font-bold rounded bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600/30 border border-emerald-600/20 transition-all"
                             >
                               Confirm
                             </button>
                           )}
-                          {role === "ADMIN" && (
+                          {(role === "ADMIN" || role === "STAFF") && (
                             <button
-                              onClick={() => router.push(`/admin/bookings/${b.id}/edit`)}
+                              onClick={() => router.push(role === "ADMIN" ? `/admin/bookings/${b.id}/edit` : `/staff/bookings/${b.id}/edit`)}
                               className="p-1.5 rounded-lg text-zinc-500 hover:text-zinc-200 hover:bg-zinc-800 transition-all"
                               title="Edit"
                             >

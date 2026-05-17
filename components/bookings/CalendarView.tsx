@@ -83,6 +83,8 @@ export default function CalendarView({
   function handleEventClick({ event }: any) {
     if (role === "ADMIN") {
       router.push(`/admin/bookings/${event.id}/edit`);
+    } else if (role === "STAFF") {
+      router.push(`/staff/bookings/${event.id}/edit`);
     }
   }
 

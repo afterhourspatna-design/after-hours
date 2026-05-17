@@ -46,8 +46,10 @@ export default function SignupPage() {
       const data = await res.json();
 
       if (!res.ok) {
-        if (data.error?.includes("phone")) {
+        if (data.error?.toLowerCase().includes("phone")) {
           setErrors({ phone: "This phone number is already registered" });
+        } else if (data.error?.toLowerCase().includes("email")) {
+          setErrors({ email: "This email is already registered" });
         } else {
           toast.error(data.error ?? "Signup failed");
         }

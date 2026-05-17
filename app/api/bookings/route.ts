@@ -183,7 +183,7 @@ export async function POST(req: NextRequest) {
       discountAmount: pricing.discountAmount,
       finalAmount,
       paymentStatus: data.paymentStatus,
-      bookingStatus: BookingStatus.HOLD,
+      bookingStatus: role === "CUSTOMER" ? BookingStatus.CONFIRMED : BookingStatus.HOLD,
       source: data.source,
       notes: data.notes ?? null,
       holdExpiresAt,

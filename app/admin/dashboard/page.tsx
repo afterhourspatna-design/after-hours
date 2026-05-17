@@ -36,11 +36,17 @@ async function getDashboardData(period: string = "today") {
   const [totalCount, periodCount, activeNow, periodRev, holds, recentBookings] = await Promise.all([
     prisma.booking.count(),
     prisma.booking.count({ where: whereRange }),
-    prisma.booking.count({
+    prisma.booking.findMany({
       where: {
         bookingStatus: { in: [BookingStatus.CONFIRMED, BookingStatus.HOLD] },
         startDateTime: { lte: now }, endDateTime: { gte: now },
       },
+      include: {
+        game: { select: { name: true, tag: true } },
+        resourceUnit: { select: { unitName: true } },
+        user: { select: { name: true } },
+      },
+      orderBy: { endDateTime: "asc" },
     }),
     prisma.booking.aggregate({
       where: {
@@ -72,7 +78,8 @@ async function getDashboardData(period: string = "today") {
   return {
     total: totalCount,
     periodCount,
-    activeNow,
+    activeNow: activeNow.length,
+    activeBookings: activeNow,
     periodRevenue: Number(periodRev._sum.finalAmount ?? 0),
     holds,
     recentBookings,
@@ -274,26 +281,28 @@ export default async function AdminDashboard({
               <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">{data.activeNow} active</span>
             </div>
             <div className="p-2 space-y-1">
-              {data.recentBookings.length > 0 ? data.recentBookings.map((b, i) => (
+              {data.activeBookings.length > 0 ? data.activeBookings.map((b, i) => (
                 <div key={b.id} className="flex items-center justify-between p-3 rounded-xl hover:bg-zinc-900/50 transition-colors group">
                   <div className="flex items-center gap-3">
                     <div className={cn(
-                      "w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-bold border",
+                      "w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-bold border flex-shrink-0",
                       i % 2 === 0 ? "bg-violet-500/10 border-violet-500/20 text-violet-400" : "bg-emerald-500/10 border-emerald-500/20 text-emerald-400"
                     )}>
-                      {b.user?.name?.substring(0, 2).toUpperCase() || 'GU'}
+                      {b.user?.name?.substring(0, 2).toUpperCase() || b.guestName?.substring(0, 2).toUpperCase() || 'GU'}
                     </div>
                     <div>
-                      <p className="text-[13px] font-bold text-zinc-200">{b.user?.name || 'Guest User'}</p>
-                      <p className="text-[10px] text-zinc-500 font-medium">{b.game?.name} • {b.bookingStatus}</p>
+                      <p className="text-[13px] font-bold text-zinc-200 truncate max-w-[120px]">{b.user?.name || b.guestName || 'Guest User'}</p>
+                      <p className="text-[10px] text-zinc-500 font-medium truncate max-w-[120px]">
+                        {b.game?.name} {b.resourceUnit ? `• ${b.resourceUnit.unitName}` : ''}
+                      </p>
                     </div>
                   </div>
-                  <div className="text-[11px] font-mono text-zinc-500 group-hover:text-zinc-300">
-                    Just now
+                  <div className="text-[11px] font-mono font-bold text-emerald-400 bg-emerald-500/10 px-2 py-1 rounded border border-emerald-500/20 flex-shrink-0">
+                    {new Date(b.endDateTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
                   </div>
                 </div>
               )) : (
-                <p className="text-center py-8 text-zinc-600 text-xs font-medium italic">No recent activity</p>
+                <p className="text-center py-8 text-zinc-600 text-xs font-medium italic">No active sessions</p>
               )}
             </div>
           </div>

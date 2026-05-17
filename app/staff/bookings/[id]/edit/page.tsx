@@ -29,7 +29,7 @@ export default async function EditBookingPage({
   return (
     <div className="space-y-5">
       <div className="flex items-center gap-3">
-        <a href="/admin/bookings"
+        <a href="/staff/bookings"
           className="p-2 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white hover:border-zinc-700 transition-all">
           <ArrowLeft className="w-4 h-4" />
         </a>
@@ -40,7 +40,7 @@ export default async function EditBookingPage({
           </p>
         </div>
       </div>
-      <BookingForm mode="edit" role="ADMIN" initialData={serializedBooking} />
+      <BookingForm mode="edit" role="STAFF" initialData={serializedBooking} />
     </div>
   );
 }

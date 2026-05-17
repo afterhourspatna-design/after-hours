@@ -43,6 +43,14 @@ interface BookingFormProps {
 
 const DURATIONS = [30, 60, 90, 120, 150, 180, 240];
 
+const TIME_OPTIONS: string[] = [];
+for (let h = 10; h <= 23; h++) {
+  for (let m = 0; m < 60; m += 5) {
+    TIME_OPTIONS.push(`${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}`);
+  }
+}
+TIME_OPTIONS.push("00:00"); // Midnight / closing
+
 export default function BookingForm({ mode = "create", initialData, prefillDate, role = "ADMIN", currentUser }: BookingFormProps) {
   const router = useRouter();
 
@@ -63,11 +71,19 @@ export default function BookingForm({ mode = "create", initialData, prefillDate,
   const [unitAvailability, setUnitAvailability] = useState<boolean | null>(null);
 
   // Time
-  const defaultDate = prefillDate ? new Date(prefillDate) : new Date();
+  const defaultDate = initialData?.startDateTime ? new Date(initialData.startDateTime) : (prefillDate ? new Date(prefillDate) : new Date());
+  const initialStartTime = initialData?.startDateTime 
+    ? format(new Date(initialData.startDateTime), "HH:mm") 
+    : (prefillDate ? format(defaultDate, "HH:mm") : "14:00");
+    
   const [bookingDate, setBookingDate] = useState(format(defaultDate, "yyyy-MM-dd"));
-  const [startTime, setStartTime] = useState(
-    prefillDate ? format(defaultDate, "HH:mm") : "14:00"
-  );
+  const [startTime, setStartTime] = useState(initialStartTime);
+
+  // Ensure startTime is in TIME_OPTIONS so the select doesn't fall back to 10:00
+  const currentOptions = TIME_OPTIONS.includes(initialStartTime) 
+    ? TIME_OPTIONS 
+    : Array.from(new Set([...TIME_OPTIONS, initialStartTime])).sort();
+
   const [durationMinutes, setDurationMinutes] = useState(initialData?.durationMinutes ?? 60);
 
   // Booking details
@@ -143,6 +159,35 @@ export default function BookingForm({ mode = "create", initialData, prefillDate,
       .then(r => r.json())
       .then(d => setUnitAvailability(d.available));
   }, [selectedUnit, bookingDate, startTime, durationMinutes]);
+
+  // Mini Availability Calendar logic
+  const [dayBookings, setDayBookings] = useState<any[]>([]);
+  useEffect(() => {
+    if (!selectedGame || !bookingDate) {
+      setDayBookings([]);
+      return;
+    }
+    const from = new Date(`${bookingDate}T00:00:00`).toISOString();
+    const to = new Date(`${bookingDate}T23:59:59`).toISOString();
+    const params = new URLSearchParams({
+      gameId: selectedGame.id,
+      from,
+      to,
+      limit: "100",
+      calendar: "1"
+    });
+    fetch(`/api/bookings?${params}`)
+      .then(r => r.json())
+      .then(data => {
+        if (Array.isArray(data)) {
+          // Filter out cancelled/expired
+          setDayBookings(data.filter(b => b.bookingStatus !== "CANCELLED" && b.bookingStatus !== "EXPIRED"));
+        } else if (data.bookings) {
+          setDayBookings(data.bookings.filter((b: any) => b.bookingStatus !== "CANCELLED" && b.bookingStatus !== "EXPIRED"));
+        }
+      });
+  }, [selectedGame, bookingDate]);
+
 
   // Enforce game min/max time
   useEffect(() => {
@@ -353,8 +398,15 @@ export default function BookingForm({ mode = "create", initialData, prefillDate,
               </div>
               <div>
                 <label className="text-xs text-zinc-400 mb-1 block">Start Time *</label>
-                <input type="time" value={startTime} onChange={e => setStartTime(e.target.value)}
-                  step="900" className="input-field" />
+                <select 
+                  value={startTime} 
+                  onChange={e => setStartTime(e.target.value)}
+                  className="input-field"
+                >
+                  {currentOptions.map(time => (
+                    <option key={time} value={time}>{time}</option>
+                  ))}
+                </select>
               </div>
               <div>
                 <label className="text-xs text-zinc-400 mb-1 block">
@@ -386,6 +438,64 @@ export default function BookingForm({ mode = "create", initialData, prefillDate,
               <p className="text-xs text-zinc-500">
                 Session: <span className="text-zinc-300">{startTime} → {endTime}</span>
               </p>
+            )}
+
+            {/* Mini Availability Timeline */}
+            {selectedGame && (
+              <div className="pt-4 mt-4 border-t border-zinc-800">
+                <label className="text-xs text-zinc-400 mb-4 block">Availability Timeline (Shop Hours 10AM - Midnight)</label>
+                
+                {/* Timeline Axis */}
+                <div className="relative h-4 mb-1 w-full text-[9px] font-bold text-zinc-600 uppercase">
+                  <span className="absolute left-0 -translate-x-1/2">10am</span>
+                  <span className="absolute left-1/4 -translate-x-1/2">1:30pm</span>
+                  <span className="absolute left-2/4 -translate-x-1/2">5pm</span>
+                  <span className="absolute left-3/4 -translate-x-1/2">8:30pm</span>
+                  <span className="absolute left-full -translate-x-1/2">12am</span>
+                </div>
+
+                <div className="space-y-2">
+                  {selectedGame.resourceUnits.map(unit => {
+                    // Find bookings for this unit
+                    const unitBookings = dayBookings.filter(b => b.resourceUnitId === unit.id);
+                    return (
+                      <div key={unit.id} className="flex flex-col gap-1">
+                        <div className="text-[10px] text-zinc-500">{unit.unitName}</div>
+                        <div className="h-6 bg-zinc-800/80 rounded relative overflow-hidden flex w-full border border-zinc-700">
+                          {unitBookings.map(b => {
+                            // Calculate left % and width % based on 10:00 to 24:00 (14 hours = 840 mins)
+                            const start = new Date(b.startDateTime);
+                            const end = new Date(b.endDateTime);
+                            const startMins = start.getHours() * 60 + start.getMinutes() - (10 * 60);
+                            const duration = (end.getTime() - start.getTime()) / 60000;
+                            
+                            if (startMins + duration <= 0 || startMins >= 840) return null; // Outside shop hours
+                            
+                            const left = Math.max(0, (startMins / 840) * 100);
+                            const width = Math.min(100 - left, (duration / 840) * 100);
+
+                            return (
+                              <div
+                                key={b.id}
+                                className="absolute top-0 bottom-0 bg-red-500/80 border-l border-red-600/50"
+                                style={{ left: `${left}%`, width: `${width}%` }}
+                                title={`${format(start, "HH:mm")} - ${format(end, "HH:mm")}`}
+                              />
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {selectedGame.resourceUnits.length === 0 && (
+                    <div className="text-xs text-zinc-500">No units available for this game.</div>
+                  )}
+                </div>
+                <div className="flex items-center gap-4 mt-2 text-[10px] text-zinc-500">
+                  <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-sm bg-zinc-800 border border-zinc-700" /> Available</div>
+                  <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-sm bg-red-500/80 border border-red-600/50" /> Booked</div>
+                </div>
+              </div>
             )}
           </div>
 

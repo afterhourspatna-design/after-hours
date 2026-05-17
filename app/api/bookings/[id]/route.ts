@@ -15,6 +15,7 @@ const updateSchema = z.object({
   resourceUnitId: z.string().optional().nullable(),
   finalAmount: z.number().optional(),
   source: z.string().optional(),
+  action: z.enum(["CHECK_IN", "CHECK_OUT"]).optional(),
 });
 
 export async function GET(
@@ -55,8 +56,16 @@ export async function PUT(
   if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const data = parsed.data;
+  const updateData: any = { ...data };
+  delete updateData.action;
 
-  if (data.startDateTime && data.durationMinutes) {
+  if (data.action === "CHECK_IN") {
+    updateData.startDateTime = new Date();
+  } else if (data.action === "CHECK_OUT") {
+    updateData.endDateTime = new Date();
+    updateData.durationMinutes = Math.max(15, Math.ceil((updateData.endDateTime.getTime() - existing.startDateTime.getTime()) / 60000));
+    updateData.bookingStatus = BookingStatus.COMPLETED;
+  } else if (data.startDateTime && data.durationMinutes) {
     const newStart = new Date(data.startDateTime);
     const newEnd = addMinutes(newStart, data.durationMinutes);
     const unitId = data.resourceUnitId ?? existing.resourceUnitId;
@@ -74,14 +83,10 @@ export async function PUT(
         }, { status: 409 });
       }
     }
+    updateData.endDateTime = newEnd;
   }
 
-  const updateData: any = { ...data };
-  if (data.startDateTime && data.durationMinutes) {
-    updateData.endDateTime = addMinutes(new Date(data.startDateTime), data.durationMinutes);
-  }
-
-  if (role === "STAFF") {
+  if (role === "STAFF" && !data.action) {
     const allowedStaffStatuses: BookingStatus[] = [BookingStatus.CONFIRMED, BookingStatus.CANCELLED];
     if (data.bookingStatus && !allowedStaffStatuses.includes(data.bookingStatus as BookingStatus)) {
       return NextResponse.json({ error: "Staff can only confirm or cancel bookings" }, { status: 403 });
