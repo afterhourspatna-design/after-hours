@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { BookingStatus } from "@prisma/client";
-import { startOfDay, subDays, differenceInMinutes } from "date-fns";
+import { startOfDay, subDays } from "date-fns";
 
 export async function GET(req: NextRequest) {
   const session = await auth();
