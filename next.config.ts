@@ -11,6 +11,7 @@ const withPWA = require("next-pwa")({
 
 const nextConfig = {
   reactStrictMode: true,
+  distDir: process.env.NODE_ENV === "development" ? ".next-dev" : ".next",
   // Next 15: renamed from serverComponentsExternalPackages
   serverExternalPackages: ["@prisma/client", "bcryptjs"],
 };
