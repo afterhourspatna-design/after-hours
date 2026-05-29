@@ -11,6 +11,7 @@ const schema = z.object({
   userId: z.string().optional().nullable(),
   excludeBookingId: z.string().optional().nullable(),
   accessoriesCount: z.number().int().min(0).optional(),
+  couponCode: z.string().optional().nullable(),
 });
 
 export async function GET(req: NextRequest) {
@@ -25,13 +26,15 @@ export async function GET(req: NextRequest) {
     userId: searchParams.get("userId"),
     excludeBookingId: searchParams.get("excludeBookingId"),
     accessoriesCount: parseInt(searchParams.get("accessoriesCount") ?? "0"),
+    couponCode: searchParams.get("couponCode"),
   });
 
   if (!parsed.success) {
     return NextResponse.json({ error: "Invalid params" }, { status: 400 });
   }
 
-  const { gameId, durationMinutes, startDateTime, userId, excludeBookingId, accessoriesCount } = parsed.data;
+  const { gameId, durationMinutes, startDateTime, userId, excludeBookingId, accessoriesCount, couponCode } = parsed.data;
+  const userRole = (session.user as any).role;
 
   const pricing = await calculateBookingPrice({
     gameId,
@@ -40,6 +43,8 @@ export async function GET(req: NextRequest) {
     userId: userId ?? null,
     excludeBookingId: excludeBookingId ?? undefined,
     accessoriesCount: accessoriesCount ?? 0,
+    couponCode: couponCode ?? undefined,
+    userRole,
   });
 
   // Also return game info

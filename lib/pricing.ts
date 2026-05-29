@@ -9,6 +9,9 @@ export interface PriceCalculation {
   finalAmount: number;         // amount to charge
   breakdown: HourBlock[];      // per-block breakdown
   accessorySurcharge: number;  // accessory rental surcharge
+  couponDiscount?: number;     // coupon discount applied
+  couponCode?: string;         // coupon code applied
+  couponError?: string;        // coupon validation error if any
 }
 
 export interface HourBlock {
@@ -34,8 +37,19 @@ export async function calculateBookingPrice(params: {
   userId?: string | null;
   excludeBookingId?: string;  // for edits — exclude the current booking
   accessoriesCount?: number;
+  couponCode?: string;
+  userRole?: string;
 }): Promise<PriceCalculation> {
-  const { gameId, durationMinutes, startDateTime, userId, excludeBookingId, accessoriesCount = 0 } = params;
+  const { 
+    gameId, 
+    durationMinutes, 
+    startDateTime, 
+    userId, 
+    excludeBookingId, 
+    accessoriesCount = 0,
+    couponCode,
+    userRole
+  } = params;
 
   const game = await prisma.game.findUniqueOrThrow({ where: { id: gameId } });
   const baseRatePerHour = Number(game.basePrice);
@@ -107,7 +121,43 @@ export async function calculateBookingPrice(params: {
   const discountPct = gameBasePrice > 0 ? Math.round((discountAmount / gameBasePrice) * 100 * 10) / 10 : 0;
 
   const basePrice = gameBasePrice + accessorySurcharge;
-  const finalAmount = gameFinalAmount + accessorySurcharge;
+  let finalAmount = gameFinalAmount + accessorySurcharge;
+
+  // Coupon processing
+  let couponDiscount = 0;
+  let couponError: string | undefined = undefined;
+  let finalCouponCode: string | undefined = undefined;
+
+  if (couponCode) {
+    const cleanedCode = couponCode.trim().toUpperCase();
+    const coupon = await prisma.coupon.findUnique({
+      where: { code: cleanedCode }
+    });
+
+    if (!coupon) {
+      couponError = "Invalid coupon code";
+    } else if (!coupon.isActive) {
+      couponError = "This coupon code is inactive";
+    } else if (userRole && !coupon.allowedRoles.includes(userRole as any)) {
+      couponError = "This coupon is not valid for your account role";
+    } else if (finalAmount < Number(coupon.minBookingAmount)) {
+      couponError = `Minimum booking amount of Rs. ${coupon.minBookingAmount} required`;
+    } else {
+      finalCouponCode = coupon.code;
+      if (coupon.discountType === "PERCENTAGE") {
+        let discount = finalAmount * (Number(coupon.discountValue) / 100);
+        if (coupon.maxDiscountAmount) {
+          discount = Math.min(discount, Number(coupon.maxDiscountAmount));
+        }
+        couponDiscount = Math.round(discount);
+      } else {
+        // FIXED
+        couponDiscount = Math.min(finalAmount, Math.round(Number(coupon.discountValue)));
+      }
+    }
+  }
+
+  finalAmount = Math.max(0, finalAmount - couponDiscount);
 
   return { 
     basePrice, 
@@ -115,7 +165,10 @@ export async function calculateBookingPrice(params: {
     discountAmount, 
     finalAmount, 
     breakdown: blocks,
-    accessorySurcharge 
+    accessorySurcharge,
+    couponDiscount,
+    couponCode: finalCouponCode,
+    couponError
   };
 }
 
@@ -131,6 +184,9 @@ export function calculatePriceSync(params: {
   defaultAccessories?: number;
   accessoryPrice?: number;
   accessoriesCount?: number;
+  couponDiscount?: number;
+  couponCode?: string;
+  couponError?: string;
 }): PriceCalculation {
   const { 
     baseRatePerHour, 
@@ -140,7 +196,10 @@ export function calculatePriceSync(params: {
     hasAccessories = false,
     defaultAccessories = 0,
     accessoryPrice = 0,
-    accessoriesCount = 0
+    accessoriesCount = 0,
+    couponDiscount = 0,
+    couponCode,
+    couponError
   } = params;
 
   const blocks: HourBlock[] = [];
@@ -181,7 +240,10 @@ export function calculatePriceSync(params: {
   const discountPct = gameBasePrice > 0 ? Math.round((discountAmount / gameBasePrice) * 100 * 10) / 10 : 0;
 
   const basePrice = gameBasePrice + accessorySurcharge;
-  const finalAmount = gameFinalAmount + accessorySurcharge;
+  let finalAmount = gameFinalAmount + accessorySurcharge;
+  if (couponDiscount) {
+    finalAmount = Math.max(0, finalAmount - couponDiscount);
+  }
 
   return { 
     basePrice, 
@@ -189,6 +251,9 @@ export function calculatePriceSync(params: {
     discountAmount, 
     finalAmount, 
     breakdown: blocks,
-    accessorySurcharge 
+    accessorySurcharge,
+    couponDiscount,
+    couponCode,
+    couponError
   };
 }
