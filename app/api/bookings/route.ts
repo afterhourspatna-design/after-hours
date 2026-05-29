@@ -21,6 +21,7 @@ const createBookingSchema = z.object({
   notes: z.string().optional().nullable(),
   priceOverride: z.number().optional().nullable(),
   accessoriesCount: z.number().int().min(0).default(0),
+  couponCode: z.string().optional().nullable(),
 });
 
 export async function GET(req: NextRequest) {
@@ -167,7 +168,23 @@ export async function POST(req: NextRequest) {
     startDateTime,
     userId: data.userId ?? null,
     accessoriesCount: data.accessoriesCount,
+    couponCode: data.couponCode ?? undefined,
+    userRole: role,
   });
+
+  if (data.couponCode && pricing.couponError) {
+    return NextResponse.json({ error: pricing.couponError }, { status: 400 });
+  }
+
+  let dbCouponId: string | null = null;
+  if (pricing.couponCode) {
+    const cp = await prisma.coupon.findUnique({
+      where: { code: pricing.couponCode }
+    });
+    if (cp) {
+      dbCouponId = cp.id;
+    }
+  }
 
   const finalAmount = data.priceOverride != null && role === "ADMIN"
     ? data.priceOverride
@@ -190,6 +207,8 @@ export async function POST(req: NextRequest) {
       basePrice: pricing.basePrice,
       discountPct: pricing.discountPct,
       discountAmount: pricing.discountAmount,
+      couponId: dbCouponId,
+      couponDiscount: pricing.couponDiscount ?? 0,
       finalAmount,
       paymentStatus: data.paymentStatus,
       bookingStatus: role === "CUSTOMER" ? BookingStatus.CONFIRMED : BookingStatus.HOLD,
@@ -204,6 +223,13 @@ export async function POST(req: NextRequest) {
       user: { select: { name: true, phone: true } },
     },
   });
+
+  if (dbCouponId) {
+    await prisma.coupon.update({
+      where: { id: dbCouponId },
+      data: { usedCount: { increment: 1 } }
+    });
+  }
 
   // Audit log
   await prisma.auditLog.create({

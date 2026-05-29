@@ -17,6 +17,7 @@ const updateSchema = z.object({
   source: z.string().optional(),
   action: z.enum(["CHECK_IN", "CHECK_OUT"]).optional(),
   accessoriesCount: z.number().int().min(0).optional(),
+  couponCode: z.string().optional().nullable(),
 });
 
 export async function GET(
@@ -59,6 +60,59 @@ export async function PUT(
   const data = parsed.data;
   const updateData: any = { ...data };
   delete updateData.action;
+
+  // Handle coupon changes
+  if (data.couponCode) {
+    const cleanedCode = data.couponCode.trim().toUpperCase();
+    const coupon = await prisma.coupon.findUnique({
+      where: { code: cleanedCode }
+    });
+    if (!coupon) {
+      return NextResponse.json({ error: "Invalid coupon code" }, { status: 400 });
+    }
+    if (!coupon.isActive) {
+      return NextResponse.json({ error: "Coupon is inactive" }, { status: 400 });
+    }
+    if (!coupon.allowedRoles.includes(role as any)) {
+      return NextResponse.json({ error: "Coupon not allowed for your role" }, { status: 400 });
+    }
+
+    const currentFinal = Number(updateData.finalAmount ?? existing.finalAmount);
+    const currentCouponDiscount = Number(existing.couponId === coupon.id ? existing.couponDiscount : 0);
+    const baseAmount = currentFinal + currentCouponDiscount;
+
+    let discount = 0;
+    if (coupon.discountType === "PERCENTAGE") {
+      discount = baseAmount * (Number(coupon.discountValue) / 100);
+      if (coupon.maxDiscountAmount) {
+        discount = Math.min(discount, Number(coupon.maxDiscountAmount));
+      }
+    } else {
+      discount = Math.min(baseAmount, Number(coupon.discountValue));
+    }
+
+    updateData.couponId = coupon.id;
+    updateData.couponDiscount = Math.round(discount);
+    updateData.finalAmount = Math.max(0, baseAmount - Math.round(discount));
+    delete updateData.couponCode;
+
+    // Increment usedCount if it is a new coupon for this booking
+    if (existing.couponId !== coupon.id) {
+      await prisma.coupon.update({
+        where: { id: coupon.id },
+        data: { usedCount: { increment: 1 } }
+      });
+    }
+  } else if (data.couponCode === null) {
+    const currentFinal = Number(updateData.finalAmount ?? existing.finalAmount);
+    const currentCouponDiscount = Number(existing.couponDiscount);
+    const baseAmount = currentFinal + currentCouponDiscount;
+
+    updateData.couponId = null;
+    updateData.couponDiscount = 0;
+    updateData.finalAmount = baseAmount;
+    delete updateData.couponCode;
+  }
 
   // Validate accessoriesCount against game config
   if (data.accessoriesCount !== undefined) {

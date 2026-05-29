@@ -6,7 +6,7 @@ import { signOut } from "next-auth/react";
 import { cn } from "@/lib/utils";
 import {
   Gamepad2, LayoutDashboard, CalendarDays, BookOpen,
-  Users, Trophy, BarChart3, Settings, LogOut, ChevronLeft, Menu, X, Zap, Shield, MessageSquare
+  Users, Trophy, BarChart3, Settings, LogOut, ChevronLeft, Menu, X, Zap, Shield, MessageSquare, Tag
 } from "lucide-react";
 import { useState } from "react";
 
@@ -38,6 +38,7 @@ const NAV_SECTIONS: NavSection[] = [
       { label: "Customers",  href: "/admin/users",        icon: Users,           roles: ["ADMIN"] },
       { label: "Staff",      href: "/admin/staff",        icon: Shield,          roles: ["ADMIN"] },
       { label: "Users",      href: "/staff/users",        icon: Users,           roles: ["STAFF"] },
+      { label: "Coupons",    href: "/admin/coupons",      icon: Tag,             roles: ["ADMIN"] },
       { label: "Games",      href: "/admin/games",        icon: Trophy,          roles: ["ADMIN"] },
       { label: "Reports",    href: "/admin/reports",      icon: BarChart3,       roles: ["ADMIN"] },
       { label: "Feedback",   href: "/admin/feedback",     icon: MessageSquare,   roles: ["ADMIN"] },

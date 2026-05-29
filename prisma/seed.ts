@@ -14,6 +14,7 @@ async function main() {
   // ─── Clean up ───────────────────────────────────────────────────────
   await prisma.auditLog.deleteMany();
   await prisma.booking.deleteMany();
+  await prisma.coupon.deleteMany();
   await prisma.resourceUnit.deleteMany();
   await prisma.game.deleteMany();
   await prisma.discountRule.deleteMany();
@@ -360,6 +361,29 @@ async function main() {
   for (const b of bookingData) {
     await prisma.booking.create({ data: b as any });
   }
+
+  // ─── Coupons ─────────────────────────────────────────────────────────
+  await prisma.coupon.createMany({
+    data: [
+      {
+        code: "WELCOME10",
+        discountType: "PERCENTAGE",
+        discountValue: 10.00,
+        maxDiscountAmount: 200.00,
+        minBookingAmount: 0.00,
+        allowedRoles: ["ADMIN", "STAFF", "CUSTOMER"],
+        isActive: true,
+      },
+      {
+        code: "STAFFONLY",
+        discountType: "FIXED",
+        discountValue: 100.00,
+        minBookingAmount: 500.00,
+        allowedRoles: ["ADMIN", "STAFF"],
+        isActive: true,
+      },
+    ],
+  });
 
   console.log("✅ Seed complete!");
   console.log(`   👤 Users:     6 (1 admin, 2 staff, 3 customers)`);
