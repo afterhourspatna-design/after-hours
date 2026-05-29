@@ -128,6 +128,10 @@ async function main() {
       deposit: 500,
       isActive: true,
       totalUnits: 2,
+      hasAccessories: true,
+      defaultAccessories: 2,
+      maxAccessories: 4,
+      accessoryPrice: 25.00,
     },
   });
 

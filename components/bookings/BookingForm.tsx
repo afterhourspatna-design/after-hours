@@ -16,6 +16,10 @@ interface Game {
   maxTimeMinutes: number;
   isActive: boolean;
   resourceUnits: { id: string; unitName: string }[];
+  hasAccessories: boolean;
+  defaultAccessories: number;
+  maxAccessories: number;
+  accessoryPrice: number;
 }
 
 interface AppUser {
@@ -31,6 +35,7 @@ interface PriceBreakdown {
   discountAmount: number;
   finalAmount: number;
   breakdown: { blockNumber: number; durationMinutes: number; discountPct: number; amount: number }[];
+  accessorySurcharge: number;
 }
 
 interface BookingFormProps {
@@ -92,6 +97,7 @@ export default function BookingForm({ mode = "create", initialData, prefillDate,
   const [paymentStatus, setPaymentStatus] = useState(initialData?.paymentStatus ?? "UNPAID");
   const [notes, setNotes] = useState(initialData?.notes ?? "");
   const [priceOverride, setPriceOverride] = useState<string>("");
+  const [accessoriesCount, setAccessoriesCount] = useState<number>(initialData?.accessoriesCount ?? 0);
 
   // Pricing
   const [pricing, setPricing] = useState<PriceBreakdown | null>(null);
@@ -105,7 +111,12 @@ export default function BookingForm({ mode = "create", initialData, prefillDate,
       setGames(data.filter(g => g.isActive !== false));
       if (initialData?.gameId) {
         const g = data.find((g: Game) => g.id === initialData.gameId);
-        if (g) setSelectedGame(g);
+        if (g) {
+          setSelectedGame(g);
+          if (mode === "create") {
+            setAccessoriesCount(g.defaultAccessories ?? 0);
+          }
+        }
       }
     });
   }, []);
@@ -133,6 +144,7 @@ export default function BookingForm({ mode = "create", initialData, prefillDate,
         gameId: selectedGame.id,
         durationMinutes: String(durationMinutes),
         startDateTime: new Date(startDT).toISOString(),
+        accessoriesCount: String(accessoriesCount),
         ...(selectedUser && !isGuest ? { userId: selectedUser.id } : {}),
         ...(initialData?.id ? { excludeBookingId: initialData.id } : {}),
       });
@@ -141,7 +153,7 @@ export default function BookingForm({ mode = "create", initialData, prefillDate,
     } finally {
       setPricingLoading(false);
     }
-  }, [selectedGame, bookingDate, startTime, durationMinutes, selectedUser, isGuest]);
+  }, [selectedGame, bookingDate, startTime, durationMinutes, selectedUser, isGuest, accessoriesCount]);
 
   useEffect(() => { calcPrice(); }, [calcPrice]);
 
@@ -213,6 +225,7 @@ export default function BookingForm({ mode = "create", initialData, prefillDate,
       resourceUnitId: selectedUnit || null,
       startDateTime: startDT.toISOString(),
       durationMinutes,
+      accessoriesCount,
       bookingType,
       paymentStatus,
       source: role === "CUSTOMER" ? "ONLINE" : source,
@@ -356,6 +369,7 @@ export default function BookingForm({ mode = "create", initialData, prefillDate,
                     const g = games.find(g => g.id === e.target.value) ?? null;
                     setSelectedGame(g);
                     setSelectedUnit("");
+                    setAccessoriesCount(g ? (g.defaultAccessories ?? 0) : 0);
                   }}
                   className="input-field"
                 >
@@ -382,6 +396,45 @@ export default function BookingForm({ mode = "create", initialData, prefillDate,
                 )}
               </div>
             </div>
+
+            {selectedGame?.hasAccessories && (
+              <div className="pt-4 border-t border-zinc-800/80 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <label className="text-xs font-semibold text-zinc-300 block">Accessories</label>
+                    <span className="text-[10px] text-zinc-500 font-medium block leading-tight mt-0.5">
+                      (Up to {selectedGame.defaultAccessories} included free. Extra accessories: Rs. {Number(selectedGame.accessoryPrice)}/hr each. Max: {selectedGame.maxAccessories})
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-3 bg-zinc-900 border border-zinc-800 rounded-xl p-1">
+                    <button
+                      type="button"
+                      onClick={() => setAccessoriesCount(c => Math.max(0, c - 1))}
+                      disabled={accessoriesCount === 0}
+                      className="w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold text-zinc-400 hover:text-white hover:bg-zinc-800 disabled:opacity-40 disabled:hover:bg-transparent transition-all"
+                    >
+                      -
+                    </button>
+                    <span className="text-sm font-bold text-white w-4 text-center">
+                      {accessoriesCount}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setAccessoriesCount(c => Math.min(selectedGame.maxAccessories, c + 1))}
+                      disabled={accessoriesCount >= selectedGame.maxAccessories}
+                      className="w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold text-zinc-400 hover:text-white hover:bg-zinc-800 disabled:opacity-40 disabled:hover:bg-transparent transition-all"
+                    >
+                      +
+                    </button>
+                  </div>
+                </div>
+                {accessoriesCount > selectedGame.defaultAccessories && (
+                  <p className="text-xs text-emerald-400 font-medium animate-pulse">
+                    ✨ Extra {(accessoriesCount - selectedGame.defaultAccessories)} accessories charged at Rs. {Number(selectedGame.accessoryPrice)}/hour.
+                  </p>
+                )}
+              </div>
+            )}
           </div>
 
           {/* ── Date & Time ── */}
@@ -577,6 +630,12 @@ export default function BookingForm({ mode = "create", initialData, prefillDate,
                     <span className="text-zinc-500">Base price</span>
                     <span className="text-zinc-400">{formatCurrency(pricing.basePrice)}</span>
                   </div>
+                  {pricing.accessorySurcharge > 0 && (
+                    <div className="flex justify-between text-xs">
+                      <span className="text-zinc-500">Accessory surcharge</span>
+                      <span className="text-zinc-400">+{formatCurrency(pricing.accessorySurcharge)}</span>
+                    </div>
+                  )}
                   {pricing.discountAmount > 0 && (
                     <div className="flex justify-between text-xs">
                       <span className="text-emerald-500">Discount</span>

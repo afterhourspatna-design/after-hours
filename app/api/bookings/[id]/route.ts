@@ -16,6 +16,7 @@ const updateSchema = z.object({
   finalAmount: z.number().optional(),
   source: z.string().optional(),
   action: z.enum(["CHECK_IN", "CHECK_OUT"]).optional(),
+  accessoriesCount: z.number().int().min(0).optional(),
 });
 
 export async function GET(
@@ -58,6 +59,14 @@ export async function PUT(
   const data = parsed.data;
   const updateData: any = { ...data };
   delete updateData.action;
+
+  // Validate accessoriesCount against game config
+  if (data.accessoriesCount !== undefined) {
+    const game = await prisma.game.findUniqueOrThrow({ where: { id: existing.gameId } });
+    if (game.hasAccessories && data.accessoriesCount > game.maxAccessories) {
+      return NextResponse.json({ error: `Maximum allowed accessories is ${game.maxAccessories}` }, { status: 400 });
+    }
+  }
 
   if (data.action === "CHECK_IN") {
     updateData.startDateTime = new Date();
