@@ -20,6 +20,7 @@ const createBookingSchema = z.object({
   source: z.nativeEnum(BookingSource).default("WALK_IN"),
   notes: z.string().optional().nullable(),
   priceOverride: z.number().optional().nullable(),
+  accessoriesCount: z.number().int().min(0).default(0),
 });
 
 export async function GET(req: NextRequest) {
@@ -153,12 +154,19 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  // Fetch game config to validate accessories count
+  const game = await prisma.game.findUniqueOrThrow({ where: { id: data.gameId } });
+  if (game.hasAccessories && data.accessoriesCount > game.maxAccessories) {
+    return NextResponse.json({ error: `Maximum allowed accessories is ${game.maxAccessories}` }, { status: 400 });
+  }
+
   // Calculate price
   const pricing = await calculateBookingPrice({
     gameId: data.gameId,
     durationMinutes: data.durationMinutes,
     startDateTime,
     userId: data.userId ?? null,
+    accessoriesCount: data.accessoriesCount,
   });
 
   const finalAmount = data.priceOverride != null && role === "ADMIN"
@@ -177,6 +185,7 @@ export async function POST(req: NextRequest) {
       startDateTime,
       endDateTime,
       durationMinutes: data.durationMinutes,
+      accessoriesCount: data.accessoriesCount,
       bookingType: data.bookingType,
       basePrice: pricing.basePrice,
       discountPct: pricing.discountPct,

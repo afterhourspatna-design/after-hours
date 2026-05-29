@@ -3,11 +3,12 @@ import { Decimal } from "@prisma/client/runtime/library";
 import { startOfDay, endOfDay } from "date-fns";
 
 export interface PriceCalculation {
-  basePrice: number;           // unit price × hours (no discount)
+  basePrice: number;           // unit price × hours + accessory surcharge (no discount on accessories)
   discountPct: number;         // effective discount percentage applied
   discountAmount: number;      // rupees saved
   finalAmount: number;         // amount to charge
   breakdown: HourBlock[];      // per-block breakdown
+  accessorySurcharge: number;  // accessory rental surcharge
 }
 
 export interface HourBlock {
@@ -32,8 +33,9 @@ export async function calculateBookingPrice(params: {
   startDateTime: Date;
   userId?: string | null;
   excludeBookingId?: string;  // for edits — exclude the current booking
+  accessoriesCount?: number;
 }): Promise<PriceCalculation> {
-  const { gameId, durationMinutes, startDateTime, userId, excludeBookingId } = params;
+  const { gameId, durationMinutes, startDateTime, userId, excludeBookingId, accessoriesCount = 0 } = params;
 
   const game = await prisma.game.findUniqueOrThrow({ where: { id: gameId } });
   const baseRatePerHour = Number(game.basePrice);
@@ -89,14 +91,32 @@ export async function calculateBookingPrice(params: {
     blockNumber++;
   }
 
-  const basePrice = Math.round((durationMinutes / 60) * baseRatePerHour);
-  const finalAmount = blocks.reduce((sum, b) => sum + b.amount, 0);
-  const discountAmount = basePrice - finalAmount;
+  // Calculate accessory surcharge (flat surcharge, not subject to user discounts)
+  let accessorySurcharge = 0;
+  if (game.hasAccessories) {
+    const extraAccessories = Math.max(0, accessoriesCount - game.defaultAccessories);
+    const ratePerExtra = Number(game.accessoryPrice);
+    accessorySurcharge = Math.round(ratePerExtra * extraAccessories * (durationMinutes / 60));
+  }
 
-  // Weighted average discount percentage
-  const discountPct = basePrice > 0 ? Math.round((discountAmount / basePrice) * 100 * 10) / 10 : 0;
+  const gameBasePrice = Math.round((durationMinutes / 60) * baseRatePerHour);
+  const gameFinalAmount = blocks.reduce((sum, b) => sum + b.amount, 0);
+  const discountAmount = gameBasePrice - gameFinalAmount;
 
-  return { basePrice, discountPct, discountAmount, finalAmount, breakdown: blocks };
+  // Weighted average discount percentage (on game pricing only)
+  const discountPct = gameBasePrice > 0 ? Math.round((discountAmount / gameBasePrice) * 100 * 10) / 10 : 0;
+
+  const basePrice = gameBasePrice + accessorySurcharge;
+  const finalAmount = gameFinalAmount + accessorySurcharge;
+
+  return { 
+    basePrice, 
+    discountPct, 
+    discountAmount, 
+    finalAmount, 
+    breakdown: blocks,
+    accessorySurcharge 
+  };
 }
 
 /**
@@ -107,8 +127,21 @@ export function calculatePriceSync(params: {
   durationMinutes: number;
   existingMinutesOnDay: number;
   isGuest: boolean;
+  hasAccessories?: boolean;
+  defaultAccessories?: number;
+  accessoryPrice?: number;
+  accessoriesCount?: number;
 }): PriceCalculation {
-  const { baseRatePerHour, durationMinutes, existingMinutesOnDay, isGuest } = params;
+  const { 
+    baseRatePerHour, 
+    durationMinutes, 
+    existingMinutesOnDay, 
+    isGuest,
+    hasAccessories = false,
+    defaultAccessories = 0,
+    accessoryPrice = 0,
+    accessoriesCount = 0
+  } = params;
 
   const blocks: HourBlock[] = [];
   let remainingMinutes = durationMinutes;
@@ -135,10 +168,27 @@ export function calculatePriceSync(params: {
     blockNumber++;
   }
 
-  const basePrice = Math.round((durationMinutes / 60) * baseRatePerHour);
-  const finalAmount = blocks.reduce((sum, b) => sum + b.amount, 0);
-  const discountAmount = basePrice - finalAmount;
-  const discountPct = basePrice > 0 ? Math.round((discountAmount / basePrice) * 100 * 10) / 10 : 0;
+  // Calculate accessory surcharge
+  let accessorySurcharge = 0;
+  if (hasAccessories) {
+    const extraAccessories = Math.max(0, accessoriesCount - defaultAccessories);
+    accessorySurcharge = Math.round(accessoryPrice * extraAccessories * (durationMinutes / 60));
+  }
 
-  return { basePrice, discountPct, discountAmount, finalAmount, breakdown: blocks };
+  const gameBasePrice = Math.round((durationMinutes / 60) * baseRatePerHour);
+  const gameFinalAmount = blocks.reduce((sum, b) => sum + b.amount, 0);
+  const discountAmount = gameBasePrice - gameFinalAmount;
+  const discountPct = gameBasePrice > 0 ? Math.round((discountAmount / gameBasePrice) * 100 * 10) / 10 : 0;
+
+  const basePrice = gameBasePrice + accessorySurcharge;
+  const finalAmount = gameFinalAmount + accessorySurcharge;
+
+  return { 
+    basePrice, 
+    discountPct, 
+    discountAmount, 
+    finalAmount, 
+    breakdown: blocks,
+    accessorySurcharge 
+  };
 }

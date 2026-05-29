@@ -83,6 +83,10 @@ model Game {
   deposit         Decimal?  @db.Decimal(10, 2)
   isActive        Boolean   @default(true)
   totalUnits      Int       @default(1)
+  hasAccessories  Boolean   @default(false)
+  defaultAccessories Int     @default(0)
+  maxAccessories   Int       @default(0)
+  accessoryPrice   Decimal   @default(0.00) @db.Decimal(10, 2)
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
@@ -119,6 +123,7 @@ model Booking {
   startDateTime  DateTime
   endDateTime    DateTime
   durationMinutes Int
+  accessoriesCount Int         @default(0)
   bookingType    BookingType   @default(HOURLY)
   basePrice      Decimal       @db.Decimal(10, 2)
   discountPct    Decimal       @default(0) @db.Decimal(5, 2)

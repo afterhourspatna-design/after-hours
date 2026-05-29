@@ -10,6 +10,7 @@ const schema = z.object({
   startDateTime: z.string().datetime(),
   userId: z.string().optional().nullable(),
   excludeBookingId: z.string().optional().nullable(),
+  accessoriesCount: z.number().int().min(0).optional(),
 });
 
 export async function GET(req: NextRequest) {
@@ -23,13 +24,14 @@ export async function GET(req: NextRequest) {
     startDateTime: searchParams.get("startDateTime"),
     userId: searchParams.get("userId"),
     excludeBookingId: searchParams.get("excludeBookingId"),
+    accessoriesCount: parseInt(searchParams.get("accessoriesCount") ?? "0"),
   });
 
   if (!parsed.success) {
     return NextResponse.json({ error: "Invalid params" }, { status: 400 });
   }
 
-  const { gameId, durationMinutes, startDateTime, userId, excludeBookingId } = parsed.data;
+  const { gameId, durationMinutes, startDateTime, userId, excludeBookingId, accessoriesCount } = parsed.data;
 
   const pricing = await calculateBookingPrice({
     gameId,
@@ -37,12 +39,22 @@ export async function GET(req: NextRequest) {
     startDateTime: new Date(startDateTime),
     userId: userId ?? null,
     excludeBookingId: excludeBookingId ?? undefined,
+    accessoriesCount: accessoriesCount ?? 0,
   });
 
   // Also return game info
   const game = await prisma.game.findUnique({
     where: { id: gameId },
-    select: { name: true, basePrice: true, minTimeMinutes: true, maxTimeMinutes: true },
+    select: { 
+      name: true, 
+      basePrice: true, 
+      minTimeMinutes: true, 
+      maxTimeMinutes: true,
+      hasAccessories: true,
+      defaultAccessories: true,
+      maxAccessories: true,
+      accessoryPrice: true,
+    },
   });
 
   return NextResponse.json({ ...pricing, game });
