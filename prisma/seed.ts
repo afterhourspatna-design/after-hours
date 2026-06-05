@@ -123,9 +123,9 @@ async function main() {
       name: "PS5",
       tag: "ps5",
       description: "PlayStation 5 gaming station with latest titles",
-      basePrice: 800,
+      basePrice: 120,
       minTimeMinutes: 30,
-      maxTimeMinutes: 120,
+      maxTimeMinutes: 60,
       deposit: 500,
       isActive: true,
       totalUnits: 2,
@@ -141,9 +141,9 @@ async function main() {
       name: "Meta Quest",
       tag: "metaquest",
       description: "Virtual Reality gaming with Meta Quest 3",
-      basePrice: 700,
-      minTimeMinutes: 30,
-      maxTimeMinutes: 120,
+      basePrice: 200,
+      minTimeMinutes: 20,
+      maxTimeMinutes: 60,
       deposit: 500,
       isActive: true,
       totalUnits: 1,
@@ -152,10 +152,10 @@ async function main() {
 
   const soccerTable = await prisma.game.create({
     data: {
-      name: "Soccer Table",
+      name: "Under Soccer Table",
       tag: "soccer",
       description: "Table football for 2-4 players",
-      basePrice: 400,
+      basePrice: 150,
       minTimeMinutes: 30,
       maxTimeMinutes: 60,
       isActive: true,
@@ -168,7 +168,7 @@ async function main() {
       name: "Table Tennis",
       tag: "tabletennis",
       description: "Professional table tennis / ping pong",
-      basePrice: 400,
+      basePrice: 150,
       minTimeMinutes: 30,
       maxTimeMinutes: 60,
       isActive: true,
@@ -181,9 +181,9 @@ async function main() {
       name: "Pool Table",
       tag: "pool",
       description: "Billiards / Pool — 8-ball and 9-ball",
-      basePrice: 500,
+      basePrice: 150,
       minTimeMinutes: 30,
-      maxTimeMinutes: 120,
+      maxTimeMinutes: 60,
       isActive: true,
       totalUnits: 2,
     },
@@ -194,9 +194,9 @@ async function main() {
       name: "Basketball Hoop",
       tag: "basketball",
       description: "Indoor basketball shooting station",
-      basePrice: 300,
-      minTimeMinutes: 30,
-      maxTimeMinutes: 60,
+      basePrice: 20,
+      minTimeMinutes: 5,
+      maxTimeMinutes: 5,
       isActive: true,
       totalUnits: 1,
     },
@@ -207,9 +207,22 @@ async function main() {
       name: "Foosball",
       tag: "foosball",
       description: "Classic foosball table for quick games",
-      basePrice: 300,
+      basePrice: 150,
       minTimeMinutes: 30,
       maxTimeMinutes: 60,
+      isActive: true,
+      totalUnits: 1,
+    },
+  });
+
+  const dart = await prisma.game.create({
+    data: {
+      name: "Dart",
+      tag: "dart",
+      description: "Classic dart board station",
+      basePrice: 20,
+      minTimeMinutes: 5,
+      maxTimeMinutes: 5,
       isActive: true,
       totalUnits: 1,
     },
@@ -220,7 +233,7 @@ async function main() {
       name: "Event Booking",
       tag: "event",
       description: "Full venue event booking — 2hr or 4hr blocks",
-      basePrice: 5000,
+      basePrice: 750,
       minTimeMinutes: 120,
       maxTimeMinutes: 240,
       deposit: 2000,
@@ -239,6 +252,7 @@ async function main() {
   const pool2 = await prisma.resourceUnit.create({ data: { gameId: poolTable.id, unitName: "Pool Table - 2" } });
   const basketUnit = await prisma.resourceUnit.create({ data: { gameId: basketball.id, unitName: "Basketball Hoop - 1" } });
   const foosUnit = await prisma.resourceUnit.create({ data: { gameId: foosball.id, unitName: "Foosball - 1" } });
+  const dartUnit = await prisma.resourceUnit.create({ data: { gameId: dart.id, unitName: "Dart Board - 1" } });
   const eventUnit = await prisma.resourceUnit.create({ data: { gameId: eventSpace.id, unitName: "Event Space" } });
 
   // ─── Sample Bookings ──────────────────────────────────────────────────
