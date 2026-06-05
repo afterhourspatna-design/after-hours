@@ -94,13 +94,49 @@ export default function BookingForm({ mode = "create", initialData, prefillDate,
 
   const [durationMinutes, setDurationMinutes] = useState(initialData?.durationMinutes ?? 60);
 
+  // Determine dynamic durations based on selected game
+  const getGameDurations = useCallback(() => {
+    if (!selectedGame) return DURATIONS;
+    switch (selectedGame.tag) {
+      case "basketball":
+      case "dart":
+        return [5];
+      case "metaquest":
+        return [20, 30, 40, 60];
+      case "foosball":
+      case "soccer":
+      case "ps5":
+      case "tabletennis":
+      case "pool":
+        return [30, 60];
+      case "event":
+        return [120, 180, 240];
+      default:
+        return [60];
+    }
+  }, [selectedGame]);
+
+  const gameDurations = getGameDurations();
+
+  // Adjust duration automatically on game change
+  useEffect(() => {
+    if (!selectedGame) return;
+    const allowed = getGameDurations();
+    if (!allowed.includes(durationMinutes)) {
+      setDurationMinutes(allowed[0]);
+    }
+  }, [selectedGame, getGameDurations]);
+
   // Booking details
   const [bookingType, setBookingType] = useState(initialData?.bookingType ?? "HOURLY");
   const [source, setSource] = useState(initialData?.source ?? "WALK_IN");
   const [paymentStatus, setPaymentStatus] = useState(initialData?.paymentStatus ?? "UNPAID");
   const [notes, setNotes] = useState(initialData?.notes ?? "");
   const [priceOverride, setPriceOverride] = useState<string>("");
-  const [accessoriesCount, setAccessoriesCount] = useState<number>(initialData?.accessoriesCount ?? 0);
+  const [accessoriesCount, setAccessoriesCount] = useState<number>(
+    initialData?.accessoriesCount ?? 
+    (initialData?.gameId ? 0 : 0)
+  );
 
   // Coupon states
   const [couponCode, setCouponCode] = useState(initialData?.coupon?.code ?? "");
@@ -124,7 +160,7 @@ export default function BookingForm({ mode = "create", initialData, prefillDate,
         if (g) {
           setSelectedGame(g);
           if (mode === "create") {
-            setAccessoriesCount(g.defaultAccessories ?? 0);
+            setAccessoriesCount(g.tag === "ps5" ? 1 : g.tag === "tabletennis" ? 2 : g.tag === "pool" ? 2 : 0);
           }
         }
       }
@@ -398,7 +434,11 @@ export default function BookingForm({ mode = "create", initialData, prefillDate,
                     const g = games.find(g => g.id === e.target.value) ?? null;
                     setSelectedGame(g);
                     setSelectedUnit("");
-                    setAccessoriesCount(g ? (g.defaultAccessories ?? 0) : 0);
+                    if (g) {
+                      setAccessoriesCount(g.tag === "ps5" ? 1 : g.tag === "tabletennis" ? 2 : g.tag === "pool" ? 2 : 0);
+                    } else {
+                      setAccessoriesCount(0);
+                    }
                   }}
                   className="input-field"
                 >
@@ -426,42 +466,95 @@ export default function BookingForm({ mode = "create", initialData, prefillDate,
               </div>
             </div>
 
-            {selectedGame?.hasAccessories && (
-              <div className="pt-4 border-t border-zinc-800/80 space-y-3">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <label className="text-xs font-semibold text-zinc-300 block">Accessories</label>
-                    <span className="text-[10px] text-zinc-500 font-medium block leading-tight mt-0.5">
-                      (Up to {selectedGame.defaultAccessories} included free. Extra accessories: Rs. {Number(selectedGame.accessoryPrice)}/hr each. Max: {selectedGame.maxAccessories})
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-3 bg-zinc-900 border border-zinc-800 rounded-xl p-1">
-                    <button
-                      type="button"
-                      onClick={() => setAccessoriesCount(c => Math.max(0, c - 1))}
-                      disabled={accessoriesCount === 0}
-                      className="w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold text-zinc-400 hover:text-white hover:bg-zinc-800 disabled:opacity-40 disabled:hover:bg-transparent transition-all"
-                    >
-                      -
-                    </button>
-                    <span className="text-sm font-bold text-white w-4 text-center">
-                      {accessoriesCount}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => setAccessoriesCount(c => Math.min(selectedGame.maxAccessories, c + 1))}
-                      disabled={accessoriesCount >= selectedGame.maxAccessories}
-                      className="w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold text-zinc-400 hover:text-white hover:bg-zinc-800 disabled:opacity-40 disabled:hover:bg-transparent transition-all"
-                    >
-                      +
-                    </button>
-                  </div>
+            {selectedGame && ["ps5", "tabletennis", "pool"].includes(selectedGame.tag) && (
+              <div className="pt-4 border-t border-zinc-800/80 space-y-3 animate-in fade-in duration-300">
+                <label className="text-xs font-semibold text-zinc-300 block">
+                  {selectedGame.tag === "ps5" ? "Controller Configuration" : selectedGame.tag === "tabletennis" ? "Racquet Options" : "Pool Stick Options"}
+                </label>
+                <div className={cn(
+                  "grid gap-3",
+                  selectedGame.tag === "ps5" ? "grid-cols-2 sm:grid-cols-4" : "grid-cols-2"
+                )}>
+                  {selectedGame.tag === "ps5" && [
+                    { count: 1, label: "1 Controller", price30: 80, price60: 120 },
+                    { count: 2, label: "2 Controllers", price30: 100, price60: 150 },
+                    { count: 3, label: "3 Controllers", price30: 120, price60: 180 },
+                    { count: 4, label: "4 Controllers", price30: 150, price60: 200 },
+                  ].map((opt) => {
+                    const active = accessoriesCount === opt.count;
+                    const price = durationMinutes <= 30 ? opt.price30 : opt.price60;
+                    return (
+                      <button
+                        key={opt.count}
+                        type="button"
+                        onClick={() => setAccessoriesCount(opt.count)}
+                        className={cn(
+                          "flex flex-col items-center justify-center p-3.5 rounded-xl border text-center transition-all duration-300",
+                          active
+                            ? "bg-gradient-to-br from-violet-600/35 to-fuchsia-600/35 border-violet-500 shadow-lg shadow-violet-500/10 text-white scale-[1.02]"
+                            : "bg-zinc-900/60 border-zinc-800 hover:border-zinc-700 text-zinc-400 hover:text-zinc-300"
+                        )}
+                      >
+                        <span className="text-xs font-bold tracking-wide">{opt.label}</span>
+                        <span className={cn("text-sm font-black mt-1", active ? "text-violet-400" : "text-zinc-500")}>
+                          ₹{price}
+                        </span>
+                      </button>
+                    );
+                  })}
+
+                  {selectedGame.tag === "tabletennis" && [
+                    { count: 2, label: "2 Racquets", price30: 80, price60: 150 },
+                    { count: 4, label: "4 Racquets", price30: 120, price60: 200 },
+                  ].map((opt) => {
+                    const active = accessoriesCount === opt.count;
+                    const price = durationMinutes <= 30 ? opt.price30 : opt.price60;
+                    return (
+                      <button
+                        key={opt.count}
+                        type="button"
+                        onClick={() => setAccessoriesCount(opt.count)}
+                        className={cn(
+                          "flex flex-col items-center justify-center p-3.5 rounded-xl border text-center transition-all duration-300",
+                          active
+                            ? "bg-gradient-to-br from-violet-600/35 to-fuchsia-600/35 border-violet-500 shadow-lg shadow-violet-500/10 text-white scale-[1.02]"
+                            : "bg-zinc-900/60 border-zinc-800 hover:border-zinc-700 text-zinc-400 hover:text-zinc-300"
+                        )}
+                      >
+                        <span className="text-xs font-bold tracking-wide">{opt.label}</span>
+                        <span className={cn("text-sm font-black mt-1", active ? "text-violet-400" : "text-zinc-500")}>
+                          ₹{price}
+                        </span>
+                      </button>
+                    );
+                  })}
+
+                  {selectedGame.tag === "pool" && [
+                    { count: 2, label: "2 Sticks", price30: 80, price60: 150 },
+                    { count: 4, label: "4 Sticks", price30: 100, price60: 180 },
+                  ].map((opt) => {
+                    const active = accessoriesCount === opt.count;
+                    const price = durationMinutes <= 30 ? opt.price30 : opt.price60;
+                    return (
+                      <button
+                        key={opt.count}
+                        type="button"
+                        onClick={() => setAccessoriesCount(opt.count)}
+                        className={cn(
+                          "flex flex-col items-center justify-center p-3.5 rounded-xl border text-center transition-all duration-300",
+                          active
+                            ? "bg-gradient-to-br from-violet-600/35 to-fuchsia-600/35 border-violet-500 shadow-lg shadow-violet-500/10 text-white scale-[1.02]"
+                            : "bg-zinc-900/60 border-zinc-800 hover:border-zinc-700 text-zinc-400 hover:text-zinc-300"
+                        )}
+                      >
+                        <span className="text-xs font-bold tracking-wide">{opt.label}</span>
+                        <span className={cn("text-sm font-black mt-1", active ? "text-violet-400" : "text-zinc-500")}>
+                          ₹{price}
+                        </span>
+                      </button>
+                    );
+                  })}
                 </div>
-                {accessoriesCount > selectedGame.defaultAccessories && (
-                  <p className="text-xs text-emerald-400 font-medium animate-pulse">
-                    ✨ Extra {(accessoriesCount - selectedGame.defaultAccessories)} accessories charged at Rs. {Number(selectedGame.accessoryPrice)}/hour.
-                  </p>
-                )}
               </div>
             )}
           </div>
@@ -500,17 +593,14 @@ export default function BookingForm({ mode = "create", initialData, prefillDate,
                   )}
                 </label>
                 <div className="flex gap-1.5 flex-wrap">
-                  {DURATIONS.filter(d => {
-                    if (!selectedGame) return d <= 120;
-                    return d >= selectedGame.minTimeMinutes && d <= selectedGame.maxTimeMinutes;
-                  }).map(d => (
+                  {gameDurations.map(d => (
                     <button key={d} type="button"
                       onClick={() => setDurationMinutes(d)}
                       className={cn("px-2.5 py-1.5 rounded-lg text-xs font-medium border transition-all",
                         durationMinutes === d
                           ? "bg-violet-600 border-violet-600 text-white"
                           : "bg-zinc-800/60 border-zinc-700 text-zinc-400 hover:border-zinc-600")}>
-                      {d < 60 ? `${d}m` : `${d / 60}h`}
+                      {d === 5 ? "5m" : d < 60 ? `${d}m` : `${d / 60}h`}
                     </button>
                   ))}
                 </div>

@@ -1,14 +1,13 @@
 import { prisma } from "@/lib/prisma";
-import { Decimal } from "@prisma/client/runtime/library";
 import { startOfDay, endOfDay } from "date-fns";
 
 export interface PriceCalculation {
-  basePrice: number;           // unit price × hours + accessory surcharge (no discount on accessories)
-  discountPct: number;         // effective discount percentage applied
-  discountAmount: number;      // rupees saved
-  finalAmount: number;         // amount to charge
+  basePrice: number;           // base cost of the game block + accessories
+  discountPct: number;         // progressive same-day discount (now always 0)
+  discountAmount: number;      // progressive savings (now always 0)
+  finalAmount: number;         // amount to charge after coupon
   breakdown: HourBlock[];      // per-block breakdown
-  accessorySurcharge: number;  // accessory rental surcharge
+  accessorySurcharge: number;  // surcharge for extra hardware accessories (now always 0 since it is built-in)
   couponDiscount?: number;     // coupon discount applied
   couponCode?: string;         // coupon code applied
   couponError?: string;        // coupon validation error if any
@@ -23,12 +22,154 @@ export interface HourBlock {
 }
 
 /**
+ * Custom helper to calculate the base amount for a block of time, based on game tag and accessories.
+ */
+/**
+ * Helper to extract the local hour and minute for the Asia/Kolkata (IST) timezone.
+ * Falls back to local system timezone if formatting fails.
+ */
+function getLocalHourAndMinute(date: Date): { hour: number; minute: number } {
+  try {
+    const formatter = new Intl.DateTimeFormat("en-US", {
+      timeZone: "Asia/Kolkata",
+      hour12: false,
+      hour: "numeric",
+      minute: "numeric",
+    });
+    const parts = formatter.formatToParts(date);
+    const hourVal = parts.find(p => p.type === "hour")?.value;
+    const minuteVal = parts.find(p => p.type === "minute")?.value;
+    if (hourVal !== undefined && minuteVal !== undefined) {
+      return { hour: parseInt(hourVal, 10), minute: parseInt(minuteVal, 10) };
+    }
+  } catch (e) {
+    console.error("Timezone formatter error", e);
+  }
+  return { hour: date.getHours(), minute: date.getMinutes() };
+}
+
+/**
+ * Custom helper to calculate the base amount for a block of time, based on game tag and accessories.
+ */
+function calculateBlockBaseAmount(params: {
+  tag: string;
+  durationMinutes: number;
+  blockMinutes: number;
+  blockNumber: number;
+  accessoriesCount: number;
+  baseRatePerHour: number;
+  startDateTime?: Date;
+}): number {
+  const { tag, durationMinutes, blockMinutes, blockNumber, accessoriesCount, baseRatePerHour, startDateTime } = params;
+
+  if (tag === "ps5") {
+    // PS5 Rates:
+    // 1 Controller: 30m = 80, 1h = 120
+    // 2 Controllers: 30m = 100, 1h = 150
+    // 3 Controllers: 30m = 120, 1h = 180
+    // 4 Controllers: 30m = 150, 1h = 200
+    let rHalf = 80;
+    let rHour = 120;
+    if (accessoriesCount === 2) {
+      rHalf = 100;
+      rHour = 150;
+    } else if (accessoriesCount === 3) {
+      rHalf = 120;
+      rHour = 180;
+    } else if (accessoriesCount === 4) {
+      rHalf = 150;
+      rHour = 200;
+    }
+
+    if (blockMinutes <= 30) {
+      return rHalf;
+    }
+    return rHour;
+  }
+
+  if (tag === "metaquest") {
+    // Meta Quest Rates: 20m: ₹80, 30m: ₹120, 40m: ₹150, 60m: ₹200
+    if (blockMinutes <= 20) return 80;
+    if (blockMinutes <= 30) return 120;
+    if (blockMinutes <= 40) return 150;
+    return 200;
+  }
+
+  if (tag === "foosball") {
+    // Foosball: 30m = ₹80, 1h = ₹150
+    if (blockMinutes <= 30) return 80;
+    return 150;
+  }
+
+  if (tag === "soccer") {
+    // Under Soccer: 30m = ₹50, 1h = ₹100
+    if (blockMinutes <= 30) return 50;
+    return 100;
+  }
+
+  if (tag === "tabletennis") {
+    // Table Tennis:
+    // 2 Racquets: 30m = ₹80, 1h = ₹150
+    // 4 Racquets: 30m = ₹120, 1h = ₹200
+    let rHalf = 80;
+    let rHour = 150;
+    if (accessoriesCount === 4) {
+      rHalf = 120;
+      rHour = 200;
+    }
+    if (blockMinutes <= 30) {
+      return rHalf;
+    }
+    return rHour;
+  }
+
+  if (tag === "pool") {
+    // Pool Table:
+    // 2 Sticks: 30m = ₹80, 1h = ₹150
+    // 4 Sticks: 30m = ₹100, 1h = ₹180
+    let rHalf = 80;
+    let rHour = 150;
+    if (accessoriesCount === 4) {
+      rHalf = 100;
+      rHour = 180;
+    }
+    if (blockMinutes <= 30) {
+      return rHalf;
+    }
+    return rHour;
+  }
+
+  if (tag === "basketball" || tag === "dart") {
+    // Basketball & Dart: ₹20 flat
+    return blockNumber === 1 ? 20 : 0;
+  }
+
+  if (tag === "event") {
+    // Event Booking:
+    // 11:00 AM – 5:00 PM: ₹750 per hour
+    // After 5:00 PM: ₹1,000 per hour
+    const startDT = startDateTime || new Date();
+    const { hour: startHour, minute: startMin } = getLocalHourAndMinute(startDT);
+    const startMinutesOfDay = startHour * 60 + startMin;
+    
+    let total = 0;
+    const startOffset = (blockNumber - 1) * 60;
+    
+    for (let m = 0; m < blockMinutes; m++) {
+      const currentMin = (startMinutesOfDay + startOffset + m) % 1440;
+      const currentHour = Math.floor(currentMin / 60);
+      const minRate = (currentHour >= 11 && currentHour < 17) ? (750 / 60) : (1000 / 60);
+      total += minRate;
+    }
+    return Math.round(total);
+  }
+
+  return (blockMinutes / 60) * baseRatePerHour;
+}
+
+/**
  * Calculates price for a new booking, applying same-day per-user discounts:
- *   Hour 1        → full price
- *   Hour 2        → 5% discount
- *   Hour 3+       → 15% discount
- *
- * Guest bookings (userId = null) never get discounts.
+ * (Progressive discounts are now disabled per request)
  */
 export async function calculateBookingPrice(params: {
   gameId: string;
@@ -43,9 +184,7 @@ export async function calculateBookingPrice(params: {
   const { 
     gameId, 
     durationMinutes, 
-    startDateTime, 
-    userId, 
-    excludeBookingId, 
+    startDateTime,
     accessoriesCount = 0,
     couponCode,
     userRole
@@ -54,74 +193,46 @@ export async function calculateBookingPrice(params: {
   const game = await prisma.game.findUniqueOrThrow({ where: { id: gameId } });
   const baseRatePerHour = Number(game.basePrice);
 
-  // Fetch same-day existing hours for this user
-  let existingMinutesOnDay = 0;
-  if (userId) {
-    const dayStart = startOfDay(startDateTime);
-    const dayEnd = endOfDay(startDateTime);
-
-    const existing = await prisma.booking.findMany({
-      where: {
-        userId,
-        bookingStatus: { in: ["HOLD", "PENDING", "CONFIRMED"] },
-        startDateTime: { gte: dayStart, lte: dayEnd },
-        ...(excludeBookingId ? { id: { not: excludeBookingId } } : {}),
-      },
-      select: { durationMinutes: true },
-    });
-
-    existingMinutesOnDay = existing.reduce((sum, b) => sum + b.durationMinutes, 0);
-  }
-
-  // Build per-30-min blocks (minimum slot unit)
+  // Build per-block distribution (minimum slot unit)
   const blocks: HourBlock[] = [];
   let remainingMinutes = durationMinutes;
-  let accumulatedMinutes = existingMinutesOnDay;
   let blockNumber = 1;
 
   while (remainingMinutes > 0) {
     const blockMinutes = Math.min(remainingMinutes, 60);
-    const cumulativeHours = (accumulatedMinutes + blockMinutes) / 60;
 
-    let discountPct = 0;
-    if (userId) {
-      if (cumulativeHours > 2) discountPct = 15;
-      else if (cumulativeHours > 1) discountPct = 5;
-    }
+    const blockBaseAmount = calculateBlockBaseAmount({
+      tag: game.tag,
+      durationMinutes,
+      blockMinutes,
+      blockNumber,
+      accessoriesCount,
+      baseRatePerHour,
+      startDateTime,
+    });
 
-    const proRatedRate = (blockMinutes / 60) * baseRatePerHour;
-    const discountedAmount = proRatedRate * (1 - discountPct / 100);
+    const discountPct = 0; // Disabled same-day progressive discounts
+    const amount = Math.round(blockBaseAmount);
 
     blocks.push({
       blockNumber,
       durationMinutes: blockMinutes,
       ratePerHour: baseRatePerHour,
       discountPct,
-      amount: Math.round(discountedAmount),
+      amount,
     });
 
-    accumulatedMinutes += blockMinutes;
     remainingMinutes -= blockMinutes;
     blockNumber++;
   }
 
-  // Calculate accessory surcharge (flat surcharge, not subject to user discounts)
-  let accessorySurcharge = 0;
-  if (game.hasAccessories) {
-    const extraAccessories = Math.max(0, accessoriesCount - game.defaultAccessories);
-    const ratePerExtra = Number(game.accessoryPrice);
-    accessorySurcharge = Math.round(ratePerExtra * extraAccessories * (durationMinutes / 60));
-  }
+  const gameBasePrice = blocks.reduce((sum, b) => sum + b.amount, 0);
+  const gameFinalAmount = gameBasePrice;
+  const discountAmount = 0;
+  const discountPct = 0;
 
-  const gameBasePrice = Math.round((durationMinutes / 60) * baseRatePerHour);
-  const gameFinalAmount = blocks.reduce((sum, b) => sum + b.amount, 0);
-  const discountAmount = gameBasePrice - gameFinalAmount;
-
-  // Weighted average discount percentage (on game pricing only)
-  const discountPct = gameBasePrice > 0 ? Math.round((discountAmount / gameBasePrice) * 100 * 10) / 10 : 0;
-
-  const basePrice = gameBasePrice + accessorySurcharge;
-  let finalAmount = gameFinalAmount + accessorySurcharge;
+  const basePrice = gameBasePrice;
+  let finalAmount = gameFinalAmount;
 
   // Coupon processing
   let couponDiscount = 0;
@@ -165,7 +276,7 @@ export async function calculateBookingPrice(params: {
     discountAmount, 
     finalAmount, 
     breakdown: blocks,
-    accessorySurcharge,
+    accessorySurcharge: 0,
     couponDiscount,
     couponCode: finalCouponCode,
     couponError
@@ -173,7 +284,7 @@ export async function calculateBookingPrice(params: {
 }
 
 /**
- * Quick sync version for display — uses pre-known existing hours
+ * Quick sync version for display
  */
 export function calculatePriceSync(params: {
   baseRatePerHour: number;
@@ -187,60 +298,61 @@ export function calculatePriceSync(params: {
   couponDiscount?: number;
   couponCode?: string;
   couponError?: string;
+  gameTag?: string;
+  startDateTime?: Date | string;
 }): PriceCalculation {
   const { 
     baseRatePerHour, 
     durationMinutes, 
-    existingMinutesOnDay, 
-    isGuest,
-    hasAccessories = false,
-    defaultAccessories = 0,
-    accessoryPrice = 0,
     accessoriesCount = 0,
     couponDiscount = 0,
     couponCode,
-    couponError
+    couponError,
+    gameTag = "ps5",
+    startDateTime
   } = params;
+
+  const startDT = startDateTime ? new Date(startDateTime) : new Date();
 
   const blocks: HourBlock[] = [];
   let remainingMinutes = durationMinutes;
-  let accumulatedMinutes = existingMinutesOnDay;
   let blockNumber = 1;
 
   while (remainingMinutes > 0) {
     const blockMinutes = Math.min(remainingMinutes, 60);
-    const cumulativeHours = (accumulatedMinutes + blockMinutes) / 60;
 
-    let discountPct = 0;
-    if (!isGuest) {
-      if (cumulativeHours > 2) discountPct = 15;
-      else if (cumulativeHours > 1) discountPct = 5;
-    }
+    const blockBaseAmount = calculateBlockBaseAmount({
+      tag: gameTag,
+      durationMinutes,
+      blockMinutes,
+      blockNumber,
+      accessoriesCount,
+      baseRatePerHour,
+      startDateTime: startDT,
+    });
 
-    const proRatedRate = (blockMinutes / 60) * baseRatePerHour;
-    const amount = Math.round(proRatedRate * (1 - discountPct / 100));
+    const discountPct = 0; // Disabled same-day progressive discounts
+    const amount = Math.round(blockBaseAmount);
 
-    blocks.push({ blockNumber, durationMinutes: blockMinutes, ratePerHour: baseRatePerHour, discountPct, amount });
+    blocks.push({
+      blockNumber,
+      durationMinutes: blockMinutes,
+      ratePerHour: baseRatePerHour,
+      discountPct,
+      amount,
+    });
 
-    accumulatedMinutes += blockMinutes;
     remainingMinutes -= blockMinutes;
     blockNumber++;
   }
 
-  // Calculate accessory surcharge
-  let accessorySurcharge = 0;
-  if (hasAccessories) {
-    const extraAccessories = Math.max(0, accessoriesCount - defaultAccessories);
-    accessorySurcharge = Math.round(accessoryPrice * extraAccessories * (durationMinutes / 60));
-  }
+  const gameBasePrice = blocks.reduce((sum, b) => sum + b.amount, 0);
+  const gameFinalAmount = gameBasePrice;
+  const discountAmount = 0;
+  const discountPct = 0;
 
-  const gameBasePrice = Math.round((durationMinutes / 60) * baseRatePerHour);
-  const gameFinalAmount = blocks.reduce((sum, b) => sum + b.amount, 0);
-  const discountAmount = gameBasePrice - gameFinalAmount;
-  const discountPct = gameBasePrice > 0 ? Math.round((discountAmount / gameBasePrice) * 100 * 10) / 10 : 0;
-
-  const basePrice = gameBasePrice + accessorySurcharge;
-  let finalAmount = gameFinalAmount + accessorySurcharge;
+  const basePrice = gameBasePrice;
+  let finalAmount = gameFinalAmount;
   if (couponDiscount) {
     finalAmount = Math.max(0, finalAmount - couponDiscount);
   }
@@ -251,7 +363,7 @@ export function calculatePriceSync(params: {
     discountAmount, 
     finalAmount, 
     breakdown: blocks,
-    accessorySurcharge,
+    accessorySurcharge: 0,
     couponDiscount,
     couponCode,
     couponError
