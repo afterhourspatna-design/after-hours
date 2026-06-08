@@ -20,8 +20,8 @@ export default function SettingsPage() {
     // Load from env defaults shown as placeholders — in production, fetch from /api/settings
     setSettings({
       venue_name: "After Hours Gaming Parlour",
-      venue_phone: "+92-300-0000000",
-      venue_email: "info@afterhours.pk",
+      venue_phone: "+91-300-0000000",
+      venue_email: "info@afterhours.in",
       currency_symbol: "Rs",
       operating_hours_start: "10:00",
       operating_hours_end: "24:00",

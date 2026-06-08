@@ -26,8 +26,8 @@ async function main() {
     data: [
       { key: "currency_symbol", value: "Rs" },
       { key: "venue_name", value: "After Hours Gaming Parlour" },
-      { key: "venue_phone", value: "+92-300-0000000" },
-      { key: "venue_email", value: "info@afterhours.pk" },
+      { key: "venue_phone", value: "+91-300-0000000" },
+      { key: "venue_email", value: "info@afterhours.in" },
       { key: "operating_hours_start", value: "10:00" },
       { key: "operating_hours_end", value: "24:00" },
       { key: "feature_customer_portal", value: "false" },
@@ -61,8 +61,8 @@ async function main() {
   const admin = await prisma.appUser.create({
     data: {
       name: "Admin",
-      phone: "+92-300-1111111",
-      email: "admin@afterhours.pk",
+      phone: "+91-300-1111111",
+      email: "admin@afterhours.in",
       passwordHash: adminHash,
       role: Role.ADMIN,
       notes: "Super admin — change password after first login",
@@ -72,8 +72,8 @@ async function main() {
   const staff1 = await prisma.appUser.create({
     data: {
       name: "Bilal (Staff)",
-      phone: "+92-300-2222222",
-      email: "bilal@afterhours.pk",
+      phone: "+91-300-2222222",
+      email: "bilal@afterhours.in",
       passwordHash: staffHash,
       role: Role.STAFF,
     },
@@ -82,8 +82,8 @@ async function main() {
   const staff2 = await prisma.appUser.create({
     data: {
       name: "Sara (Staff)",
-      phone: "+92-300-3333333",
-      email: "sara@afterhours.pk",
+      phone: "+91-300-3333333",
+      email: "sara@afterhours.in",
       passwordHash: staffHash,
       role: Role.STAFF,
     },
@@ -92,7 +92,7 @@ async function main() {
   const customer1 = await prisma.appUser.create({
     data: {
       name: "Ahmed Khan",
-      phone: "+92-333-1001001",
+      phone: "+91-333-1001001",
       email: "ahmed@example.com",
       passwordHash: custHash,
       role: Role.CUSTOMER,
@@ -102,7 +102,7 @@ async function main() {
   const customer2 = await prisma.appUser.create({
     data: {
       name: "Fatima Malik",
-      phone: "+92-333-2002002",
+      phone: "+91-333-2002002",
       email: "fatima@example.com",
       passwordHash: custHash,
       role: Role.CUSTOMER,
@@ -112,7 +112,7 @@ async function main() {
   const customer3 = await prisma.appUser.create({
     data: {
       name: "Usman Tariq",
-      phone: "+92-333-3003003",
+      phone: "+91-333-3003003",
       role: Role.CUSTOMER,
     },
   });
@@ -274,7 +274,7 @@ async function main() {
       bookingStatus: BookingStatus.COMPLETED, source: BookingSource.PHONE,
     },
     {
-      guestName: "Zaid Guest", guestPhone: "+92-321-9999999", gameId: metaQuest.id, resourceUnitId: metaUnit.id,
+      guestName: "Zaid Guest", guestPhone: "+91-321-9999999", gameId: metaQuest.id, resourceUnitId: metaUnit.id,
       startDateTime: setHours(subDays(today, 4), 16), endDateTime: setHours(subDays(today, 4), 17),
       durationMinutes: 60, bookingType: BookingType.HOURLY, basePrice: 700, discountPct: 0,
       discountAmount: 0, finalAmount: 700, paymentStatus: PaymentStatus.PAID,
@@ -284,7 +284,7 @@ async function main() {
       userId: customer3.id, gameId: ps5.id, resourceUnitId: ps5Unit2.id,
       startDateTime: setHours(subDays(today, 3), 20), endDateTime: setHours(subDays(today, 3), 22),
       durationMinutes: 120, bookingType: BookingType.HOURLY, basePrice: 1600, discountPct: 0,
-      discountAmount: 0, finalAmount: 1600, paymentStatus: PaymentStatus.PARTIAL,
+      discountAmount: 0, finalAmount: 1600, paymentStatus: PaymentStatus.UNPAID,
       bookingStatus: BookingStatus.COMPLETED, source: BookingSource.INSTAGRAM,
     },
     {
@@ -303,7 +303,7 @@ async function main() {
       bookingStatus: BookingStatus.COMPLETED, source: BookingSource.WALK_IN,
     },
     {
-      guestName: "Hamza Walk-in", guestPhone: "+92-300-8888888", gameId: poolTable.id, resourceUnitId: pool2.id,
+      guestName: "Hamza Walk-in", guestPhone: "+91-300-8888888", gameId: poolTable.id, resourceUnitId: pool2.id,
       startDateTime: setHours(subDays(today, 1), 21), endDateTime: setHours(subDays(today, 1), 22),
       durationMinutes: 60, bookingType: BookingType.HOURLY, basePrice: 500, discountPct: 0,
       discountAmount: 0, finalAmount: 500, paymentStatus: PaymentStatus.UNPAID,
@@ -326,7 +326,7 @@ async function main() {
       bookingStatus: BookingStatus.PENDING, source: BookingSource.PHONE,
     },
     {
-      guestName: "Walk-in Guest", guestPhone: "+92-312-7777777", gameId: soccerTable.id, resourceUnitId: soccerUnit.id,
+      guestName: "Walk-in Guest", guestPhone: "+91-312-7777777", gameId: soccerTable.id, resourceUnitId: soccerUnit.id,
       startDateTime: addHours(today, 1), endDateTime: addHours(today, 2),
       durationMinutes: 60, bookingType: BookingType.HOURLY, basePrice: 400, discountPct: 0,
       discountAmount: 0, finalAmount: 400, paymentStatus: PaymentStatus.PAID,
@@ -337,7 +337,7 @@ async function main() {
       userId: customer3.id, gameId: ps5.id, resourceUnitId: ps5Unit2.id,
       startDateTime: setHours(addDays(today, 1), 16), endDateTime: setHours(addDays(today, 1), 18),
       durationMinutes: 120, bookingType: BookingType.HOURLY, basePrice: 1600, discountPct: 0,
-      discountAmount: 0, finalAmount: 1600, paymentStatus: PaymentStatus.PARTIAL,
+      discountAmount: 0, finalAmount: 1600, paymentStatus: PaymentStatus.UNPAID,
       bookingStatus: BookingStatus.CONFIRMED, source: BookingSource.ONLINE,
       notes: "Advance booking — call to confirm",
     },
@@ -349,10 +349,10 @@ async function main() {
       bookingStatus: BookingStatus.PENDING, source: BookingSource.INSTAGRAM,
     },
     {
-      guestName: "Corporate Event", guestPhone: "+92-300-5555555", gameId: eventSpace.id, resourceUnitId: eventUnit.id,
+      guestName: "Corporate Event", guestPhone: "+91-300-5555555", gameId: eventSpace.id, resourceUnitId: eventUnit.id,
       startDateTime: setHours(addDays(today, 3), 18), endDateTime: setHours(addDays(today, 3), 22),
       durationMinutes: 240, bookingType: BookingType.EVENT, basePrice: 20000, discountPct: 0,
-      discountAmount: 0, finalAmount: 20000, paymentStatus: PaymentStatus.PARTIAL,
+      discountAmount: 0, finalAmount: 20000, paymentStatus: PaymentStatus.UNPAID,
       bookingStatus: BookingStatus.CONFIRMED, source: BookingSource.REFERRAL,
       notes: "Corporate team night — confirm headcount 48hrs before",
     },
@@ -405,8 +405,8 @@ async function main() {
   console.log(`   📦 Units:     10`);
   console.log(`   📅 Bookings:  ${bookingData.length}`);
   console.log(`\n🔑 Login credentials:`);
-  console.log(`   Admin:    admin@afterhours.pk  / admin123`);
-  console.log(`   Staff:    bilal@afterhours.pk  / staff123`);
+  console.log(`   Admin:    admin@afterhours.in  / admin123`);
+  console.log(`   Staff:    bilal@afterhours.in  / staff123`);
   console.log(`   Customer: ahmed@example.com    / customer123`);
 }
 

@@ -88,7 +88,7 @@ function UserModal({ user, onClose, onSaved }: UserModalProps) {
           <div>
             <label className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider mb-1.5 block">Phone Number (10 Digits) *</label>
             <div className="relative">
-               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-zinc-500 font-bold">+92</span>
+               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-zinc-500 font-bold">+91</span>
                <input 
                  type="tel"
                  maxLength={10}
@@ -207,7 +207,7 @@ export default function UsersPage() {
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-bold text-white group-hover:text-violet-400 transition-colors duration-300">{u.name}</p>
                   <div className="flex items-center gap-4 mt-1">
-                    <span className="flex items-center gap-1.5 text-xs text-zinc-400 font-medium"><Phone className="w-3 h-3 text-zinc-600" /> +92 {u.phone}</span>
+                    <span className="flex items-center gap-1.5 text-xs text-zinc-400 font-medium"><Phone className="w-3 h-3 text-zinc-600" /> +91 {u.phone}</span>
                     {u.email && <span className="flex items-center gap-1.5 text-xs text-zinc-500 font-medium"><Mail className="w-3 h-3 text-zinc-600" /> {u.email}</span>}
                   </div>
                 </div>

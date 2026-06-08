@@ -111,7 +111,7 @@ export default function SignupPage() {
               <label className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider mb-1 block">Phone Number *</label>
               <div className="relative">
                 <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-600" />
-                <span className="absolute left-10 top-1/2 -translate-y-1/2 text-sm text-zinc-500 font-bold">+92</span>
+                <span className="absolute left-10 top-1/2 -translate-y-1/2 text-sm text-zinc-500 font-bold">+91</span>
                 <input
                   required
                   type="tel"

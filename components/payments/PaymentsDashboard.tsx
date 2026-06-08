@@ -31,6 +31,7 @@ interface Booking {
   user: { name: string; phone: string } | null;
   updatedAt: string | null;
   paymentId: string | null;
+  snacksAmount: number | null;
 }
 
 interface PaymentGroup {
@@ -41,6 +42,7 @@ interface PaymentGroup {
   totalNegotiated: number;
   totalCash: number;
   totalOnline: number;
+  totalSnacks: number;
   customerNames: string;
   bookings: Booking[];
 }
@@ -62,6 +64,7 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
 
   // Payment Form States
   const [negotiatedInput, setNegotiatedInput] = useState("");
+  const [snacksInput, setSnacksInput] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<"CASH" | "ONLINE" | "MIXED">("ONLINE");
   const [cashInput, setCashInput] = useState("");
   const [onlineInput, setOnlineInput] = useState("");
@@ -86,6 +89,7 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
           totalNegotiated: 0,
           totalCash: 0,
           totalOnline: 0,
+          totalSnacks: 0,
           customerNames: "",
           bookings: [],
         });
@@ -96,6 +100,7 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
       group.totalNegotiated += Number(b.negotiatedAmount ?? b.finalAmount);
       group.totalCash += Number(b.cashAmount ?? 0);
       group.totalOnline += Number(b.onlineAmount ?? 0);
+      group.totalSnacks += Number(b.snacksAmount ?? 0);
       group.bookings.push(b);
     });
 
@@ -180,6 +185,7 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
   const handleOpenPayModal = () => {
     if (selectedIds.size === 0) return;
     setNegotiatedInput(String(totalActualAmount));
+    setSnacksInput("");
     setPaymentMethod("ONLINE");
     setCashInput("");
     setOnlineInput("");
@@ -188,24 +194,28 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
 
   // Real-time values
   const totalNegotiatedVal = Number(negotiatedInput) || 0;
+  const snacksVal = Number(snacksInput) || 0;
   const cashVal = Number(cashInput) || 0;
   const onlineVal = Number(onlineInput) || 0;
+  const totalWithSnacks = totalNegotiatedVal + snacksVal;
 
   // Real-time validations
-  const isSplitInvalid = paymentMethod === "MIXED" && Math.abs(cashVal + onlineVal - totalNegotiatedVal) > 0.01;
+  const isSplitInvalid = paymentMethod === "MIXED" && Math.abs(cashVal + onlineVal - totalWithSnacks) > 0.01;
   const isNegotiatedInvalid = totalNegotiatedVal < 0;
-  const isSubmitDisabled = isNegotiatedInvalid || isSplitInvalid || submittingPayment;
+  const isSnacksInvalid = snacksVal < 0;
+  const isSubmitDisabled = isNegotiatedInvalid || isSnacksInvalid || isSplitInvalid || submittingPayment;
 
-  // Auto-fill simple Cash/Online values when Negotiated changes
+  // Auto-fill simple Cash/Online values when Negotiated or Snacks changes
   useEffect(() => {
+    const totalVal = (Number(negotiatedInput) || 0) + (Number(snacksInput) || 0);
     if (paymentMethod === "CASH") {
-      setCashInput(negotiatedInput);
+      setCashInput(String(totalVal));
       setOnlineInput("");
     } else if (paymentMethod === "ONLINE") {
-      setOnlineInput(negotiatedInput);
+      setOnlineInput(String(totalVal));
       setCashInput("");
     }
-  }, [negotiatedInput, paymentMethod]);
+  }, [negotiatedInput, snacksInput, paymentMethod]);
 
   const handleConfirmPayment = async () => {
     if (isSubmitDisabled) return;
@@ -215,9 +225,10 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
       const payload = {
         bookingIds: Array.from(selectedIds),
         negotiatedAmount: totalNegotiatedVal,
+        snacksAmount: snacksVal,
         paymentMethod,
-        cashAmount: paymentMethod === "MIXED" ? cashVal : paymentMethod === "CASH" ? totalNegotiatedVal : 0,
-        onlineAmount: paymentMethod === "MIXED" ? onlineVal : paymentMethod === "ONLINE" ? totalNegotiatedVal : 0,
+        cashAmount: paymentMethod === "MIXED" ? cashVal : paymentMethod === "CASH" ? totalWithSnacks : 0,
+        onlineAmount: paymentMethod === "MIXED" ? onlineVal : paymentMethod === "ONLINE" ? totalWithSnacks : 0,
       };
 
       const res = await fetch("/api/bookings/batch-pay", {
@@ -433,8 +444,11 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
                       <td className="text-sm text-zinc-400 whitespace-nowrap">
                         {formatCurrency(p.totalActual)}
                       </td>
-                      <td className="text-sm font-semibold text-emerald-400 whitespace-nowrap">
-                        {formatCurrency(p.totalNegotiated)}
+                      <td className="text-xs text-zinc-300 whitespace-nowrap">
+                        <p className="text-sm font-semibold text-emerald-400">{formatCurrency(p.totalNegotiated + p.totalSnacks)}</p>
+                        {p.totalSnacks > 0 && (
+                          <p className="text-[10px] text-zinc-500">Games: {formatCurrency(p.totalNegotiated)} | Snacks: {formatCurrency(p.totalSnacks)}</p>
+                        )}
                       </td>
                       <td>
                         <div className="text-xs">
@@ -567,23 +581,35 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
             </div>
 
             {/* Price section */}
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-3 gap-3">
               <div>
                 <label className="text-xs text-zinc-500 font-medium block mb-1">Total Actual Amount</label>
-                <div className="bg-zinc-800/40 border border-zinc-800 rounded-xl px-3 py-2.5 text-sm font-bold text-zinc-400">
+                <div className="bg-zinc-800/40 border border-zinc-800 rounded-xl px-3 py-2.5 text-xs font-bold text-zinc-400 truncate">
                   {formatCurrency(totalActualAmount)}
                 </div>
               </div>
 
               <div>
-                <label className="text-xs text-violet-400 font-bold block mb-1">Negotiated Settled Amount</label>
+                <label className="text-xs text-violet-400 font-bold block mb-1">Negotiated Amount</label>
                 <input
                   type="number"
                   value={negotiatedInput}
                   onChange={(e) => setNegotiatedInput(e.target.value)}
                   disabled={submittingPayment}
-                  placeholder="Enter negotiated amount"
-                  className="input-field"
+                  placeholder="Games amount"
+                  className="input-field text-xs"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs text-violet-400 font-bold block mb-1">Snacks Amount</label>
+                <input
+                  type="number"
+                  value={snacksInput}
+                  onChange={(e) => setSnacksInput(e.target.value)}
+                  disabled={submittingPayment}
+                  placeholder="Snacks amount"
+                  className="input-field text-xs"
                 />
               </div>
             </div>
@@ -641,18 +667,26 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
                 <div className="col-span-2 flex items-start gap-2 text-[11px] text-amber-500 bg-amber-500/5 border border-amber-500/10 p-2.5 rounded-lg">
                   <Info className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
                   <p className="leading-relaxed">
-                    Note: Combined sum of Cash (₹{cashVal}) + Online (₹{onlineVal}) must exactly equal the Negotiated Settled Amount (₹{totalNegotiatedVal}).
+                    Note: Combined sum of Cash (₹{cashVal}) + Online (₹{onlineVal}) must exactly equal the Overall Settled Amount (₹{totalWithSnacks}).
                   </p>
                 </div>
               </div>
             )}
 
             {/* Summary details */}
-            <div className="flex items-center justify-between text-xs text-zinc-400 py-1">
-              <span>Total to update:</span>
-              <span className="font-bold text-white text-sm">
-                {formatCurrency(totalNegotiatedVal)}
-              </span>
+            <div className="flex flex-col gap-1.5 bg-zinc-950/20 p-3 border border-zinc-800/60 rounded-xl">
+              <div className="flex items-center justify-between text-xs text-zinc-400">
+                <span>Games Settled Total:</span>
+                <span className="font-semibold text-white">{formatCurrency(totalNegotiatedVal)}</span>
+              </div>
+              <div className="flex items-center justify-between text-xs text-zinc-400">
+                <span>Snacks Total:</span>
+                <span className="font-semibold text-white">{formatCurrency(snacksVal)}</span>
+              </div>
+              <div className="flex items-center justify-between text-xs font-bold text-zinc-300 border-t border-zinc-800/40 pt-1.5 mt-0.5">
+                <span>Overall Total to Pay:</span>
+                <span className="text-sm text-emerald-400 font-extrabold">{formatCurrency(totalWithSnacks)}</span>
+              </div>
             </div>
 
             {/* Warning alert if sum is wrong */}
@@ -660,7 +694,7 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
               <div className="flex items-start gap-2 p-3 bg-red-500/10 border border-red-500/20 text-red-400 rounded-xl text-xs">
                 <Info className="w-4 h-4 flex-shrink-0 mt-0.5" />
                 <p>
-                  Mathematical error: Cash + Online (₹{(cashVal + onlineVal).toFixed(2)}) does not match negotiated amount (₹{totalNegotiatedVal.toFixed(2)}).
+                  Mathematical error: Cash + Online (₹{(cashVal + onlineVal).toFixed(2)}) does not match overall total (₹{totalWithSnacks.toFixed(2)}).
                 </p>
               </div>
             )}
@@ -729,7 +763,7 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
             </div>
 
             {/* Payment Info Metadata Grid */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 bg-zinc-950/40 p-4 border border-zinc-900 rounded-xl">
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4 bg-zinc-950/40 p-4 border border-zinc-900 rounded-xl">
               <div>
                 <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">Settled Date</p>
                 <p className="text-sm font-semibold text-white mt-1">
@@ -743,17 +777,31 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
                 </span>
               </div>
               <div>
-                <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">Actual Total</p>
-                <p className="text-sm font-bold text-zinc-400 mt-1">
+                <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">Actual Games</p>
+                <p className="text-xs font-bold text-zinc-400 mt-1">
                   {formatCurrency(selectedPaymentDetail.totalActual)}
                 </p>
               </div>
               <div>
-                <p className="text-[10px] text-violet-400 font-bold uppercase tracking-wider">Settled Total</p>
-                <p className="text-sm font-extrabold text-emerald-400 mt-1">
+                <p className="text-[10px] text-violet-400 font-bold uppercase tracking-wider">Games Settled</p>
+                <p className="text-xs font-bold text-zinc-200 mt-1">
                   {formatCurrency(selectedPaymentDetail.totalNegotiated)}
                 </p>
               </div>
+              <div>
+                <p className="text-[10px] text-violet-400 font-bold uppercase tracking-wider">Snacks Paid</p>
+                <p className="text-xs font-bold text-zinc-200 mt-1">
+                  {formatCurrency(selectedPaymentDetail.totalSnacks)}
+                </p>
+              </div>
+            </div>
+
+            {/* Overall settled total */}
+            <div className="flex items-center justify-between text-xs bg-emerald-500/5 p-3 border border-emerald-500/10 rounded-xl">
+              <p className="text-emerald-400 font-bold">Overall Transaction Settled Total (Games + Snacks):</p>
+              <p className="text-sm font-extrabold text-emerald-400">
+                {formatCurrency(selectedPaymentDetail.totalNegotiated + selectedPaymentDetail.totalSnacks)}
+              </p>
             </div>
 
             {/* Split breakdown for MIXED payments */}

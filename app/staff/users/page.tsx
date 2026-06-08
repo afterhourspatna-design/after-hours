@@ -78,7 +78,7 @@ function UserModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => v
           <div>
             <label className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider mb-1.5 block">Phone Number (10 Digits) *</label>
             <div className="relative">
-               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-zinc-500 font-bold">+92</span>
+               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-zinc-500 font-bold">+91</span>
                <input 
                  type="tel"
                  maxLength={10}
@@ -162,7 +162,7 @@ export default function StaffUsersPage() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-bold text-white group-hover:text-violet-400 transition-colors duration-300">{u.name}</p>
-                  <p className="text-xs text-zinc-500 font-medium">+92 {u.phone}{u.email ? ` · ${u.email}` : ""}</p>
+                  <p className="text-xs text-zinc-500 font-medium">+91 {u.phone}{u.email ? ` · ${u.email}` : ""}</p>
                 </div>
                 <a href={`/staff/bookings/new?userId=${u.id}`} 
                   className="text-xs font-bold px-4 py-2 rounded-xl bg-violet-600/10 text-violet-400 border border-violet-500/10 hover:bg-violet-600 hover:text-white transition-all duration-300">

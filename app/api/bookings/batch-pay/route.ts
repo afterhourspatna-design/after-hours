@@ -10,6 +10,7 @@ const batchPaySchema = z.object({
   paymentMethod: z.enum(["CASH", "ONLINE", "MIXED"]),
   cashAmount: z.number().nonnegative().optional(),
   onlineAmount: z.number().nonnegative().optional(),
+  snacksAmount: z.number().nonnegative().optional(),
 });
 
 export async function POST(req: NextRequest) {
@@ -33,15 +34,15 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { bookingIds, negotiatedAmount, paymentMethod, cashAmount = 0, onlineAmount = 0 } = parsed.data;
+    const { bookingIds, negotiatedAmount, paymentMethod, cashAmount = 0, onlineAmount = 0, snacksAmount = 0 } = parsed.data;
 
     // Validate MIXED payment type equation
     if (paymentMethod === "MIXED") {
       const sum = Number((cashAmount + onlineAmount).toFixed(2));
-      const neg = Number(negotiatedAmount.toFixed(2));
-      if (Math.abs(sum - neg) > 0.01) {
+      const totalWithSnacks = Number((negotiatedAmount + snacksAmount).toFixed(2));
+      if (Math.abs(sum - totalWithSnacks) > 0.01) {
         return NextResponse.json(
-          { error: "Cash + Online amounts must equal the total negotiated amount" },
+          { error: "Cash + Online amounts must equal the total settled amount (including snacks)" },
           { status: 400 }
         );
       }
@@ -80,13 +81,14 @@ export async function POST(req: NextRequest) {
 
       // Calculate proportional shares
       const bNegotiated = Math.round(negotiatedAmount * ratio * 100) / 100;
+      const bSnacks = Math.round(snacksAmount * ratio * 100) / 100;
       let bCash = 0;
       let bOnline = 0;
 
       if (paymentMethod === "CASH") {
-        bCash = bNegotiated;
+        bCash = Number((bNegotiated + bSnacks).toFixed(2));
       } else if (paymentMethod === "ONLINE") {
-        bOnline = bNegotiated;
+        bOnline = Number((bNegotiated + bSnacks).toFixed(2));
       } else if (paymentMethod === "MIXED") {
         bCash = Math.round(cashAmount * ratio * 100) / 100;
         bOnline = Math.round(onlineAmount * ratio * 100) / 100;
@@ -101,6 +103,7 @@ export async function POST(req: NextRequest) {
           cashAmount: bCash,
           onlineAmount: bOnline,
           paymentId,
+          snacksAmount: bSnacks,
         },
       });
     });
@@ -121,6 +124,7 @@ export async function POST(req: NextRequest) {
           paymentMethod,
           cashAmount,
           onlineAmount,
+          snacksAmount,
         },
       },
     });

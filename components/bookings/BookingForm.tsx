@@ -368,7 +368,7 @@ export default function BookingForm({ mode = "create", initialData, prefillDate,
                   <div>
                     <label className="text-xs text-zinc-400 mb-1 block">Mobile Number (10 Digits) *</label>
                     <div className="relative">
-                       <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-zinc-500 font-bold">+92</span>
+                       <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-zinc-500 font-bold">+91</span>
                        <input 
                          type="tel"
                          maxLength={10}
@@ -674,16 +674,9 @@ export default function BookingForm({ mode = "create", initialData, prefillDate,
           {/* ── Details ── */}
           <div className="glass-card p-5 space-y-4">
             <h3 className="text-sm font-semibold text-white">Booking Details</h3>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            <div className="grid grid-cols-2 gap-3">
               {role !== "CUSTOMER" && (
                 <>
-                  <div>
-                    <label className="text-xs text-zinc-400 mb-1 block">Booking Type</label>
-                    <select value={bookingType} onChange={e => setBookingType(e.target.value)} className="input-field">
-                      <option value="HOURLY">Hourly</option>
-                      <option value="EVENT">Event</option>
-                    </select>
-                  </div>
                   <div>
                     <label className="text-xs text-zinc-400 mb-1 block">Source</label>
                     <select value={source} onChange={e => setSource(e.target.value)} className="input-field">
@@ -696,7 +689,6 @@ export default function BookingForm({ mode = "create", initialData, prefillDate,
                     <label className="text-xs text-zinc-400 mb-1 block">Payment Status</label>
                     <select value={paymentStatus} onChange={e => setPaymentStatus(e.target.value)} className="input-field">
                       <option value="UNPAID">Unpaid</option>
-                      <option value="PARTIAL">Partial</option>
                       <option value="PAID">Paid</option>
                     </select>
                   </div>
