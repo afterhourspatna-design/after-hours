@@ -6,7 +6,7 @@ import { z } from "zod";
 
 const schema = z.object({
   gameId: z.string(),
-  durationMinutes: z.number().min(15),
+  durationMinutes: z.number().min(5),
   startDateTime: z.string().datetime(),
   userId: z.string().optional().nullable(),
   excludeBookingId: z.string().optional().nullable(),
