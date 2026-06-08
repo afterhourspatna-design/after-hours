@@ -147,7 +147,7 @@ export default function StaffManagementPage() {
               <div>
                 <label className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider mb-1.5 block">Phone Number (10 Digits) *</label>
                 <div className="relative">
-                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-zinc-500 font-bold">+92</span>
+                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-zinc-500 font-bold">+91</span>
                    <input 
                      required
                      type="tel"
@@ -171,7 +171,7 @@ export default function StaffManagementPage() {
                    value={newStaff.email} 
                    onChange={e => setNewStaff({...newStaff, email: e.target.value})}
                    className={cn("input-field", errors.email && "border-red-500/50 bg-red-500/5")} 
-                   placeholder="staff@afterhours.pk" 
+                   placeholder="staff@afterhours.in" 
                 />
                 {errors.email && <p className="text-[10px] text-red-400 font-bold mt-1.5 flex items-center gap-1"><AlertCircle className="w-3 h-3" /> {errors.email}</p>}
               </div>
@@ -254,7 +254,7 @@ export default function StaffManagementPage() {
                         <td className="px-5 py-4">
                           <div className="space-y-1">
                             <div className="flex items-center gap-1.5 text-xs text-zinc-400 font-medium">
-                              <Phone className="w-3 h-3 text-zinc-600" /> +92 {u.phone}
+                              <Phone className="w-3 h-3 text-zinc-600" /> +91 {u.phone}
                             </div>
                             {u.email && (
                               <div className="flex items-center gap-1.5 text-xs text-zinc-500">

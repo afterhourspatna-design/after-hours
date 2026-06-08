@@ -135,6 +135,23 @@ export async function POST(req: NextRequest) {
     data.source = BookingSource.ONLINE;
   }
 
+  let resolvedUserId = data.userId ?? null;
+  if (!resolvedUserId && data.guestPhone) {
+    let guestUser = await prisma.appUser.findUnique({
+      where: { phone: data.guestPhone },
+    });
+    if (!guestUser) {
+      guestUser = await prisma.appUser.create({
+        data: {
+          name: data.guestName || "Guest Customer",
+          phone: data.guestPhone,
+          role: "CUSTOMER",
+        },
+      });
+    }
+    resolvedUserId = guestUser.id;
+  }
+
   const startDateTime = new Date(data.startDateTime);
   const endDateTime = addMinutes(startDateTime, data.durationMinutes);
 
@@ -168,7 +185,7 @@ export async function POST(req: NextRequest) {
     gameId: data.gameId,
     durationMinutes: data.durationMinutes,
     startDateTime,
-    userId: data.userId ?? null,
+    userId: resolvedUserId,
     accessoriesCount: data.accessoriesCount,
     couponCode: data.couponCode ?? undefined,
     userRole: role,
@@ -196,7 +213,7 @@ export async function POST(req: NextRequest) {
 
   const booking = await prisma.booking.create({
     data: {
-      userId: data.userId ?? null,
+      userId: resolvedUserId,
       guestName: data.guestName ?? null,
       guestPhone: data.guestPhone ?? null,
       gameId: data.gameId,
