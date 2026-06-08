@@ -11,7 +11,7 @@ const updateSchema = z.object({
   paymentStatus: z.nativeEnum(PaymentStatus).optional(),
   notes: z.string().optional().nullable(),
   startDateTime: z.string().datetime().optional(),
-  durationMinutes: z.number().min(15).optional(),
+  durationMinutes: z.number().min(5).optional(),
   resourceUnitId: z.string().optional().nullable(),
   finalAmount: z.number().optional(),
   source: z.string().optional(),

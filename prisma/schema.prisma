@@ -137,6 +137,11 @@ model Booking {
   notes          String?
   holdExpiresAt  DateTime?
   createdById    String?
+  negotiatedAmount Decimal?    @db.Decimal(10, 2)
+  paymentMethod    String?
+  cashAmount       Decimal?    @db.Decimal(10, 2)
+  onlineAmount     Decimal?    @db.Decimal(10, 2)
+  paymentId        String?
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
 

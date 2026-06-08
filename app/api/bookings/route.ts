@@ -14,7 +14,7 @@ const createBookingSchema = z.object({
   gameId: z.string(),
   resourceUnitId: z.string().optional().nullable(),
   startDateTime: z.string().datetime(),
-  durationMinutes: z.number().min(15).max(480),
+  durationMinutes: z.number().min(5).max(480),
   bookingType: z.nativeEnum(BookingType).default("HOURLY"),
   paymentStatus: z.nativeEnum(PaymentStatus).default("UNPAID"),
   source: z.nativeEnum(BookingSource).default("WALK_IN"),
@@ -38,6 +38,7 @@ export async function GET(req: NextRequest) {
   const page = parseInt(searchParams.get("page") ?? "1");
   const limit = parseInt(searchParams.get("limit") ?? "50");
   const status = searchParams.get("status") as BookingStatus | null;
+  const paymentStatus = searchParams.get("paymentStatus") as PaymentStatus | null;
   const gameId = searchParams.get("gameId");
   const search = searchParams.get("q");
   const dateFrom = searchParams.get("from");
@@ -56,6 +57,7 @@ export async function GET(req: NextRequest) {
   }
 
   if (status) where.bookingStatus = status;
+  if (paymentStatus) where.paymentStatus = paymentStatus;
   if (gameId) where.gameId = gameId;
   if (dateFrom || dateTo) {
     where.startDateTime = {

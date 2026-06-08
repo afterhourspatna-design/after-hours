@@ -7,7 +7,7 @@ import { addMinutes } from "date-fns";
 const schema = z.object({
   resourceUnitId: z.string(),
   startDateTime: z.string().datetime(),
-  durationMinutes: z.number().min(15),
+  durationMinutes: z.number().min(5),
   excludeBookingId: z.string().optional(),
 });
 
