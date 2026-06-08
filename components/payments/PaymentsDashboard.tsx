@@ -111,7 +111,12 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
       }
     });
 
-    return Array.from(paymentsMap.values());
+    // Sort payments so the most recently settled (updatedAt) appears on top
+    return Array.from(paymentsMap.values()).sort((a, b) => {
+      const dateA = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
+      const dateB = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
+      return dateB - dateA;
+    });
   };
 
   const fetchBookings = useCallback(async () => {
