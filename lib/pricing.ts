@@ -161,7 +161,7 @@ function calculateBlockBaseAmount(params: {
       const minRate = (currentHour >= 11 && currentHour < 17) ? (750 / 60) : (1000 / 60);
       total += minRate;
     }
-    return Math.round(total);
+    return Math.round(total * 100) / 100;
   }
 
   return (blockMinutes / 60) * baseRatePerHour;
@@ -212,7 +212,7 @@ export async function calculateBookingPrice(params: {
     });
 
     const discountPct = 0; // Disabled same-day progressive discounts
-    const amount = Math.round(blockBaseAmount);
+    const amount = Math.round(blockBaseAmount * 100) / 100;
 
     blocks.push({
       blockNumber,
@@ -260,10 +260,10 @@ export async function calculateBookingPrice(params: {
         if (coupon.maxDiscountAmount) {
           discount = Math.min(discount, Number(coupon.maxDiscountAmount));
         }
-        couponDiscount = Math.round(discount);
+        couponDiscount = Math.round(discount * 100) / 100;
       } else {
         // FIXED
-        couponDiscount = Math.min(finalAmount, Math.round(Number(coupon.discountValue)));
+        couponDiscount = Math.min(finalAmount, Math.round(Number(coupon.discountValue) * 100) / 100);
       }
     }
   }
@@ -332,7 +332,7 @@ export function calculatePriceSync(params: {
     });
 
     const discountPct = 0; // Disabled same-day progressive discounts
-    const amount = Math.round(blockBaseAmount);
+    const amount = Math.round(blockBaseAmount * 100) / 100;
 
     blocks.push({
       blockNumber,

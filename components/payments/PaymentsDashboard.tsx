@@ -69,6 +69,50 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
   const [cashInput, setCashInput] = useState("");
   const [onlineInput, setOnlineInput] = useState("");
   const [selectedPaymentDetail, setSelectedPaymentDetail] = useState<PaymentGroup | null>(null);
+  const [editPaymentId, setEditPaymentId] = useState<string | null>(null);
+  const [payOnlySnacks, setPayOnlySnacks] = useState(false);
+
+  // Standalone Snack Sale States
+  const [showSnackSaleModal, setShowSnackSaleModal] = useState(false);
+  const [snackGuestMode, setSnackGuestMode] = useState(true);
+  const [snackGuestName, setSnackGuestName] = useState("");
+  const [snackGuestPhone, setSnackGuestPhone] = useState("");
+  const [snackSearchQuery, setSnackSearchQuery] = useState("");
+  const [snackSelectedUser, setSnackSelectedUser] = useState<any | null>(null);
+  const [snackUserResults, setSnackUserResults] = useState<any[]>([]);
+  const [snackAmountInput, setSnackAmountInput] = useState("");
+  const [snackPaymentMethod, setSnackPaymentMethod] = useState<"CASH" | "ONLINE" | "MIXED">("ONLINE");
+  const [snackCashInput, setSnackCashInput] = useState("");
+  const [snackOnlineInput, setSnackOnlineInput] = useState("");
+  const [submittingSnackSale, setSubmittingSnackSale] = useState(false);
+
+  // User search debounce for snacks sale
+  useEffect(() => {
+    if (snackGuestMode || snackSearchQuery.length < 2) {
+      setSnackUserResults([]);
+      return;
+    }
+    const t = setTimeout(async () => {
+      const res = await fetch(`/api/users?q=${encodeURIComponent(snackSearchQuery)}&limit=8`);
+      if (res.ok) {
+        const data = await res.json();
+        setSnackUserResults(data.users ?? []);
+      }
+    }, 300);
+    return () => clearTimeout(t);
+  }, [snackSearchQuery, snackGuestMode]);
+
+  // Auto-fill simple Cash/Online values for snacks when Snack Amount or Payment Method changes
+  useEffect(() => {
+    const totalVal = Number(snackAmountInput) || 0;
+    if (snackPaymentMethod === "CASH") {
+      setSnackCashInput(String(totalVal));
+      setSnackOnlineInput("");
+    } else if (snackPaymentMethod === "ONLINE") {
+      setSnackOnlineInput(String(totalVal));
+      setSnackCashInput("");
+    }
+  }, [snackAmountInput, snackPaymentMethod]);
 
   const LIMIT = 15;
 
@@ -189,11 +233,110 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
     setPaymentMethod("ONLINE");
     setCashInput("");
     setOnlineInput("");
+    setPayOnlySnacks(false);
+    setEditPaymentId(null);
     setShowPayModal(true);
   };
 
+  const handleOpenEditModal = (p: PaymentGroup) => {
+    setEditPaymentId(p.paymentId);
+    const bookingIds = p.bookings.map((b) => b.id);
+    setSelectedIds(new Set(bookingIds));
+    setNegotiatedInput(String(p.totalNegotiated));
+    setSnacksInput(String(p.totalSnacks));
+    setPaymentMethod(p.paymentMethod as "CASH" | "ONLINE" | "MIXED");
+    setCashInput(p.totalCash ? String(p.totalCash) : "");
+    setOnlineInput(p.totalOnline ? String(p.totalOnline) : "");
+    setPayOnlySnacks(p.totalNegotiated === 0 && p.totalSnacks > 0);
+    setShowPayModal(true);
+  };
+
+  const handleOpenPayOnlySnacksModal = (b: Booking) => {
+    setSelectedIds(new Set([b.id]));
+    setNegotiatedInput("0");
+    setSnacksInput("");
+    setPaymentMethod("ONLINE");
+    setCashInput("");
+    setOnlineInput("");
+    setPayOnlySnacks(true);
+    setEditPaymentId(null);
+    setShowPayModal(true);
+  };
+
+  const handleClosePayModal = () => {
+    setShowPayModal(false);
+    setEditPaymentId(null);
+    setPayOnlySnacks(false);
+    setSelectedIds(new Set());
+  };
+
+  const handleOpenRecordSnackSaleModal = () => {
+    setSnackGuestMode(true);
+    setSnackGuestName("");
+    setSnackGuestPhone("");
+    setSnackSearchQuery("");
+    setSnackSelectedUser(null);
+    setSnackUserResults([]);
+    setSnackAmountInput("");
+    setSnackPaymentMethod("ONLINE");
+    setSnackCashInput("");
+    setSnackOnlineInput("");
+    setShowSnackSaleModal(true);
+  };
+
+  const handleCloseSnackSaleModal = () => {
+    setShowSnackSaleModal(false);
+    setSnackGuestMode(true);
+    setSnackGuestName("");
+    setSnackGuestPhone("");
+    setSnackSearchQuery("");
+    setSnackSelectedUser(null);
+    setSnackUserResults([]);
+    setSnackAmountInput("");
+    setSnackPaymentMethod("ONLINE");
+    setSnackCashInput("");
+    setSnackOnlineInput("");
+  };
+
+  const handleConfirmSnackSale = async () => {
+    const snackAmountVal = Number(snackAmountInput) || 0;
+    if (snackAmountVal <= 0) return;
+    setSubmittingSnackSale(true);
+
+    try {
+      const payload = {
+        bookingIds: [],
+        negotiatedAmount: 0,
+        snacksAmount: snackAmountVal,
+        paymentMethod: snackPaymentMethod,
+        cashAmount: snackPaymentMethod === "MIXED" ? Number(snackCashInput) || 0 : snackPaymentMethod === "CASH" ? snackAmountVal : 0,
+        onlineAmount: snackPaymentMethod === "MIXED" ? Number(snackOnlineInput) || 0 : snackPaymentMethod === "ONLINE" ? snackAmountVal : 0,
+        userId: snackGuestMode ? null : snackSelectedUser?.id,
+        guestName: snackGuestMode ? snackGuestName : null,
+        guestPhone: snackGuestMode ? snackGuestPhone : null,
+      };
+
+      const res = await fetch("/api/bookings/batch-pay", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error ?? "Failed to save snack sale");
+
+      toast.success("Successfully recorded snack sale!");
+      handleCloseSnackSaleModal();
+      fetchBookings();
+    } catch (err: any) {
+      toast.error(err.message || "Snack sale failed");
+    } finally {
+      setSubmittingSnackSale(false);
+    }
+  };
+
   // Real-time values
-  const totalNegotiatedVal = Number(negotiatedInput) || 0;
+  const totalNegotiatedVal = payOnlySnacks ? 0 : (Number(negotiatedInput) || 0);
   const snacksVal = Number(snacksInput) || 0;
   const cashVal = Number(cashInput) || 0;
   const onlineVal = Number(onlineInput) || 0;
@@ -207,7 +350,7 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
 
   // Auto-fill simple Cash/Online values when Negotiated or Snacks changes
   useEffect(() => {
-    const totalVal = (Number(negotiatedInput) || 0) + (Number(snacksInput) || 0);
+    const totalVal = totalNegotiatedVal + snacksVal;
     if (paymentMethod === "CASH") {
       setCashInput(String(totalVal));
       setOnlineInput("");
@@ -215,24 +358,34 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
       setOnlineInput(String(totalVal));
       setCashInput("");
     }
-  }, [negotiatedInput, snacksInput, paymentMethod]);
+  }, [totalNegotiatedVal, snacksVal, paymentMethod]);
 
   const handleConfirmPayment = async () => {
     if (isSubmitDisabled) return;
     setSubmittingPayment(true);
 
     try {
-      const payload = {
-        bookingIds: Array.from(selectedIds),
-        negotiatedAmount: totalNegotiatedVal,
-        snacksAmount: snacksVal,
-        paymentMethod,
-        cashAmount: paymentMethod === "MIXED" ? cashVal : paymentMethod === "CASH" ? totalWithSnacks : 0,
-        onlineAmount: paymentMethod === "MIXED" ? onlineVal : paymentMethod === "ONLINE" ? totalWithSnacks : 0,
-      };
+      const payload = editPaymentId
+        ? {
+            paymentId: editPaymentId,
+            negotiatedAmount: totalNegotiatedVal,
+            snacksAmount: snacksVal,
+            paymentMethod,
+            cashAmount: paymentMethod === "MIXED" ? cashVal : paymentMethod === "CASH" ? totalWithSnacks : 0,
+            onlineAmount: paymentMethod === "MIXED" ? onlineVal : paymentMethod === "ONLINE" ? totalWithSnacks : 0,
+          }
+        : {
+            bookingIds: Array.from(selectedIds),
+            negotiatedAmount: totalNegotiatedVal,
+            snacksAmount: snacksVal,
+            paymentMethod,
+            cashAmount: paymentMethod === "MIXED" ? cashVal : paymentMethod === "CASH" ? totalWithSnacks : 0,
+            onlineAmount: paymentMethod === "MIXED" ? onlineVal : paymentMethod === "ONLINE" ? totalWithSnacks : 0,
+          };
 
+      const method = editPaymentId ? "PUT" : "POST";
       const res = await fetch("/api/bookings/batch-pay", {
-        method: "POST",
+        method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
@@ -240,9 +393,8 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
       const result = await res.json();
       if (!res.ok) throw new Error(result.error ?? "Failed to process payment");
 
-      toast.success(`Successfully processed payment for ${result.count} bookings!`);
-      setShowPayModal(false);
-      setSelectedIds(new Set());
+      toast.success(editPaymentId ? "Successfully updated payment!" : `Successfully processed payment for ${result.count} bookings!`);
+      handleClosePayModal();
       fetchBookings();
     } catch (err: any) {
       toast.error(err.message || "Payment process failed");
@@ -290,8 +442,15 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
       </div>
 
       {/* Toolbar */}
-      <div className="flex flex-col sm:flex-row gap-3">
-        <div className="relative flex-1">
+      <div className="flex flex-col sm:flex-row gap-3 items-center">
+        <button
+          onClick={handleOpenRecordSnackSaleModal}
+          className="px-4 py-2.5 bg-violet-600 hover:bg-violet-500 text-white rounded-xl font-bold shadow-lg shadow-violet-900/20 transition-all text-sm flex items-center gap-2 whitespace-nowrap self-stretch"
+        >
+          <Coins className="w-4 h-4" />
+          Record Snack Sale
+        </button>
+        <div className="relative flex-1 w-full">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
           <input
             value={search}
@@ -339,6 +498,7 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
                         className="rounded border-zinc-700 text-violet-600 focus:ring-violet-500 bg-zinc-900 h-4 w-4"
                       />
                     </th>
+                    <th className="w-24 text-left">Action</th>
                     <th>Customer</th>
                     <th>Game / Unit</th>
                     <th>Date & Time</th>
@@ -369,6 +529,14 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
                             onChange={() => handleSelectRow(b.id)}
                             className="rounded border-zinc-700 text-violet-600 focus:ring-violet-500 bg-zinc-900 h-4 w-4"
                           />
+                        </td>
+                        <td onClick={(e) => e.stopPropagation()}>
+                          <button
+                            onClick={() => handleOpenPayOnlySnacksModal(b)}
+                            className="px-2.5 py-1 bg-violet-600 hover:bg-violet-500 text-white text-[11px] font-bold rounded-lg transition-colors whitespace-nowrap shadow-sm"
+                          >
+                            Pay Snacks
+                          </button>
                         </td>
                         <td>
                           <div>
@@ -466,12 +634,20 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
                         {formatDate(p.updatedAt)}
                       </td>
                       <td className="text-right" onClick={(e) => e.stopPropagation()}>
-                        <button
-                          onClick={() => setSelectedPaymentDetail(p)}
-                          className="px-3 py-1 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-zinc-300 text-xs font-semibold rounded-lg transition-colors"
-                        >
-                          View Details
-                        </button>
+                        <div className="flex gap-2 justify-end">
+                          <button
+                            onClick={() => setSelectedPaymentDetail(p)}
+                            className="px-3 py-1 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-zinc-300 text-xs font-semibold rounded-lg transition-colors"
+                          >
+                            View Details
+                          </button>
+                          <button
+                            onClick={() => handleOpenEditModal(p)}
+                            className="px-3 py-1 bg-violet-600 hover:bg-violet-500 text-white text-xs font-semibold rounded-lg transition-colors"
+                          >
+                            Edit
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -542,7 +718,7 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
           {/* Backdrop dim */}
           <div
             className="absolute inset-0 bg-black/75 backdrop-blur-sm transition-opacity"
-            onClick={() => !submittingPayment && setShowPayModal(false)}
+            onClick={() => !submittingPayment && handleClosePayModal()}
           />
 
           {/* Modal Container */}
@@ -551,10 +727,10 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
             <div className="flex items-center justify-between border-b border-zinc-800/60 pb-3">
               <div className="flex items-center gap-2">
                 <Coins className="w-5 h-5 text-violet-400" />
-                <h3 className="text-lg font-bold text-white">Settle Batch Payment</h3>
+                <h3 className="text-lg font-bold text-white">{editPaymentId ? "Edit Payment History" : "Settle Batch Payment"}</h3>
               </div>
               <button
-                onClick={() => setShowPayModal(false)}
+                onClick={() => handleClosePayModal()}
                 disabled={submittingPayment}
                 className="text-zinc-500 hover:text-white transition-colors"
               >
@@ -580,6 +756,29 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
               </div>
             </div>
 
+            {/* Pay only for snacks option */}
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="payOnlySnacks"
+                checked={payOnlySnacks}
+                onChange={(e) => {
+                  const checked = e.target.checked;
+                  setPayOnlySnacks(checked);
+                  if (checked) {
+                    setNegotiatedInput("0");
+                  } else {
+                    setNegotiatedInput(String(totalActualAmount));
+                  }
+                }}
+                disabled={submittingPayment}
+                className="rounded border-zinc-700 text-violet-600 focus:ring-violet-500 bg-zinc-900 h-4 w-4"
+              />
+              <label htmlFor="payOnlySnacks" className="text-xs font-semibold text-zinc-300 cursor-pointer">
+                Pay only for snacks (Settle snacks amount, leave game payment pending)
+              </label>
+            </div>
+
             {/* Price section */}
             <div className="grid grid-cols-3 gap-3">
               <div>
@@ -593,9 +792,9 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
                 <label className="text-xs text-violet-400 font-bold block mb-1">Negotiated Amount</label>
                 <input
                   type="number"
-                  value={negotiatedInput}
+                  value={payOnlySnacks ? "0" : negotiatedInput}
                   onChange={(e) => setNegotiatedInput(e.target.value)}
-                  disabled={submittingPayment}
+                  disabled={submittingPayment || payOnlySnacks}
                   placeholder="Games amount"
                   className="input-field text-xs"
                 />
@@ -703,7 +902,7 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
             <div className="flex gap-2 border-t border-zinc-800/60 pt-4">
               <button
                 type="button"
-                onClick={() => setShowPayModal(false)}
+                onClick={() => handleClosePayModal()}
                 disabled={submittingPayment}
                 className="flex-1 py-2.5 bg-zinc-800 border border-zinc-700 text-zinc-300 text-sm font-semibold rounded-xl hover:text-white hover:bg-zinc-700 transition-all"
               >
@@ -866,6 +1065,269 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
                 className="w-full py-2.5 bg-zinc-800 border border-zinc-700 text-zinc-300 text-sm font-semibold rounded-xl hover:text-white hover:bg-zinc-700 transition-all"
               >
                 Close Details
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Standalone Snack Sale Modal */}
+      {showSnackSaleModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-black/75 backdrop-blur-sm transition-opacity"
+            onClick={() => !submittingSnackSale && handleCloseSnackSaleModal()}
+          />
+
+          <div className="relative glass-card bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-lg overflow-hidden flex flex-col shadow-2xl z-10 p-6 space-y-5 animate-scale-in max-h-[90vh] custom-scroll overflow-y-auto">
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-zinc-800/60 pb-3">
+              <div className="flex items-center gap-2">
+                <Coins className="w-5 h-5 text-violet-400" />
+                <h3 className="text-lg font-bold text-white">Record Snack Sale</h3>
+              </div>
+              <button
+                onClick={handleCloseSnackSaleModal}
+                disabled={submittingSnackSale}
+                className="text-zinc-500 hover:text-white transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Customer Toggle */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-xs text-zinc-400 font-semibold uppercase tracking-wider">Customer Type</label>
+                <div className="flex items-center gap-2 bg-zinc-800/60 rounded-xl p-1">
+                  <button
+                    type="button"
+                    onClick={() => setSnackGuestMode(false)}
+                    className={cn(
+                      "px-3 py-1.5 rounded-lg text-xs font-medium transition-all",
+                      !snackGuestMode ? "bg-violet-600 text-white" : "text-zinc-400 hover:text-zinc-200"
+                    )}
+                  >
+                    Registered
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSnackGuestMode(true)}
+                    className={cn(
+                      "px-3 py-1.5 rounded-lg text-xs font-medium transition-all",
+                      snackGuestMode ? "bg-violet-600 text-white" : "text-zinc-400 hover:text-zinc-200"
+                    )}
+                  >
+                    Guest
+                  </button>
+                </div>
+              </div>
+
+              {snackGuestMode ? (
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs text-zinc-500 font-medium block mb-1">Guest Name (optional)</label>
+                    <input
+                      value={snackGuestName}
+                      onChange={(e) => setSnackGuestName(e.target.value)}
+                      placeholder="e.g. Ahmed Ali"
+                      className="input-field"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-zinc-500 font-medium block mb-1">Mobile Number (optional)</label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-zinc-500 font-bold">+91</span>
+                      <input
+                        type="tel"
+                        maxLength={10}
+                        value={snackGuestPhone}
+                        onChange={(e) => {
+                          const val = e.target.value.replace(/\D/g, "").slice(0, 10);
+                          setSnackGuestPhone(val);
+                        }}
+                        placeholder="9876543210"
+                        className="input-field pl-10"
+                      />
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="relative">
+                  <label className="text-xs text-zinc-500 font-medium block mb-1">Search Registered User</label>
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
+                    {snackSelectedUser ? (
+                      <div className="input-field pl-9 flex items-center justify-between">
+                        <span className="text-sm text-white">
+                          {snackSelectedUser.name} <span className="text-zinc-500 text-xs">· {snackSelectedUser.phone}</span>
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSnackSelectedUser(null);
+                            setSnackSearchQuery("");
+                          }}
+                        >
+                          <X className="w-4 h-4 text-zinc-500 hover:text-white" />
+                        </button>
+                      </div>
+                    ) : (
+                      <input
+                        value={snackSearchQuery}
+                        onChange={(e) => setSnackSearchQuery(e.target.value)}
+                        placeholder="Search by name or phone…"
+                        className="input-field pl-9"
+                      />
+                    )}
+                  </div>
+                  {snackUserResults.length > 0 && !snackSelectedUser && (
+                    <div className="absolute top-full left-0 right-0 z-20 mt-1 bg-zinc-900 border border-zinc-700 rounded-xl shadow-xl max-h-48 overflow-y-auto">
+                      {snackUserResults.map((u) => (
+                        <button
+                          key={u.id}
+                          type="button"
+                          onClick={() => {
+                            setSnackSelectedUser(u);
+                            setSnackSearchQuery("");
+                            setSnackUserResults([]);
+                          }}
+                          className="w-full px-4 py-2 text-left hover:bg-zinc-800 transition-colors flex items-center justify-between text-sm"
+                        >
+                          <span className="text-white">{u.name}</span>
+                          <span className="text-xs text-zinc-500">{u.phone}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Snack Amount */}
+            <div>
+              <label className="text-xs text-zinc-400 font-semibold uppercase tracking-wider block mb-1">Snacks Amount (₹) *</label>
+              <input
+                type="number"
+                value={snackAmountInput}
+                onChange={(e) => setSnackAmountInput(e.target.value)}
+                disabled={submittingSnackSale}
+                placeholder="Enter snacks amount"
+                className="input-field"
+              />
+            </div>
+
+            {/* Payment Method Selector */}
+            <div className="space-y-2">
+              <label className="text-xs text-zinc-400 font-semibold uppercase tracking-wider block">Way of Payment</label>
+              <div className="grid grid-cols-3 gap-2">
+                {(["ONLINE", "CASH", "MIXED"] as const).map((method) => (
+                  <button
+                    key={method}
+                    type="button"
+                    onClick={() => setSnackPaymentMethod(method)}
+                    disabled={submittingSnackSale}
+                    className={cn(
+                      "py-3 rounded-xl border text-xs font-semibold uppercase transition-all flex flex-col items-center justify-center gap-1.5",
+                      snackPaymentMethod === method
+                        ? "bg-violet-600/10 border-violet-500 text-violet-400 shadow-md shadow-violet-950/20"
+                        : "bg-zinc-800/30 border-zinc-800/60 text-zinc-500 hover:text-zinc-300 hover:border-zinc-700"
+                    )}
+                  >
+                    <span>{method === "MIXED" ? "Cash + Online" : method.toLowerCase()}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Mixed Payment Split Inputs */}
+            {snackPaymentMethod === "MIXED" && (
+              <div className="grid grid-cols-2 gap-4 bg-zinc-950/20 p-4 border border-zinc-800/60 rounded-xl animate-fade-in">
+                <div>
+                  <label className="text-xs text-zinc-500 font-medium block mb-1">Cash Amount</label>
+                  <input
+                    type="number"
+                    value={snackCashInput}
+                    onChange={(e) => setSnackCashInput(e.target.value)}
+                    disabled={submittingSnackSale}
+                    placeholder="Cash amount"
+                    className="input-field"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-zinc-500 font-medium block mb-1">Online Amount</label>
+                  <input
+                    type="number"
+                    value={snackOnlineInput}
+                    onChange={(e) => setSnackOnlineInput(e.target.value)}
+                    disabled={submittingSnackSale}
+                    placeholder="Online amount"
+                    className="input-field"
+                  />
+                </div>
+
+                {/* Validation check message */}
+                <div className="col-span-2 flex items-start gap-2 text-[11px] text-amber-500 bg-amber-500/5 border border-amber-500/10 p-2.5 rounded-lg">
+                  <Info className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
+                  <p className="leading-relaxed">
+                    Note: Combined sum of Cash (₹{Number(snackCashInput) || 0}) + Online (₹{Number(snackOnlineInput) || 0}) must exactly equal the Snacks Amount (₹{Number(snackAmountInput) || 0}).
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Mathematical Error split */}
+            {snackPaymentMethod === "MIXED" && Math.abs((Number(snackCashInput) || 0) + (Number(snackOnlineInput) || 0) - (Number(snackAmountInput) || 0)) > 0.01 && (
+              <div className="flex items-start gap-2 p-3 bg-red-500/10 border border-red-500/20 text-red-400 rounded-xl text-xs">
+                <Info className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                <p>
+                  Mathematical error: Cash + Online (₹{((Number(snackCashInput) || 0) + (Number(snackOnlineInput) || 0)).toFixed(2)}) does not match snacks amount (₹{(Number(snackAmountInput) || 0).toFixed(2)}).
+                </p>
+              </div>
+            )}
+
+            {/* Actions */}
+            <div className="flex gap-2 border-t border-zinc-800/60 pt-4">
+              <button
+                type="button"
+                onClick={handleCloseSnackSaleModal}
+                disabled={submittingSnackSale}
+                className="flex-1 py-2.5 bg-zinc-800 border border-zinc-700 text-zinc-300 text-sm font-semibold rounded-xl hover:text-white hover:bg-zinc-700 transition-all"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmSnackSale}
+                disabled={
+                  submittingSnackSale ||
+                  (Number(snackAmountInput) || 0) <= 0 ||
+                  (!snackGuestMode && !snackSelectedUser) ||
+                  (snackGuestMode && snackGuestPhone && snackGuestPhone.length !== 10) ||
+                  (snackPaymentMethod === "MIXED" && Math.abs((Number(snackCashInput) || 0) + (Number(snackOnlineInput) || 0) - (Number(snackAmountInput) || 0)) > 0.01)
+                }
+                className={cn(
+                  "flex-1 py-2.5 bg-violet-600 hover:bg-violet-500 text-white text-sm font-bold rounded-xl transition-all shadow-lg flex items-center justify-center gap-2",
+                  (submittingSnackSale ||
+                    (Number(snackAmountInput) || 0) <= 0 ||
+                    (!snackGuestMode && !snackSelectedUser) ||
+                    (snackGuestMode && snackGuestPhone && snackGuestPhone.length !== 10) ||
+                    (snackPaymentMethod === "MIXED" && Math.abs((Number(snackCashInput) || 0) + (Number(snackOnlineInput) || 0) - (Number(snackAmountInput) || 0)) > 0.01))
+                    ? "opacity-50 cursor-not-allowed"
+                    : "shadow-violet-900/30 hover:shadow-violet-800/40"
+                )}
+              >
+                {submittingSnackSale ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                    Recording...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle className="w-4 h-4" />
+                    Record Sale
+                  </>
+                )}
               </button>
             </div>
           </div>
