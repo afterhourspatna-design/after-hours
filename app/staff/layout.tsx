@@ -14,7 +14,7 @@ export default async function StaffLayout({ children }: { children: React.ReactN
       <Sidebar role="STAFF" userName={session.user.name ?? "Staff"} userEmail={session.user.email ?? ""} />
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         <main className="flex-1 overflow-y-auto custom-scroll">
-          <div className="page-enter p-8 max-w-[1400px] mx-auto w-full">
+          <div className="page-enter p-8 mt-14 lg:mt-0 max-w-[1400px] mx-auto w-full">
             {children}
           </div>
         </main>

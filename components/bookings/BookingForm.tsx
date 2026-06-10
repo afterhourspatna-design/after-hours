@@ -132,7 +132,6 @@ export default function BookingForm({ mode = "create", initialData, prefillDate,
   const [source, setSource] = useState(initialData?.source ?? "WALK_IN");
   const [paymentStatus, setPaymentStatus] = useState(initialData?.paymentStatus ?? "UNPAID");
   const [notes, setNotes] = useState(initialData?.notes ?? "");
-  const [priceOverride, setPriceOverride] = useState<string>("");
   const [accessoriesCount, setAccessoriesCount] = useState<number>(
     initialData?.accessoriesCount ?? 
     (initialData?.gameId ? 0 : 0)
@@ -294,7 +293,6 @@ export default function BookingForm({ mode = "create", initialData, prefillDate,
       paymentStatus,
       source: role === "CUSTOMER" ? "ONLINE" : source,
       notes: notes || null,
-      ...(priceOverride && role === "ADMIN" ? { priceOverride: Number(priceOverride) } : {}),
       couponCode: appliedCoupon || null,
     };
 
@@ -324,7 +322,6 @@ export default function BookingForm({ mode = "create", initialData, prefillDate,
     }
   }
 
-  const finalPrice = priceOverride ? Number(priceOverride) : (pricing?.finalAmount ?? 0);
   const endTime = startTime
     ? format(addMinutes(new Date(`${bookingDate}T${startTime}:00`), durationMinutes), "HH:mm")
     : "";
@@ -674,27 +671,16 @@ export default function BookingForm({ mode = "create", initialData, prefillDate,
           {/* ── Details ── */}
           <div className="glass-card p-5 space-y-4">
             <h3 className="text-sm font-semibold text-white">Booking Details</h3>
-            <div className="grid grid-cols-2 gap-3">
-              {role !== "CUSTOMER" && (
-                <>
-                  <div>
-                    <label className="text-xs text-zinc-400 mb-1 block">Source</label>
-                    <select value={source} onChange={e => setSource(e.target.value)} className="input-field">
-                      {Object.entries(SOURCE_LABELS).map(([k, v]) => (
-                        <option key={k} value={k}>{v}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="text-xs text-zinc-400 mb-1 block">Payment Status</label>
-                    <select value={paymentStatus} onChange={e => setPaymentStatus(e.target.value)} className="input-field">
-                      <option value="UNPAID">Unpaid</option>
-                      <option value="PAID">Paid</option>
-                    </select>
-                  </div>
-                </>
-              )}
-            </div>
+            {role !== "CUSTOMER" && (
+              <div className="max-w-xs">
+                <label className="text-xs text-zinc-400 mb-1 block">Source</label>
+                <select value={source} onChange={e => setSource(e.target.value)} className="input-field">
+                  {Object.entries(SOURCE_LABELS).map(([k, v]) => (
+                    <option key={k} value={k}>{v}</option>
+                  ))}
+                </select>
+              </div>
+            )}
             {/* ── Coupons ── */}
             <div className="pt-4 border-t border-zinc-800/60 space-y-3">
               <label className="text-xs font-semibold text-zinc-300 block">Promo Code</label>
@@ -858,23 +844,9 @@ export default function BookingForm({ mode = "create", initialData, prefillDate,
                   ) : null}
                   <div className="flex justify-between text-sm font-bold pt-1">
                     <span className="text-white">Total</span>
-                    <span className="text-violet-400">{formatCurrency(priceOverride || pricing.finalAmount)}</span>
+                    <span className="text-violet-400">{formatCurrency(pricing.finalAmount)}</span>
                   </div>
                 </div>
-
-                {/* Admin override */}
-                {role === "ADMIN" && (
-                  <div>
-                    <label className="text-xs text-zinc-500 mb-1 block">Override price (admin only)</label>
-                    <input
-                      type="number"
-                      value={priceOverride}
-                      onChange={e => setPriceOverride(e.target.value)}
-                      placeholder={String(pricing.finalAmount)}
-                      className="input-field text-sm"
-                    />
-                  </div>
-                )}
               </div>
             ) : (
               <p className="text-xs text-zinc-600">Select a game and time to see pricing</p>

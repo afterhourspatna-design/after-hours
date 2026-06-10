@@ -92,8 +92,8 @@ export async function PUT(
     }
 
     updateData.couponId = coupon.id;
-    updateData.couponDiscount = Math.round(discount);
-    updateData.finalAmount = Math.max(0, baseAmount - Math.round(discount));
+    updateData.couponDiscount = Math.round(discount * 100) / 100;
+    updateData.finalAmount = Math.max(0, Math.round((baseAmount - discount) * 100) / 100);
     delete updateData.couponCode;
 
     // Increment usedCount if it is a new coupon for this booking
