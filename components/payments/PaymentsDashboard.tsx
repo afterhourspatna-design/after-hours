@@ -71,6 +71,17 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
   const [selectedPaymentDetail, setSelectedPaymentDetail] = useState<PaymentGroup | null>(null);
   const [editPaymentId, setEditPaymentId] = useState<string | null>(null);
   const [payOnlySnacks, setPayOnlySnacks] = useState(false);
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+
+  useEffect(() => {
+    setPage(1);
+  }, [startDate, endDate]);
+
+  useEffect(() => {
+    setStartDate("");
+    setEndDate("");
+  }, [activeTab]);
 
   // Standalone Snack Sale States
   const [showSnackSaleModal, setShowSnackSaleModal] = useState(false);
@@ -176,6 +187,8 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
         limit: String(LIMIT),
         ...(search ? { q: search } : {}),
         paymentStatus: activeTab === "UNPAID" ? "UNPAID" : "PAID",
+        ...(activeTab === "PAID" && startDate ? { from: `${startDate}T00:00:00.000Z` } : {}),
+        ...(activeTab === "PAID" && endDate ? { to: `${endDate}T23:59:59.999Z` } : {}),
       });
       const res = await fetch(`/api/bookings?${params}`);
       if (res.ok) {
@@ -194,7 +207,7 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
     } finally {
       setLoading(false);
     }
-  }, [page, search, activeTab]);
+  }, [page, search, activeTab, startDate, endDate]);
 
   useEffect(() => {
     fetchBookings();
@@ -442,33 +455,69 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
       </div>
 
       {/* Toolbar */}
-      <div className="flex flex-col sm:flex-row gap-3 items-center">
-        <button
-          onClick={handleOpenRecordSnackSaleModal}
-          className="px-4 py-2.5 bg-violet-600 hover:bg-violet-500 text-white rounded-xl font-bold shadow-lg shadow-violet-900/20 transition-all text-sm flex items-center gap-2 whitespace-nowrap self-stretch"
-        >
-          <Coins className="w-4 h-4" />
-          Record Snack Sale
-        </button>
-        <div className="relative flex-1 w-full">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
-          <input
-            value={search}
-            onChange={(e) => {
-              setSearch(e.target.value);
-              setPage(1);
-            }}
-            placeholder="Search customer, phone, notes…"
-            className="input-field pl-9"
-          />
+      <div className="flex flex-col gap-3">
+        <div className="flex flex-col sm:flex-row gap-3 items-center">
+          <button
+            onClick={handleOpenRecordSnackSaleModal}
+            className="px-4 py-2.5 bg-violet-600 hover:bg-violet-500 text-white rounded-xl font-bold shadow-lg shadow-violet-900/20 transition-all text-sm flex items-center gap-2 whitespace-nowrap self-stretch"
+          >
+            <Coins className="w-4 h-4" />
+            Record Snack Sale
+          </button>
+          <div className="relative flex-1 w-full">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
+            <input
+              value={search}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setPage(1);
+              }}
+              placeholder="Search customer, phone, notes…"
+              className="input-field pl-9"
+            />
+          </div>
+          <button
+            onClick={fetchBookings}
+            className="p-2.5 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white hover:border-zinc-700 transition-all self-stretch flex items-center justify-center"
+            title="Refresh"
+          >
+            <RefreshCw className="w-4 h-4" />
+          </button>
         </div>
-        <button
-          onClick={fetchBookings}
-          className="p-2.5 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white hover:border-zinc-700 transition-all self-stretch flex items-center justify-center"
-          title="Refresh"
-        >
-          <RefreshCw className="w-4 h-4" />
-        </button>
+
+        {/* Date Filter Row for History tab */}
+        {activeTab === "PAID" && (
+          <div className="flex flex-wrap items-center gap-3 bg-zinc-900/40 p-3 rounded-xl border border-zinc-800/60 animate-fade-in">
+            <span className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Filter Date Range:</span>
+            <div className="flex items-center gap-2">
+              <input
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className="input-field text-xs w-36 py-1.5 animate-fade-in"
+              />
+              <span className="text-xs text-zinc-500">to</span>
+              <input
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                className="input-field text-xs w-36 py-1.5 animate-fade-in"
+                min={startDate || undefined}
+              />
+            </div>
+            {(startDate || endDate) && (
+              <button
+                onClick={() => {
+                  setStartDate("");
+                  setEndDate("");
+                }}
+                className="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-semibold rounded-lg border border-zinc-700 transition-all active:scale-95"
+              >
+                Clear Range
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Payments Table */}

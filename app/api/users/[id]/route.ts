@@ -6,7 +6,10 @@ import { z } from "zod";
 const updateSchema = z.object({
   name: z.string().min(1).optional(),
   phone: z.string().min(7).optional(),
-  email: z.string().email().optional().nullable(),
+  email: z.preprocess(
+    (val) => (typeof val === "string" ? val.trim().toLowerCase() : val),
+    z.string().email().optional().nullable()
+  ),
   notes: z.string().optional().nullable(),
   isActive: z.boolean().optional(),
 });
@@ -39,6 +42,18 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
   const body = await req.json();
   const parsed = updateSchema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: "Validation failed" }, { status: 400 });
+
+  if (parsed.data.email) {
+    const existingEmail = await prisma.appUser.findFirst({
+      where: {
+        email: parsed.data.email,
+        id: { not: id },
+      },
+    });
+    if (existingEmail) {
+      return NextResponse.json({ error: "A user with this email already exists" }, { status: 409 });
+    }
+  }
 
   const user = await prisma.appUser.update({ where: { id }, data: parsed.data });
   return NextResponse.json(user);
