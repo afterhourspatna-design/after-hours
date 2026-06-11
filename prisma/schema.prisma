@@ -67,6 +67,13 @@ model AppUser {
   bookings     Booking[]
   feedback     Feedback[]
 
+  // Referral System Fields
+  referredById           String?
+  referredByPhone        String?
+  referredBy             AppUser?   @relation("UserReferrals", fields: [referredById], references: [id], onDelete: SetNull)
+  refereeUsers           AppUser[]  @relation("UserReferrals")
+  referralRewardsClaimed Int        @default(0)
+
   @@index([phone])
   @@index([role])
   @@map("app_users")

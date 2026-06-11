@@ -130,6 +130,7 @@ export default function BookingForm({ mode = "create", initialData, prefillDate,
   // Booking details
   const [bookingType, setBookingType] = useState(initialData?.bookingType ?? "HOURLY");
   const [source, setSource] = useState(initialData?.source ?? "WALK_IN");
+  const [referredByPhone, setReferredByPhone] = useState("");
   const [paymentStatus, setPaymentStatus] = useState(initialData?.paymentStatus ?? "UNPAID");
   const [notes, setNotes] = useState(initialData?.notes ?? "");
   const [accessoriesCount, setAccessoriesCount] = useState<number>(
@@ -276,6 +277,16 @@ export default function BookingForm({ mode = "create", initialData, prefillDate,
 
     if (!selectedGame) { toast.error("Please select a game"); return; }
     if (isGuest && (!guestName || !guestPhone)) { toast.error("Guest name and phone are required"); return; }
+    if (isGuest && source === "REFERRAL") {
+      if (!referredByPhone) {
+        toast.error("Please enter the phone number of the person who referred this guest");
+        return;
+      }
+      if (referredByPhone === guestPhone) {
+        toast.error("A guest cannot refer themselves");
+        return;
+      }
+    }
     if (!isGuest && !selectedUser) { toast.error("Please select a user or switch to Guest mode"); return; }
     if (unitAvailability === false) { toast.error("This unit is not available at the selected time"); return; }
 
@@ -292,6 +303,7 @@ export default function BookingForm({ mode = "create", initialData, prefillDate,
       bookingType,
       paymentStatus,
       source: role === "CUSTOMER" ? "ONLINE" : source,
+      referredByPhone: (isGuest && source === "REFERRAL") ? referredByPhone : null,
       notes: notes || null,
       couponCode: appliedCoupon || null,
     };
@@ -672,13 +684,31 @@ export default function BookingForm({ mode = "create", initialData, prefillDate,
           <div className="glass-card p-5 space-y-4">
             <h3 className="text-sm font-semibold text-white">Booking Details</h3>
             {role !== "CUSTOMER" && (
-              <div className="max-w-xs">
-                <label className="text-xs text-zinc-400 mb-1 block">Source</label>
-                <select value={source} onChange={e => setSource(e.target.value)} className="input-field">
-                  {Object.entries(SOURCE_LABELS).map(([k, v]) => (
-                    <option key={k} value={k}>{v}</option>
-                  ))}
-                </select>
+              <div className="space-y-4 max-w-xs">
+                <div>
+                  <label className="text-xs text-zinc-400 mb-1 block">Source</label>
+                  <select value={source} onChange={e => setSource(e.target.value)} className="input-field">
+                    {Object.entries(SOURCE_LABELS).map(([k, v]) => (
+                      <option key={k} value={k}>{v}</option>
+                    ))}
+                  </select>
+                </div>
+                {isGuest && source === "REFERRAL" && (
+                  <div>
+                    <label className="text-xs text-zinc-400 mb-1 block">Referrer Phone Number (10 Digits)</label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-zinc-500 font-bold">+91</span>
+                      <input
+                        type="tel"
+                        maxLength={10}
+                        value={referredByPhone}
+                        onChange={e => setReferredByPhone(e.target.value.replace(/\D/g, "").slice(0, 10))}
+                        placeholder="3000000000"
+                        className="input-field pl-12"
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
             )}
             {/* ── Coupons ── */}
