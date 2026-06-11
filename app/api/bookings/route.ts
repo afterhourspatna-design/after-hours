@@ -22,6 +22,7 @@ const createBookingSchema = z.object({
   priceOverride: z.number().optional().nullable(),
   accessoriesCount: z.number().int().min(0).default(0),
   couponCode: z.string().optional().nullable(),
+  referredByPhone: z.string().optional().nullable(),
 });
 
 export async function GET(req: NextRequest) {
@@ -141,11 +142,34 @@ export async function POST(req: NextRequest) {
       where: { phone: data.guestPhone },
     });
     if (!guestUser) {
+      let referredById = null;
+      let referredByPhone = null;
+      if (data.source === BookingSource.REFERRAL && data.referredByPhone) {
+        const cleanedPhone = data.referredByPhone.replace(/\D/g, "");
+        if (cleanedPhone) {
+          const referrer = await prisma.appUser.findFirst({
+            where: {
+              OR: [
+                { phone: data.referredByPhone },
+                { phone: { contains: cleanedPhone } }
+              ]
+            }
+          });
+          if (!referrer) {
+            return NextResponse.json({ error: "Referrer phone number not found in database. Please register the referring customer first." }, { status: 400 });
+          }
+          referredById = referrer.id;
+          referredByPhone = referrer.phone;
+        }
+      }
+
       guestUser = await prisma.appUser.create({
         data: {
           name: data.guestName || "Guest Customer",
           phone: data.guestPhone,
           role: "CUSTOMER",
+          referredById,
+          referredByPhone,
         },
       });
     }
