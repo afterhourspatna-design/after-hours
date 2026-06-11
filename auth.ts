@@ -6,7 +6,10 @@ import { z } from "zod";
 import { authConfig } from "./auth.config";
 
 const credentialsSchema = z.object({
-  email: z.string().email(),
+  email: z.preprocess(
+    (val) => (typeof val === "string" ? val.trim().toLowerCase() : val),
+    z.string().email()
+  ),
   password: z.string().min(1),
 });
 
@@ -27,8 +30,13 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
         const { email, password } = parsed.data;
 
-        const user = await prisma.appUser.findUnique({
-          where: { email },
+        const user = await prisma.appUser.findFirst({
+          where: {
+            email: {
+              equals: email,
+              mode: "insensitive",
+            },
+          },
           select: {
             id: true,
             name: true,
