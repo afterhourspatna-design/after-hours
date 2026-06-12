@@ -4,38 +4,141 @@ import { redirect } from "next/navigation";
 import { BookingStatus } from "@prisma/client";
 import { formatCurrency, cn } from "@/lib/utils";
 import {
-  BookOpen, Users, DollarSign, TrendingUp, Zap, Clock, AlertTriangle,
-  Download, Plus, Search, Filter, SlidersHorizontal,
+  BookOpen, Users, IndianRupee, TrendingUp, Zap, Clock, AlertTriangle,
+  Download, Plus, Search, Filter, SlidersHorizontal, Gamepad2, Coffee
 } from "lucide-react";
 import StatCard from "@/components/ui/StatCard";
 import HoldAlert from "@/components/bookings/HoldAlert";
-import DashboardCalendar from "@/components/bookings/DashboardCalendar";
 import {
-  startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth,
+  startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, subDays,
 } from "date-fns";
 
-async function getDashboardData(period: string = "today") {
+function getISTStartAndEnd(date: Date) {
+  const formatter = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Kolkata",
+    year: "numeric",
+    month: "numeric",
+    day: "numeric",
+  });
+  const parts = formatter.formatToParts(date);
+  const year = parseInt(parts.find(p => p.type === "year")!.value, 10);
+  const month = parseInt(parts.find(p => p.type === "month")!.value, 10) - 1;
+  const day = parseInt(parts.find(p => p.type === "day")!.value, 10);
+
+  const start = new Date(Date.UTC(year, month, day, 0, 0, 0, 0) - (5.5 * 60 * 60 * 1000));
+  const end = new Date(Date.UTC(year, month, day, 23, 59, 59, 999) - (5.5 * 60 * 60 * 1000));
+  return { start, end };
+}
+
+function getISTWeekBounds(date: Date) {
+  const istTime = new Date(date.getTime() + (5.5 * 60 * 60 * 1000));
+  const dayOfWeek = istTime.getUTCDay();
+  const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+
+  const mondayVal = new Date(istTime);
+  mondayVal.setUTCDate(istTime.getUTCDate() - daysToMonday);
+
+  const sundayVal = new Date(mondayVal);
+  sundayVal.setUTCDate(mondayVal.getUTCDate() + 6);
+
+  const start = new Date(Date.UTC(mondayVal.getUTCFullYear(), mondayVal.getUTCMonth(), mondayVal.getUTCDate(), 0, 0, 0, 0) - (5.5 * 60 * 60 * 1000));
+  const end = new Date(Date.UTC(sundayVal.getUTCFullYear(), sundayVal.getUTCMonth(), sundayVal.getUTCDate(), 23, 59, 59, 999) - (5.5 * 60 * 60 * 1000));
+  return { start, end };
+}
+
+function getISTMonthBounds(date: Date) {
+  const istTime = new Date(date.getTime() + (5.5 * 60 * 60 * 1000));
+  const year = istTime.getUTCFullYear();
+  const month = istTime.getUTCMonth();
+
+  const start = new Date(Date.UTC(year, month, 1, 0, 0, 0, 0) - (5.5 * 60 * 60 * 1000));
+  
+  const nextMonthFirst = new Date(Date.UTC(year, month + 1, 1, 0, 0, 0, 0));
+  const lastDay = new Date(nextMonthFirst.getTime() - 1);
+  const end = new Date(lastDay.getTime() - (5.5 * 60 * 60 * 1000));
+
+  return { start, end };
+}
+
+function formatInIST(date: Date): string {
+  const formatter = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Kolkata",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+  const parts = formatter.formatToParts(date);
+  const year = parts.find(p => p.type === "year")!.value;
+  const month = parts.find(p => p.type === "month")!.value;
+  const day = parts.find(p => p.type === "day")!.value;
+  return `${year}-${month}-${day}`;
+}
+
+function parseISTDateString(dateStr: string, isEnd: boolean) {
+  const [year, month, day] = dateStr.split("-").map(Number);
+  if (isEnd) {
+    return new Date(Date.UTC(year, month - 1, day, 23, 59, 59, 999) - (5.5 * 60 * 60 * 1000));
+  } else {
+    return new Date(Date.UTC(year, month - 1, day, 0, 0, 0, 0) - (5.5 * 60 * 60 * 1000));
+  }
+}
+
+async function getDashboardData(period: string = "today", from?: string, to?: string) {
   const now = new Date();
+  const boundsToday = getISTStartAndEnd(now);
+  const boundsWeek = getISTWeekBounds(now);
+  const boundsMonth = getISTMonthBounds(now);
+
   let startDate: Date | undefined;
-  let endDate: Date = endOfDay(now);
+  let endDate: Date | undefined;
 
   if (period === "today") {
-    startDate = startOfDay(now);
+    startDate = boundsToday.start;
+    endDate = boundsToday.end;
   } else if (period === "week") {
-    startDate = startOfWeek(now, { weekStartsOn: 1 });
-    endDate = endOfWeek(now, { weekStartsOn: 1 });
+    startDate = boundsWeek.start;
+    endDate = boundsWeek.end;
   } else if (period === "month") {
-    startDate = startOfMonth(now);
-    endDate = endOfMonth(now);
+    startDate = boundsMonth.start;
+    endDate = boundsMonth.end;
   } else if (period === "all") {
     startDate = undefined;
+    endDate = undefined;
+  } else if (period === "custom" && from && to) {
+    try {
+      startDate = parseISTDateString(from, false);
+      endDate = parseISTDateString(to, true);
+    } catch (e) {
+      startDate = boundsToday.start;
+      endDate = boundsToday.end;
+    }
   }
 
-  const whereRange = startDate ? { startDateTime: { gte: startDate, lte: endDate } } : {};
+  const whereRange = startDate && endDate ? { startDateTime: { gte: startDate, lte: endDate } } : {};
 
-  const [totalCount, periodCount, activeNow, periodRev, holds, recentBookings] = await Promise.all([
+  // Get bounds for last 7 days (including today)
+  const bounds7Days = {
+    start: new Date(boundsToday.start.getTime() - (6 * 24 * 60 * 60 * 1000)),
+    end: boundsToday.end,
+  };
+
+  const [
+    totalCount,
+    periodCount,
+    todayCount,
+    weekCount,
+    monthCount,
+    activeNow,
+    periodBookings,
+    holds,
+    recentBookings,
+    last7DaysBookings,
+  ] = await Promise.all([
     prisma.booking.count(),
     prisma.booking.count({ where: whereRange }),
+    prisma.booking.count({ where: { startDateTime: { gte: boundsToday.start, lte: boundsToday.end } } }),
+    prisma.booking.count({ where: { startDateTime: { gte: boundsWeek.start, lte: boundsWeek.end } } }),
+    prisma.booking.count({ where: { startDateTime: { gte: boundsMonth.start, lte: boundsMonth.end } } }),
     prisma.booking.findMany({
       where: {
         bookingStatus: { in: [BookingStatus.CONFIRMED, BookingStatus.HOLD] },
@@ -48,12 +151,18 @@ async function getDashboardData(period: string = "today") {
       },
       orderBy: { endDateTime: "asc" },
     }),
-    prisma.booking.aggregate({
+    prisma.booking.findMany({
       where: {
         ...whereRange,
         bookingStatus: { in: [BookingStatus.CONFIRMED, BookingStatus.COMPLETED] },
       },
-      _sum: { finalAmount: true },
+      select: { 
+        finalAmount: true, 
+        negotiatedAmount: true, 
+        snacksAmount: true, 
+        paymentStatus: true,
+        game: { select: { name: true } },
+      },
     }),
     prisma.booking.findMany({
       where: { bookingStatus: BookingStatus.HOLD, holdExpiresAt: { gt: now } },
@@ -73,29 +182,102 @@ async function getDashboardData(period: string = "today") {
       },
       orderBy: { createdAt: "desc" },
     }),
+    prisma.booking.findMany({
+      where: {
+        startDateTime: { gte: bounds7Days.start, lte: bounds7Days.end },
+        bookingStatus: { in: [BookingStatus.CONFIRMED, BookingStatus.COMPLETED] },
+      },
+      select: { startDateTime: true, finalAmount: true, negotiatedAmount: true, snacksAmount: true, paymentStatus: true },
+    }),
   ]);
+
+  let periodGameRevenue = 0;
+  let periodSnacksRevenue = 0;
+  const gameMap: Record<string, { count: number; revenue: number }> = {};
+
+  for (const b of periodBookings) {
+    const isPaid = b.paymentStatus === "PAID";
+    const baseRev = isPaid 
+      ? Number(b.negotiatedAmount ?? b.finalAmount) 
+      : Number(b.finalAmount);
+    const snacksRev = Number(b.snacksAmount ?? 0);
+    
+    periodGameRevenue += baseRev;
+    periodSnacksRevenue += snacksRev;
+
+    const gameName = b.game?.name || "Other";
+    if (!gameMap[gameName]) {
+      gameMap[gameName] = { count: 0, revenue: 0 };
+    }
+    gameMap[gameName].count += 1;
+    gameMap[gameName].revenue += baseRev;
+  }
+  const periodRevenue = periodGameRevenue + periodSnacksRevenue;
+
+  const gameUtilization = Object.entries(gameMap)
+    .map(([name, stats]) => ({
+      name,
+      count: stats.count,
+      revenue: stats.revenue,
+    }))
+    .sort((a, b) => b.revenue - a.revenue);
+
+  const dailyMap: Record<string, number> = {};
+  for (let i = 6; i >= 0; i--) {
+    const day = subDays(now, i);
+    dailyMap[formatInIST(day)] = 0;
+  }
+
+  for (const b of last7DaysBookings) {
+    const key = formatInIST(b.startDateTime);
+    if (key in dailyMap) {
+      const isPaid = b.paymentStatus === "PAID";
+      const baseRev = isPaid 
+        ? Number(b.negotiatedAmount ?? b.finalAmount) 
+        : Number(b.finalAmount);
+      const snacksRev = Number(b.snacksAmount ?? 0);
+      dailyMap[key] += baseRev + snacksRev;
+    }
+  }
+
+  const last7DaysRevenue = Object.entries(dailyMap).map(([date, amount]) => {
+    const dateObj = new Date(date);
+    const dayName = dateObj.toLocaleDateString("en-US", { weekday: "narrow" });
+    return {
+      date,
+      dayName,
+      amount,
+    };
+  });
 
   return {
     total: totalCount,
     periodCount,
+    todayCount,
+    weekCount,
+    monthCount,
     activeNow: activeNow.length,
     activeBookings: activeNow,
-    periodRevenue: Number(periodRev._sum.finalAmount ?? 0),
+    periodRevenue,
+    periodGameRevenue,
+    periodSnacksRevenue,
+    gameUtilization,
     holds,
     recentBookings,
+    last7DaysRevenue,
   };
 }
 
 export default async function AdminDashboard({
   searchParams,
 }: {
-  searchParams: Promise<{ period?: string }>;
+  searchParams: Promise<{ period?: string; from?: string; to?: string }>;
 }) {
   const session = await auth();
   if (!session?.user) redirect("/login");
 
-  const { period = "today" } = await searchParams;
-  const data = await getDashboardData(period);
+  const { period = "today", from, to } = await searchParams;
+  const data = await getDashboardData(period, from, to);
 
   const stats = [
     {
@@ -103,41 +285,52 @@ export default async function AdminDashboard({
       value: data.periodCount.toLocaleString(),
       icon: BookOpen,
       iconColor: "text-zinc-400",
-      subtitle: "vs last period",
-      trend: { value: 12.4, label: "up" } as any,
+      subtitle: "Bookings in period",
     },
     {
       title: "Active Sessions",
       value: `${data.activeNow} / 8 units`,
       icon: Zap,
       iconColor: "text-emerald-400",
-      subtitle: "vs last hour",
-      trend: { value: 2, label: "up" } as any,
+      subtitle: "Current parlor load",
     },
     {
-      title: "Pending Holds",
-      value: data.holds.length,
-      icon: Clock,
+      title: "Game Bookings",
+      value: formatCurrency(data.periodGameRevenue),
+      icon: Gamepad2,
+      iconColor: "text-indigo-400",
+      subtitle: "From console play",
+    },
+    {
+      title: "Snack Sales",
+      value: formatCurrency(data.periodSnacksRevenue),
+      icon: Coffee,
       iconColor: "text-amber-400",
-      subtitle: "vs last period",
-      trend: { value: 1, label: "down" } as any,
+      subtitle: "From snack sales",
     },
     {
-      title: "Revenue",
+      title: "Total Revenue",
       value: formatCurrency(data.periodRevenue),
-      icon: DollarSign,
+      icon: IndianRupee,
       iconColor: "text-violet-400",
-      subtitle: "vs last period",
-      trend: { value: 8.7, label: "up" } as any,
+      subtitle: "Combined total",
     },
   ];
 
   const periods = [
-    { id: "today", label: "Today", count: data.periodCount },
-    { id: "week", label: "Week", count: 31 },
-    { id: "month", label: "Month", count: 142 },
+    { id: "today", label: "Today", count: data.todayCount },
+    { id: "week", label: "Week", count: data.weekCount },
+    { id: "month", label: "Month", count: data.monthCount },
     { id: "all", label: "All time", count: data.total },
   ];
+
+  if (period === "custom" && from && to) {
+    periods.push({
+      id: "custom",
+      label: `Custom Range (${from} to ${to})`,
+      count: data.periodCount,
+    });
+  }
 
   return (
     <div className="space-y-8 max-w-[1400px] mx-auto">
@@ -196,7 +389,7 @@ export default async function AdminDashboard({
           {periods.map((p) => (
             <a
               key={p.id}
-              href={`/admin/dashboard?period=${p.id}`}
+              href={p.id === "custom" ? `/admin/dashboard?period=custom&from=${from}&to=${to}` : `/admin/dashboard?period=${p.id}`}
               className={cn(
                 "flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-xl transition-all duration-200",
                 period === p.id
@@ -215,16 +408,38 @@ export default async function AdminDashboard({
           ))}
         </div>
 
-        <div className="flex items-center gap-3">
-          <button className="flex items-center gap-2 px-4 py-2 text-zinc-500 hover:text-zinc-300 text-xs font-bold transition-all">
-            <Filter className="w-4 h-4" />
-            Filter
-          </button>
-          <button className="flex items-center gap-2 px-4 py-2 text-zinc-500 hover:text-zinc-300 text-xs font-bold transition-all">
-            <SlidersHorizontal className="w-4 h-4" />
-            Customize
-          </button>
-        </div>
+        <form action="/admin/dashboard" method="GET" className="flex items-center gap-2">
+          <input type="hidden" name="period" value="custom" />
+          <div className="flex items-center gap-1.5 bg-zinc-900/40 p-1.5 rounded-2xl border border-zinc-900">
+            <div className="flex items-center gap-1.5 px-2">
+              <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">From</span>
+              <input 
+                type="date" 
+                name="from" 
+                defaultValue={from || ""}
+                className="bg-transparent border-none text-xs text-zinc-300 focus:outline-none focus:ring-0 cursor-pointer [color-scheme:dark]"
+                required
+              />
+            </div>
+            <div className="w-[1px] h-4 bg-zinc-800" />
+            <div className="flex items-center gap-1.5 px-2">
+              <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">To</span>
+              <input 
+                type="date" 
+                name="to"
+                defaultValue={to || ""}
+                className="bg-transparent border-none text-xs text-zinc-300 focus:outline-none focus:ring-0 cursor-pointer [color-scheme:dark]"
+                required
+              />
+            </div>
+            <button 
+              type="submit"
+              className="px-3 py-1.5 bg-violet-600 hover:bg-violet-500 text-white text-[10px] font-black uppercase tracking-wider rounded-xl transition-all active:scale-95"
+            >
+              Apply
+            </button>
+          </div>
+        </form>
       </div>
 
       {/* Hold Alerts */}
@@ -235,42 +450,118 @@ export default async function AdminDashboard({
       )}
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6">
         {stats.map((s, idx) => (
-          <div key={s.title} className="animate-in fade-in zoom-in-95 duration-500" style={{ animationDelay: `${idx * 100}ms` }}>
-            <StatCard {...s} />
+          <div key={s.title} className="animate-in fade-in zoom-in-95 duration-500 h-full" style={{ animationDelay: `${idx * 100}ms` }}>
+            <StatCard {...s} className="h-full flex flex-col justify-between" />
           </div>
         ))}
       </div>
 
       {/* Main Content Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-        {/* Calendar View */}
-        <div className="lg:col-span-8 space-y-6">
+        {/* Game Performance */}
+        <div className="lg:col-span-8 space-y-8">
           <div className="glass-card overflow-hidden border-zinc-900/50 shadow-2xl">
             <div className="px-6 py-5 border-b border-zinc-900 flex items-center justify-between bg-zinc-950/20">
               <div className="flex items-center gap-3">
                 <div className="p-2 rounded-lg bg-violet-500/10 border border-violet-500/20">
-                  <BookOpen className="w-4 h-4 text-violet-400" />
+                  <Gamepad2 className="w-4 h-4 text-violet-400" />
                 </div>
                 <div>
-                  <h2 className="text-sm font-bold text-white tracking-tight">Booking schedule</h2>
-                  <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">Thursday, May 14</p>
+                  <h2 className="text-sm font-bold text-white tracking-tight">Game Performance</h2>
+                  <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">Booking count and revenue per game</p>
                 </div>
               </div>
-              <div className="flex items-center gap-1 bg-zinc-900/50 p-1 rounded-xl border border-zinc-800/60">
-                <button className="px-3 py-1.5 text-[10px] font-black uppercase tracking-tighter bg-zinc-800 text-white rounded-lg">Day</button>
-                <button className="px-3 py-1.5 text-[10px] font-black uppercase tracking-tighter text-zinc-500 hover:text-zinc-300 rounded-lg">Week</button>
-              </div>
+              <span className="text-[10px] font-mono font-bold text-violet-400 bg-violet-500/10 px-2.5 py-1 rounded border border-violet-500/20 uppercase tracking-wider">
+                {period}
+              </span>
             </div>
-            <div className="p-2">
-              <DashboardCalendar />
+            
+            <div className="p-6 space-y-6">
+              {data.gameUtilization.length > 0 ? (
+                data.gameUtilization.map((game, idx) => {
+                  const maxRevenue = Math.max(...data.gameUtilization.map(g => g.revenue), 1);
+                  const sharePct = maxRevenue > 0 ? (game.revenue / maxRevenue) * 100 : 0;
+                  
+                  return (
+                    <div key={game.name} className="space-y-2.5">
+                      <div className="flex items-center justify-between text-xs">
+                        <div className="flex items-center gap-2">
+                          <span className="w-5 h-5 rounded-md bg-zinc-900 border border-zinc-800 flex items-center justify-center text-[10px] font-bold text-zinc-500">
+                            {idx + 1}
+                          </span>
+                          <span className="font-bold text-zinc-200">{game.name}</span>
+                        </div>
+                        <div className="flex items-center gap-4 text-zinc-400 font-medium">
+                          <span>{game.count} {game.count === 1 ? 'booking' : 'bookings'}</span>
+                          <span className="font-bold font-mono text-white">{formatCurrency(game.revenue)}</span>
+                        </div>
+                      </div>
+                      
+                      <div className="w-full bg-zinc-900 h-2 rounded-full overflow-hidden border border-zinc-800/40 relative">
+                        <div 
+                          className="bg-gradient-to-r from-violet-600 to-indigo-500 h-2 rounded-full transition-all duration-500" 
+                          style={{ width: `${sharePct}%` }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })
+              ) : (
+                <div className="text-center py-12 text-zinc-600 text-xs font-medium italic">
+                  No bookings registered in this period
+                </div>
+              )}
             </div>
           </div>
         </div>
 
         {/* Activity & Side Info */}
         <div className="lg:col-span-4 space-y-6">
+          {/* Revenue 7d Chart Section (Simulated from screenshot) */}
+          <div className="glass-card border-zinc-900/50 bg-zinc-950/30 p-5 space-y-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <TrendingUp className="w-4 h-4 text-zinc-400" />
+                <h3 className="text-sm font-bold text-white">Revenue • 7d</h3>
+              </div>
+              <p className="text-xs font-bold text-zinc-400">{formatCurrency(data.periodRevenue)}</p>
+            </div>
+
+            <div className="flex items-end justify-between h-32 gap-2 pt-6">
+              {data.last7DaysRevenue.map((d, i) => {
+                const maxVal = Math.max(...data.last7DaysRevenue.map(item => item.amount), 100);
+                const heightPct = maxVal > 0 ? (d.amount / maxVal) * 100 : 0;
+                const formattedAmount = d.amount >= 1000 
+                  ? `₹${(d.amount / 1000).toFixed(1)}k` 
+                  : `₹${d.amount}`;
+                
+                return (
+                  <div key={d.date} className="flex-1 h-full flex flex-col justify-end items-center group">
+                    <div className="w-full h-24 flex items-end relative">
+                      <div
+                        className={cn(
+                          "w-full rounded-t-md transition-all duration-500 cursor-help relative",
+                          i === 6 ? "bg-violet-500 shadow-[0_0_15px_rgba(139,92,246,0.3)]" : "bg-zinc-800 hover:bg-zinc-700"
+                        )}
+                        style={{ height: `${heightPct}%` }}
+                      >
+                        <div className="absolute -top-5 left-1/2 -translate-x-1/2 text-[9px] font-bold text-zinc-400 whitespace-nowrap">
+                          {d.amount > 0 ? formattedAmount : ""}
+                        </div>
+                        <div className="absolute -top-10 left-1/2 -translate-x-1/2 bg-zinc-900 text-[10px] font-bold text-white px-2 py-1 rounded border border-zinc-700 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
+                          ₹{d.amount.toLocaleString()}
+                        </div>
+                      </div>
+                    </div>
+                    <span className="text-[10px] font-black text-zinc-600 uppercase mt-2">{d.dayName}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
           {/* Live Activity Section */}
           <div className="glass-card border-zinc-900/50 bg-zinc-950/30">
             <div className="px-5 py-4 border-b border-zinc-900 flex items-center justify-between">
@@ -304,36 +595,6 @@ export default async function AdminDashboard({
               )) : (
                 <p className="text-center py-8 text-zinc-600 text-xs font-medium italic">No active sessions</p>
               )}
-            </div>
-          </div>
-
-          {/* Revenue 7d Chart Section (Simulated from screenshot) */}
-          <div className="glass-card border-zinc-900/50 bg-zinc-950/30 p-5 space-y-6">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <TrendingUp className="w-4 h-4 text-zinc-400" />
-                <h3 className="text-sm font-bold text-white">Revenue • 7d</h3>
-              </div>
-              <p className="text-xs font-bold text-zinc-400">{formatCurrency(data.periodRevenue)}</p>
-            </div>
-
-            <div className="flex items-end justify-between h-32 gap-2 pt-4">
-              {[40, 60, 45, 30, 100, 50, 40].map((h, i) => (
-                <div key={i} className="flex-1 flex flex-col items-center gap-2 group">
-                  <div
-                    className={cn(
-                      "w-full rounded-t-md transition-all duration-500 cursor-help relative",
-                      i === 4 ? "bg-violet-500 shadow-[0_0_15px_rgba(139,92,246,0.3)]" : "bg-zinc-800 hover:bg-zinc-700"
-                    )}
-                    style={{ height: `${h}%` }}
-                  >
-                    <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-zinc-900 text-[10px] font-bold text-white px-2 py-1 rounded border border-zinc-700 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
-                      Rs {h * 100}
-                    </div>
-                  </div>
-                  <span className="text-[10px] font-black text-zinc-600 uppercase">{"MTWTFSS"[i]}</span>
-                </div>
-              ))}
             </div>
           </div>
         </div>
