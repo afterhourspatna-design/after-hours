@@ -45,8 +45,9 @@ export async function suggestAvailableUnit(params: {
   gameId: string;
   startDateTime: Date;
   endDateTime: Date;
+  excludeBookingId?: string;
 }): Promise<string | null> {
-  const { gameId, startDateTime, endDateTime } = params;
+  const { gameId, startDateTime, endDateTime, excludeBookingId } = params;
 
   const units = await prisma.resourceUnit.findMany({
     where: { gameId, isActive: true },
@@ -58,6 +59,7 @@ export async function suggestAvailableUnit(params: {
       resourceUnitId: unit.id,
       startDateTime,
       endDateTime,
+      excludeBookingId,
     });
     if (available) return unit.id;
   }

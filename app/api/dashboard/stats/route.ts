@@ -1,8 +1,54 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from "date-fns";
 import { BookingStatus } from "@prisma/client";
+
+function getISTStartAndEnd(date: Date) {
+  const formatter = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Kolkata",
+    year: "numeric",
+    month: "numeric",
+    day: "numeric",
+  });
+  const parts = formatter.formatToParts(date);
+  const year = parseInt(parts.find(p => p.type === "year")!.value, 10);
+  const month = parseInt(parts.find(p => p.type === "month")!.value, 10) - 1;
+  const day = parseInt(parts.find(p => p.type === "day")!.value, 10);
+
+  const start = new Date(Date.UTC(year, month, day, 0, 0, 0, 0) - (5.5 * 60 * 60 * 1000));
+  const end = new Date(Date.UTC(year, month, day, 23, 59, 59, 999) - (5.5 * 60 * 60 * 1000));
+  return { start, end };
+}
+
+function getISTWeekBounds(date: Date) {
+  const istTime = new Date(date.getTime() + (5.5 * 60 * 60 * 1000));
+  const dayOfWeek = istTime.getUTCDay();
+  const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+
+  const mondayVal = new Date(istTime);
+  mondayVal.setUTCDate(istTime.getUTCDate() - daysToMonday);
+
+  const sundayVal = new Date(mondayVal);
+  sundayVal.setUTCDate(mondayVal.getUTCDate() + 6);
+
+  const start = new Date(Date.UTC(mondayVal.getUTCFullYear(), mondayVal.getUTCMonth(), mondayVal.getUTCDate(), 0, 0, 0, 0) - (5.5 * 60 * 60 * 1000));
+  const end = new Date(Date.UTC(sundayVal.getUTCFullYear(), sundayVal.getUTCMonth(), sundayVal.getUTCDate(), 23, 59, 59, 999) - (5.5 * 60 * 60 * 1000));
+  return { start, end };
+}
+
+function getISTMonthBounds(date: Date) {
+  const istTime = new Date(date.getTime() + (5.5 * 60 * 60 * 1000));
+  const year = istTime.getUTCFullYear();
+  const month = istTime.getUTCMonth();
+
+  const start = new Date(Date.UTC(year, month, 1, 0, 0, 0, 0) - (5.5 * 60 * 60 * 1000));
+  
+  const nextMonthFirst = new Date(Date.UTC(year, month + 1, 1, 0, 0, 0, 0));
+  const lastDay = new Date(nextMonthFirst.getTime() - 1);
+  const end = new Date(lastDay.getTime() - (5.5 * 60 * 60 * 1000));
+
+  return { start, end };
+}
 
 export async function GET() {
   const session = await auth();
@@ -11,22 +57,19 @@ export async function GET() {
   if (!["ADMIN", "STAFF"].includes(role)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const now = new Date();
-  const todayStart = startOfDay(now);
-  const todayEnd = endOfDay(now);
-  const weekStart = startOfWeek(now, { weekStartsOn: 1 });
-  const weekEnd = endOfWeek(now, { weekStartsOn: 1 });
-  const monthStart = startOfMonth(now);
-  const monthEnd = endOfMonth(now);
+  const todayBounds = getISTStartAndEnd(now);
+  const weekBounds = getISTWeekBounds(now);
+  const monthBounds = getISTMonthBounds(now);
 
   const [
-    totalBookings, todayBookings, activeNow, weeklyRevenue, monthlyRevenue, holdCount,
+    totalBookings, todayBookings, activeNow, weeklyBookings, monthlyBookings, holdCount,
   ] = await Promise.all([
     // Total all-time
     prisma.booking.count(),
 
     // Today
     prisma.booking.count({
-      where: { startDateTime: { gte: todayStart, lte: todayEnd } },
+      where: { startDateTime: { gte: todayBounds.start, lte: todayBounds.end } },
     }),
 
     // Active right now
@@ -38,22 +81,22 @@ export async function GET() {
       },
     }),
 
-    // Weekly revenue (CONFIRMED + COMPLETED)
-    prisma.booking.aggregate({
+    // Weekly bookings (CONFIRMED + COMPLETED)
+    prisma.booking.findMany({
       where: {
-        startDateTime: { gte: weekStart, lte: weekEnd },
+        startDateTime: { gte: weekBounds.start, lte: weekBounds.end },
         bookingStatus: { in: [BookingStatus.CONFIRMED, BookingStatus.COMPLETED] },
       },
-      _sum: { finalAmount: true },
+      select: { finalAmount: true, negotiatedAmount: true, snacksAmount: true, paymentStatus: true },
     }),
 
-    // Monthly revenue
-    prisma.booking.aggregate({
+    // Monthly bookings (CONFIRMED + COMPLETED)
+    prisma.booking.findMany({
       where: {
-        startDateTime: { gte: monthStart, lte: monthEnd },
+        startDateTime: { gte: monthBounds.start, lte: monthBounds.end },
         bookingStatus: { in: [BookingStatus.CONFIRMED, BookingStatus.COMPLETED] },
       },
-      _sum: { finalAmount: true },
+      select: { finalAmount: true, negotiatedAmount: true, snacksAmount: true, paymentStatus: true },
     }),
 
     // Active holds
@@ -62,12 +105,30 @@ export async function GET() {
     }),
   ]);
 
+  const weeklyRevenue = weeklyBookings.reduce((sum, b) => {
+    const isPaid = b.paymentStatus === "PAID";
+    const baseRev = isPaid 
+      ? Number(b.negotiatedAmount ?? b.finalAmount) 
+      : Number(b.finalAmount);
+    const snacksRev = Number(b.snacksAmount ?? 0);
+    return sum + baseRev + snacksRev;
+  }, 0);
+
+  const monthlyRevenue = monthlyBookings.reduce((sum, b) => {
+    const isPaid = b.paymentStatus === "PAID";
+    const baseRev = isPaid 
+      ? Number(b.negotiatedAmount ?? b.finalAmount) 
+      : Number(b.finalAmount);
+    const snacksRev = Number(b.snacksAmount ?? 0);
+    return sum + baseRev + snacksRev;
+  }, 0);
+
   return NextResponse.json({
     totalBookings,
     todayBookings,
     activeNow,
-    weeklyRevenue: Number(weeklyRevenue._sum.finalAmount ?? 0),
-    monthlyRevenue: Number(monthlyRevenue._sum.finalAmount ?? 0),
+    weeklyRevenue,
+    monthlyRevenue,
     holdCount,
   });
 }

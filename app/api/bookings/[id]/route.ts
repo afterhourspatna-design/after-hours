@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { checkAvailability } from "@/lib/booking-helpers";
+import { checkAvailability, suggestAvailableUnit } from "@/lib/booking-helpers";
+import { calculateBookingPrice } from "@/lib/pricing";
 import { BookingStatus, PaymentStatus } from "@prisma/client";
 import { addMinutes } from "date-fns";
 import { z } from "zod";
@@ -18,6 +19,11 @@ const updateSchema = z.object({
   action: z.enum(["CHECK_IN", "CHECK_OUT"]).optional(),
   accessoriesCount: z.number().int().min(0).optional(),
   couponCode: z.string().optional().nullable(),
+  gameId: z.string().optional(),
+  userId: z.string().optional().nullable(),
+  guestName: z.string().optional().nullable(),
+  guestPhone: z.string().optional().nullable(),
+  referredByPhone: z.string().optional().nullable(),
 });
 
 export async function GET(
@@ -60,83 +66,136 @@ export async function PUT(
   const data = parsed.data;
   const updateData: any = { ...data };
   delete updateData.action;
+  delete updateData.couponCode;
+  delete updateData.referredByPhone;
 
-  // Handle coupon changes
-  if (data.couponCode) {
-    const cleanedCode = data.couponCode.trim().toUpperCase();
-    const coupon = await prisma.coupon.findUnique({
-      where: { code: cleanedCode }
-    });
-    if (!coupon) {
-      return NextResponse.json({ error: "Invalid coupon code" }, { status: 400 });
-    }
-    if (!coupon.isActive) {
-      return NextResponse.json({ error: "Coupon is inactive" }, { status: 400 });
-    }
-    if (!coupon.allowedRoles.includes(role as any)) {
-      return NextResponse.json({ error: "Coupon not allowed for your role" }, { status: 400 });
-    }
-
-    const currentFinal = Number(updateData.finalAmount ?? existing.finalAmount);
-    const currentCouponDiscount = Number(existing.couponId === coupon.id ? existing.couponDiscount : 0);
-    const baseAmount = currentFinal + currentCouponDiscount;
-
-    let discount = 0;
-    if (coupon.discountType === "PERCENTAGE") {
-      discount = baseAmount * (Number(coupon.discountValue) / 100);
-      if (coupon.maxDiscountAmount) {
-        discount = Math.min(discount, Number(coupon.maxDiscountAmount));
-      }
-    } else {
-      discount = Math.min(baseAmount, Number(coupon.discountValue));
-    }
-
-    updateData.couponId = coupon.id;
-    updateData.couponDiscount = Math.round(discount * 100) / 100;
-    updateData.finalAmount = Math.max(0, Math.round((baseAmount - discount) * 100) / 100);
-    delete updateData.couponCode;
-
-    // Increment usedCount if it is a new coupon for this booking
-    if (existing.couponId !== coupon.id) {
-      await prisma.coupon.update({
-        where: { id: coupon.id },
-        data: { usedCount: { increment: 1 } }
+  // Resolve userId if user/guest details are changed
+  let resolvedUserId = existing.userId;
+  if (data.userId !== undefined || data.guestPhone !== undefined) {
+    if (data.userId) {
+      resolvedUserId = data.userId;
+    } else if (data.guestPhone) {
+      let guestUser = await prisma.appUser.findUnique({
+        where: { phone: data.guestPhone },
       });
-    }
-  } else if (data.couponCode === null) {
-    const currentFinal = Number(updateData.finalAmount ?? existing.finalAmount);
-    const currentCouponDiscount = Number(existing.couponDiscount);
-    const baseAmount = currentFinal + currentCouponDiscount;
+      if (!guestUser) {
+        let referredById = null;
+        let referredByPhone = null;
+        if (data.source === "REFERRAL" && data.referredByPhone) {
+          const cleanedPhone = data.referredByPhone.replace(/\D/g, "");
+          if (cleanedPhone) {
+            const referrer = await prisma.appUser.findFirst({
+              where: {
+                OR: [
+                  { phone: data.referredByPhone },
+                  { phone: { contains: cleanedPhone } }
+                ]
+              }
+            });
+            if (referrer) {
+              referredById = referrer.id;
+              referredByPhone = referrer.phone;
+            }
+          }
+        }
 
-    updateData.couponId = null;
-    updateData.couponDiscount = 0;
-    updateData.finalAmount = baseAmount;
-    delete updateData.couponCode;
+        guestUser = await prisma.appUser.create({
+          data: {
+            name: data.guestName || "Guest Customer",
+            phone: data.guestPhone,
+            role: "CUSTOMER",
+            referredById,
+            referredByPhone,
+          },
+        });
+      }
+      resolvedUserId = guestUser.id;
+    } else {
+      resolvedUserId = null;
+    }
+    updateData.userId = resolvedUserId;
   }
+
+  // Resolve gameId
+  const gameId = data.gameId ?? existing.gameId;
 
   // Validate accessoriesCount against game config
   if (data.accessoriesCount !== undefined) {
-    const game = await prisma.game.findUniqueOrThrow({ where: { id: existing.gameId } });
+    const game = await prisma.game.findUniqueOrThrow({ where: { id: gameId } });
     if (game.hasAccessories && data.accessoriesCount > game.maxAccessories) {
       return NextResponse.json({ error: `Maximum allowed accessories is ${game.maxAccessories}` }, { status: 400 });
     }
   }
 
+  // Resolve start time, duration, and end time
+  let start = existing.startDateTime;
+  let duration = existing.durationMinutes;
+
   if (data.action === "CHECK_IN") {
-    updateData.startDateTime = new Date();
+    start = new Date();
+    updateData.startDateTime = start;
+    
+    // Validate or auto-assign unit for start
+    const end = addMinutes(start, duration);
+    let resourceUnitId = existing.resourceUnitId;
+    if (!resourceUnitId) {
+      resourceUnitId = await suggestAvailableUnit({
+        gameId,
+        startDateTime: start,
+        endDateTime: end,
+        excludeBookingId: id,
+      });
+      if (!resourceUnitId) {
+        return NextResponse.json({ error: "No available units for this time slot" }, { status: 409 });
+      }
+      updateData.resourceUnitId = resourceUnitId;
+    }
   } else if (data.action === "CHECK_OUT") {
-    updateData.endDateTime = new Date();
-    updateData.durationMinutes = Math.max(15, Math.ceil((updateData.endDateTime.getTime() - existing.startDateTime.getTime()) / 60000));
+    const end = new Date();
+    duration = Math.max(15, Math.ceil((end.getTime() - existing.startDateTime.getTime()) / 60000));
+    updateData.endDateTime = end;
+    updateData.durationMinutes = duration;
     updateData.bookingStatus = BookingStatus.COMPLETED;
-  } else if (data.startDateTime && data.durationMinutes) {
-    const newStart = new Date(data.startDateTime);
-    const newEnd = addMinutes(newStart, data.durationMinutes);
-    const unitId = data.resourceUnitId ?? existing.resourceUnitId;
-    if (unitId) {
+  } else if (data.startDateTime || data.durationMinutes || data.gameId || data.resourceUnitId !== undefined) {
+    if (data.startDateTime) {
+      start = new Date(data.startDateTime);
+      updateData.startDateTime = start;
+    }
+    if (data.durationMinutes) {
+      duration = data.durationMinutes;
+    }
+    const end = addMinutes(start, duration);
+    updateData.endDateTime = end;
+
+    // Resolve resource unit
+    let resourceUnitId = data.resourceUnitId !== undefined ? data.resourceUnitId : existing.resourceUnitId;
+
+    // If gameId changed, make sure the unit belongs to the new game
+    if (data.gameId && data.gameId !== existing.gameId) {
+      if (resourceUnitId) {
+        const unit = await prisma.resourceUnit.findUnique({ where: { id: resourceUnitId } });
+        if (!unit || unit.gameId !== data.gameId) {
+          resourceUnitId = null;
+        }
+      }
+    }
+
+    if (!resourceUnitId) {
+      const suggested = await suggestAvailableUnit({
+        gameId,
+        startDateTime: start,
+        endDateTime: end,
+        excludeBookingId: id,
+      });
+      if (!suggested) {
+        return NextResponse.json({ error: "No available units for this time slot" }, { status: 409 });
+      }
+      resourceUnitId = suggested;
+    } else {
       const { available, conflictingBooking } = await checkAvailability({
-        resourceUnitId: unitId,
-        startDateTime: newStart,
-        endDateTime: newEnd,
+        resourceUnitId,
+        startDateTime: start,
+        endDateTime: end,
         excludeBookingId: id,
       });
       if (!available) {
@@ -146,19 +205,82 @@ export async function PUT(
         }, { status: 409 });
       }
     }
-    updateData.endDateTime = newEnd;
+    updateData.resourceUnitId = resourceUnitId;
   }
 
+  // Role limits check
   if (role === "STAFF" && !data.action) {
     const allowedStaffStatuses: BookingStatus[] = [BookingStatus.CONFIRMED, BookingStatus.CANCELLED];
     if (data.bookingStatus && !allowedStaffStatuses.includes(data.bookingStatus as BookingStatus)) {
       return NextResponse.json({ error: "Staff can only confirm or cancel bookings" }, { status: 403 });
     }
-    delete updateData.startDateTime;
-    delete updateData.durationMinutes;
-    delete updateData.endDateTime;
-    delete updateData.resourceUnitId;
-    delete updateData.finalAmount;
+  }
+
+  // Recalculate price if fields affecting price are updated
+  const needsPriceRecalculation =
+    updateData.durationMinutes !== undefined ||
+    updateData.startDateTime !== undefined ||
+    updateData.accessoriesCount !== undefined ||
+    data.couponCode !== undefined ||
+    updateData.gameId !== undefined ||
+    data.userId !== undefined ||
+    data.guestPhone !== undefined;
+
+  if (needsPriceRecalculation) {
+    const accessories = updateData.accessoriesCount ?? existing.accessoriesCount;
+
+    let couponCodeToUse: string | undefined = undefined;
+    if (data.couponCode !== undefined) {
+      couponCodeToUse = data.couponCode ?? undefined;
+    } else if (existing.couponId) {
+      const existingCoupon = await prisma.coupon.findUnique({
+        where: { id: existing.couponId }
+      });
+      couponCodeToUse = existingCoupon?.code;
+    }
+
+    const pricing = await calculateBookingPrice({
+      gameId,
+      durationMinutes: duration,
+      startDateTime: start,
+      userId: resolvedUserId,
+      accessoriesCount: accessories,
+      couponCode: couponCodeToUse,
+      userRole: role,
+    });
+
+    if (pricing.couponError) {
+      return NextResponse.json({ error: pricing.couponError }, { status: 400 });
+    }
+
+    let dbCouponId: string | null = null;
+    if (pricing.couponCode) {
+      const cp = await prisma.coupon.findUnique({
+        where: { code: pricing.couponCode }
+      });
+      if (cp) {
+        dbCouponId = cp.id;
+      }
+    }
+
+    updateData.basePrice = pricing.basePrice;
+    updateData.discountPct = pricing.discountPct;
+    updateData.discountAmount = pricing.discountAmount;
+    updateData.couponId = dbCouponId;
+    updateData.couponDiscount = pricing.couponDiscount ?? 0;
+    
+    // Only overwrite finalAmount if it wasn't manually overridden by an ADMIN in the request
+    if (updateData.finalAmount === undefined || role !== "ADMIN") {
+      updateData.finalAmount = pricing.finalAmount;
+    }
+
+    // Increment usedCount if it is a new coupon for this booking
+    if (dbCouponId && existing.couponId !== dbCouponId) {
+      await prisma.coupon.update({
+        where: { id: dbCouponId },
+        data: { usedCount: { increment: 1 } }
+      });
+    }
   }
 
   const booking = await prisma.booking.update({

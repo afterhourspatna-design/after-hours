@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { format, addMinutes } from "date-fns";
-import { Loader2, User, Users, Gamepad2, Clock, DollarSign, ChevronDown, Search, X, AlertCircle } from "lucide-react";
+import { Loader2, User, Users, Gamepad2, Clock, IndianRupee, ChevronDown, Search, X, AlertCircle } from "lucide-react";
 import { cn, formatCurrency, SOURCE_LABELS } from "@/lib/utils";
 
 interface Game {
@@ -821,7 +821,7 @@ export default function BookingForm({ mode = "create", initialData, prefillDate,
         <div className="space-y-4">
           <div className="glass-card p-5 space-y-4 sticky top-20">
             <div className="flex items-center gap-2 text-sm font-semibold text-white">
-              <DollarSign className="w-4 h-4 text-violet-400" />
+              <IndianRupee className="w-4 h-4 text-violet-400" />
               Price Summary
             </div>
 

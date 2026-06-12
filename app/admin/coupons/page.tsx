@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { 
   Tag, Plus, Trash2, Edit, CheckSquare, Square, 
-  Loader2, Search, AlertCircle, Percent, DollarSign, ToggleLeft, ToggleRight
+  Loader2, Search, AlertCircle, Percent, ToggleLeft, ToggleRight
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
