@@ -210,7 +210,7 @@ async function getDashboardData(period: string = "today", from?: string, to?: st
       gameMap[gameName] = { count: 0, revenue: 0 };
     }
     gameMap[gameName].count += 1;
-    gameMap[gameName].revenue += baseRev + snacksRev;
+    gameMap[gameName].revenue += baseRev;
   }
   const periodRevenue = periodGameRevenue + periodSnacksRevenue;
 

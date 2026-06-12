@@ -85,8 +85,7 @@ export async function GET(req: NextRequest) {
       const baseRev = isPaid 
         ? Number(b.negotiatedAmount ?? b.finalAmount) 
         : Number(b.finalAmount);
-      const snacksRev = Number(b.snacksAmount ?? 0);
-      return sum + baseRev + snacksRev;
+      return sum + baseRev;
     }, 0);
     return {
       game: g.name,
