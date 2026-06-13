@@ -115,6 +115,7 @@ async function getDashboardData(period: string = "today", from?: string, to?: st
   }
 
   const whereRange = startDate && endDate ? { startDateTime: { gte: startDate, lte: endDate } } : {};
+  const paymentWhereRange = startDate && endDate ? { createdAt: { gte: startDate, lte: endDate } } : {};
 
   // Get bounds for last 7 days (including today)
   const bounds7Days = {
@@ -133,6 +134,8 @@ async function getDashboardData(period: string = "today", from?: string, to?: st
     holds,
     recentBookings,
     last7DaysBookings,
+    periodStandaloneSnacks,
+    last7DaysStandaloneSnacks,
   ] = await Promise.all([
     prisma.booking.count(),
     prisma.booking.count({ where: whereRange }),
@@ -159,7 +162,6 @@ async function getDashboardData(period: string = "today", from?: string, to?: st
       select: { 
         finalAmount: true, 
         negotiatedAmount: true, 
-        snacksAmount: true, 
         paymentStatus: true,
         game: { select: { name: true } },
       },
@@ -187,7 +189,17 @@ async function getDashboardData(period: string = "today", from?: string, to?: st
         startDateTime: { gte: bounds7Days.start, lte: bounds7Days.end },
         bookingStatus: { in: [BookingStatus.CONFIRMED, BookingStatus.COMPLETED] },
       },
-      select: { startDateTime: true, finalAmount: true, negotiatedAmount: true, snacksAmount: true, paymentStatus: true },
+      select: { startDateTime: true, finalAmount: true, negotiatedAmount: true, paymentStatus: true },
+    }),
+    prisma.snackOrder.findMany({
+      where: paymentWhereRange,
+      select: { amount: true }
+    }),
+    prisma.snackOrder.findMany({
+      where: {
+        createdAt: { gte: bounds7Days.start, lte: bounds7Days.end }
+      },
+      select: { createdAt: true, amount: true }
     }),
   ]);
 
@@ -200,10 +212,8 @@ async function getDashboardData(period: string = "today", from?: string, to?: st
     const baseRev = isPaid 
       ? Number(b.negotiatedAmount ?? b.finalAmount) 
       : Number(b.finalAmount);
-    const snacksRev = Number(b.snacksAmount ?? 0);
     
     periodGameRevenue += baseRev;
-    periodSnacksRevenue += snacksRev;
 
     const gameName = b.game?.name || "Other";
     if (!gameMap[gameName]) {
@@ -212,6 +222,11 @@ async function getDashboardData(period: string = "today", from?: string, to?: st
     gameMap[gameName].count += 1;
     gameMap[gameName].revenue += baseRev;
   }
+  
+  for (const s of periodStandaloneSnacks) {
+    periodSnacksRevenue += Number(s.amount);
+  }
+  
   const periodRevenue = periodGameRevenue + periodSnacksRevenue;
 
   const gameUtilization = Object.entries(gameMap)
@@ -235,8 +250,14 @@ async function getDashboardData(period: string = "today", from?: string, to?: st
       const baseRev = isPaid 
         ? Number(b.negotiatedAmount ?? b.finalAmount) 
         : Number(b.finalAmount);
-      const snacksRev = Number(b.snacksAmount ?? 0);
-      dailyMap[key] += baseRev + snacksRev;
+      dailyMap[key] += baseRev;
+    }
+  }
+
+  for (const s of last7DaysStandaloneSnacks) {
+    const key = formatInIST(s.createdAt);
+    if (key in dailyMap) {
+      dailyMap[key] += Number(s.amount);
     }
   }
 

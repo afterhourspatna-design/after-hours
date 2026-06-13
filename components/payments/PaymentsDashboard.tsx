@@ -59,6 +59,7 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [paymentHistory, setPaymentHistory] = useState<PaymentGroup[]>([]);
   const [showPayModal, setShowPayModal] = useState(false);
   const [submittingPayment, setSubmittingPayment] = useState(false);
 
@@ -83,123 +84,85 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
     setEndDate("");
   }, [activeTab]);
 
-  // Standalone Snack Sale States
-  const [showSnackSaleModal, setShowSnackSaleModal] = useState(false);
-  const [snackGuestMode, setSnackGuestMode] = useState(true);
-  const [snackGuestName, setSnackGuestName] = useState("");
-  const [snackGuestPhone, setSnackGuestPhone] = useState("");
-  const [snackSearchQuery, setSnackSearchQuery] = useState("");
-  const [snackSelectedUser, setSnackSelectedUser] = useState<any | null>(null);
-  const [snackUserResults, setSnackUserResults] = useState<any[]>([]);
-  const [snackAmountInput, setSnackAmountInput] = useState("");
-  const [snackPaymentMethod, setSnackPaymentMethod] = useState<"CASH" | "ONLINE" | "MIXED">("ONLINE");
-  const [snackCashInput, setSnackCashInput] = useState("");
-  const [snackOnlineInput, setSnackOnlineInput] = useState("");
-  const [submittingSnackSale, setSubmittingSnackSale] = useState(false);
-
-  // User search debounce for snacks sale
-  useEffect(() => {
-    if (snackGuestMode || snackSearchQuery.length < 2) {
-      setSnackUserResults([]);
-      return;
-    }
-    const t = setTimeout(async () => {
-      const res = await fetch(`/api/users?q=${encodeURIComponent(snackSearchQuery)}&limit=8`);
-      if (res.ok) {
-        const data = await res.json();
-        setSnackUserResults(data.users ?? []);
-      }
-    }, 300);
-    return () => clearTimeout(t);
-  }, [snackSearchQuery, snackGuestMode]);
-
-  // Auto-fill simple Cash/Online values for snacks when Snack Amount or Payment Method changes
-  useEffect(() => {
-    const totalVal = Number(snackAmountInput) || 0;
-    if (snackPaymentMethod === "CASH") {
-      setSnackCashInput(String(totalVal));
-      setSnackOnlineInput("");
-    } else if (snackPaymentMethod === "ONLINE") {
-      setSnackOnlineInput(String(totalVal));
-      setSnackCashInput("");
-    }
-  }, [snackAmountInput, snackPaymentMethod]);
 
   const LIMIT = 15;
 
-  // Group paid bookings by paymentId
-  const getPaymentsList = (): PaymentGroup[] => {
-    const paymentsMap = new Map<string, PaymentGroup>();
 
-    bookings.forEach((b) => {
-      // If paymentId is null (old paid booking), use legacy id
-      const pid = b.paymentId || `LEGACY-${b.id}`;
-
-      if (!paymentsMap.has(pid)) {
-        paymentsMap.set(pid, {
-          paymentId: pid,
-          updatedAt: b.updatedAt || b.startDateTime,
-          paymentMethod: b.paymentMethod || "UNKNOWN",
-          totalActual: 0,
-          totalNegotiated: 0,
-          totalCash: 0,
-          totalOnline: 0,
-          totalSnacks: 0,
-          customerNames: "",
-          bookings: [],
-        });
-      }
-
-      const group = paymentsMap.get(pid)!;
-      group.totalActual += Number(b.finalAmount);
-      group.totalNegotiated += Number(b.negotiatedAmount ?? b.finalAmount);
-      group.totalCash += Number(b.cashAmount ?? 0);
-      group.totalOnline += Number(b.onlineAmount ?? 0);
-      group.totalSnacks += Number(b.snacksAmount ?? 0);
-      group.bookings.push(b);
-    });
-
-    // Format unique names in a comma-separated string for each group
-    paymentsMap.forEach((group) => {
-      const uniqueNames = Array.from(
-        new Set(group.bookings.map((b) => b.user?.name ?? b.guestName ?? "Guest"))
-      );
-      if (uniqueNames.length <= 2) {
-        group.customerNames = uniqueNames.join(", ");
-      } else {
-        group.customerNames = `${uniqueNames.slice(0, 2).join(", ")} (+${uniqueNames.length - 2} others)`;
-      }
-    });
-
-    // Sort payments so the most recently settled (updatedAt) appears on top
-    return Array.from(paymentsMap.values()).sort((a, b) => {
-      const dateA = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
-      const dateB = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
-      return dateB - dateA;
-    });
-  };
 
   const fetchBookings = useCallback(async () => {
     setLoading(true);
     try {
-      const params = new URLSearchParams({
-        page: String(page),
-        limit: String(LIMIT),
-        ...(search ? { q: search } : {}),
-        paymentStatus: activeTab === "UNPAID" ? "UNPAID" : "PAID",
-        ...(activeTab === "PAID" && startDate ? { from: `${startDate}T00:00:00.000Z` } : {}),
-        ...(activeTab === "PAID" && endDate ? { to: `${endDate}T23:59:59.999Z` } : {}),
-      });
-      const res = await fetch(`/api/bookings?${params}`);
-      if (res.ok) {
-        const data = await res.json();
-        // For Unpaid tab, filter out CANCELLED or EXPIRED bookings so we don't present them for checkout
-        let list: Booking[] = data.bookings ?? [];
-        if (activeTab === "UNPAID") {
-          list = list.filter((b) => !["CANCELLED", "EXPIRED"].includes(b.bookingStatus));
+      if (activeTab === "UNPAID") {
+        const params = new URLSearchParams({
+          page: String(page),
+          limit: String(LIMIT),
+          includeSnacks: "1",
+          ...(search ? { q: search } : {}),
+          paymentStatus: "UNPAID",
+        });
+        const res = await fetch(`/api/bookings?${params}`);
+        if (res.ok) {
+          const data = await res.json();
+          const list: Booking[] = (data.bookings ?? []).filter((b: Booking) => !["CANCELLED", "EXPIRED"].includes(b.bookingStatus));
+          setBookings(list);
+          setTotal(data.total ?? 0);
         }
-        setBookings(list);
-        setTotal(data.total ?? 0);
+      } else {
+        // PAID tab -> Fetch from /api/payments
+        const params = new URLSearchParams({
+          page: String(page),
+          limit: String(LIMIT),
+          ...(search ? { q: search } : {}),
+          ...(startDate ? { from: `${startDate}T00:00:00.000Z` } : {}),
+          ...(endDate ? { to: `${endDate}T23:59:59.999Z` } : {}),
+        });
+        const res = await fetch(`/api/payments?${params}`);
+        if (res.ok) {
+          const data = await res.json();
+          const mappedGroups: PaymentGroup[] = (data.payments ?? []).map((p: any) => {
+            const snackBookings = (p.snackOrders ?? []).map((snack: any) => ({
+              id: `SNACK_${snack.id}`,
+              guestName: snack.guestName,
+              guestPhone: snack.guestPhone,
+              startDateTime: p.createdAt,
+              endDateTime: p.createdAt,
+              durationMinutes: 0,
+              bookingStatus: "COMPLETED",
+              paymentStatus: "PAID",
+              finalAmount: snack.amount,
+              negotiatedAmount: snack.amount,
+              paymentMethod: p.paymentMethod,
+              cashAmount: 0,
+              onlineAmount: 0,
+              source: "WALK_IN",
+              game: { name: "Snacks", tag: "SNACK" },
+              resourceUnit: null,
+              user: snack.user,
+              updatedAt: p.createdAt,
+              paymentId: p.id,
+              snacksAmount: snack.amount,
+            }));
+
+            const allBookings = [...p.bookings, ...snackBookings];
+            const totalActual = allBookings.reduce((sum, b) => sum + Number(b.finalAmount), 0);
+            const totalSnacks = (p.snackOrders ?? []).reduce((sum: number, s: any) => sum + Number(s.amount), 0);
+
+            return {
+              paymentId: p.id,
+              updatedAt: p.createdAt,
+              paymentMethod: p.paymentMethod,
+              totalActual,
+              totalNegotiated: Number(p.negotiatedAmount),
+              totalCash: Number(p.cashAmount),
+              totalOnline: Number(p.onlineAmount),
+              totalSnacks,
+              customerNames: p.customerNames,
+              bookings: allBookings,
+            };
+          });
+          setPaymentHistory(mappedGroups);
+          setTotal(data.total ?? 0);
+        }
       }
     } catch (err) {
       console.error(err);
@@ -237,12 +200,18 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
   // Math totals for checkout
   const selectedBookings = bookings.filter((b) => selectedIds.has(b.id));
   const totalActualAmount = selectedBookings.reduce((sum, b) => sum + Number(b.finalAmount), 0);
+  const totalActualGamesAmount = selectedBookings
+    .filter((b) => !b.id.startsWith("SNACK_"))
+    .reduce((sum, b) => sum + Number(b.finalAmount), 0);
+  const totalActualSnacksAmount = selectedBookings
+    .filter((b) => b.id.startsWith("SNACK_"))
+    .reduce((sum, b) => sum + Number(b.finalAmount), 0);
 
   // Open modal and pre-fill values
   const handleOpenPayModal = () => {
     if (selectedIds.size === 0) return;
-    setNegotiatedInput(String(totalActualAmount));
-    setSnacksInput("");
+    setNegotiatedInput(String(totalActualGamesAmount));
+    setSnacksInput(totalActualSnacksAmount > 0 ? String(totalActualSnacksAmount) : "");
     setPaymentMethod("ONLINE");
     setCashInput("");
     setOnlineInput("");
@@ -264,17 +233,6 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
     setShowPayModal(true);
   };
 
-  const handleOpenPayOnlySnacksModal = (b: Booking) => {
-    setSelectedIds(new Set([b.id]));
-    setNegotiatedInput("0");
-    setSnacksInput("");
-    setPaymentMethod("ONLINE");
-    setCashInput("");
-    setOnlineInput("");
-    setPayOnlySnacks(true);
-    setEditPaymentId(null);
-    setShowPayModal(true);
-  };
 
   const handleClosePayModal = () => {
     setShowPayModal(false);
@@ -283,70 +241,6 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
     setSelectedIds(new Set());
   };
 
-  const handleOpenRecordSnackSaleModal = () => {
-    setSnackGuestMode(true);
-    setSnackGuestName("");
-    setSnackGuestPhone("");
-    setSnackSearchQuery("");
-    setSnackSelectedUser(null);
-    setSnackUserResults([]);
-    setSnackAmountInput("");
-    setSnackPaymentMethod("ONLINE");
-    setSnackCashInput("");
-    setSnackOnlineInput("");
-    setShowSnackSaleModal(true);
-  };
-
-  const handleCloseSnackSaleModal = () => {
-    setShowSnackSaleModal(false);
-    setSnackGuestMode(true);
-    setSnackGuestName("");
-    setSnackGuestPhone("");
-    setSnackSearchQuery("");
-    setSnackSelectedUser(null);
-    setSnackUserResults([]);
-    setSnackAmountInput("");
-    setSnackPaymentMethod("ONLINE");
-    setSnackCashInput("");
-    setSnackOnlineInput("");
-  };
-
-  const handleConfirmSnackSale = async () => {
-    const snackAmountVal = Number(snackAmountInput) || 0;
-    if (snackAmountVal <= 0) return;
-    setSubmittingSnackSale(true);
-
-    try {
-      const payload = {
-        bookingIds: [],
-        negotiatedAmount: 0,
-        snacksAmount: snackAmountVal,
-        paymentMethod: snackPaymentMethod,
-        cashAmount: snackPaymentMethod === "MIXED" ? Number(snackCashInput) || 0 : snackPaymentMethod === "CASH" ? snackAmountVal : 0,
-        onlineAmount: snackPaymentMethod === "MIXED" ? Number(snackOnlineInput) || 0 : snackPaymentMethod === "ONLINE" ? snackAmountVal : 0,
-        userId: snackGuestMode ? null : snackSelectedUser?.id,
-        guestName: snackGuestMode ? snackGuestName : null,
-        guestPhone: snackGuestMode ? snackGuestPhone : null,
-      };
-
-      const res = await fetch("/api/bookings/batch-pay", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-
-      const result = await res.json();
-      if (!res.ok) throw new Error(result.error ?? "Failed to save snack sale");
-
-      toast.success("Successfully recorded snack sale!");
-      handleCloseSnackSaleModal();
-      fetchBookings();
-    } catch (err: any) {
-      toast.error(err.message || "Snack sale failed");
-    } finally {
-      setSubmittingSnackSale(false);
-    }
-  };
 
   // Real-time values
   const totalNegotiatedVal = payOnlySnacks ? 0 : (Number(negotiatedInput) || 0);
@@ -358,7 +252,7 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
   // Real-time validations
   const isSplitInvalid = paymentMethod === "MIXED" && Math.abs(cashVal + onlineVal - totalWithSnacks) > 0.01;
   const isNegotiatedInvalid = totalNegotiatedVal < 0;
-  const isSnacksInvalid = snacksVal < 0;
+  const isSnacksInvalid = editPaymentId ? snacksVal < 0 : snacksVal < totalActualSnacksAmount;
   const isSubmitDisabled = isNegotiatedInvalid || isSnacksInvalid || isSplitInvalid || submittingPayment;
 
   // Auto-fill simple Cash/Online values when Negotiated or Snacks changes
@@ -457,13 +351,7 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
       {/* Toolbar */}
       <div className="flex flex-col gap-3">
         <div className="flex flex-col sm:flex-row gap-3 items-center">
-          <button
-            onClick={handleOpenRecordSnackSaleModal}
-            className="px-4 py-2.5 bg-violet-600 hover:bg-violet-500 text-white rounded-xl font-bold shadow-lg shadow-violet-900/20 transition-all text-sm flex items-center gap-2 whitespace-nowrap self-stretch"
-          >
-            <Coins className="w-4 h-4" />
-            Record Snack Sale
-          </button>
+
           <div className="relative flex-1 w-full">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
             <input
@@ -524,7 +412,7 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
       <div className="glass-card overflow-hidden relative">
         {loading ? (
           <TableSkeleton rows={8} />
-        ) : bookings.length === 0 ? (
+        ) : (activeTab === "UNPAID" ? bookings.length === 0 : paymentHistory.length === 0) ? (
           <EmptyState
             title={activeTab === "UNPAID" ? "All settled up!" : "No payments history yet"}
             description={
@@ -547,7 +435,6 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
                         className="rounded border-zinc-700 text-violet-600 focus:ring-violet-500 bg-zinc-900 h-4 w-4"
                       />
                     </th>
-                    <th className="w-24 text-left">Action</th>
                     <th>Customer</th>
                     <th>Game / Unit</th>
                     <th>Date & Time</th>
@@ -578,14 +465,6 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
                             onChange={() => handleSelectRow(b.id)}
                             className="rounded border-zinc-700 text-violet-600 focus:ring-violet-500 bg-zinc-900 h-4 w-4"
                           />
-                        </td>
-                        <td onClick={(e) => e.stopPropagation()}>
-                          <button
-                            onClick={() => handleOpenPayOnlySnacksModal(b)}
-                            className="px-2.5 py-1 bg-violet-600 hover:bg-violet-500 text-white text-[11px] font-bold rounded-lg transition-colors whitespace-nowrap shadow-sm"
-                          >
-                            Pay Snacks
-                          </button>
                         </td>
                         <td>
                           <div>
@@ -637,7 +516,7 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
                   </tr>
                 </thead>
                 <tbody>
-                  {getPaymentsList().map((p) => (
+                  {paymentHistory.map((p) => (
                     <tr
                       key={p.paymentId}
                       onClick={() => setSelectedPaymentDetail(p)}
@@ -947,6 +826,16 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
               </div>
             )}
 
+            {/* Warning alert if snacksVal is less than pre-existing unpaid snacks */}
+            {!editPaymentId && snacksVal < totalActualSnacksAmount && (
+              <div className="flex items-start gap-2 p-3 bg-red-500/10 border border-red-500/20 text-red-400 rounded-xl text-xs">
+                <Info className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                <p>
+                  Validation error: Snacks amount cannot be less than pre-existing unpaid snacks (₹{totalActualSnacksAmount}). Adjust/delete snacks in the Snacks tab first.
+                </p>
+              </div>
+            )}
+
             {/* Actions */}
             <div className="flex gap-2 border-t border-zinc-800/60 pt-4">
               <button
@@ -993,395 +882,180 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
             onClick={() => setSelectedPaymentDetail(null)}
           />
 
-          <div className="relative glass-card bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-2xl overflow-hidden flex flex-col shadow-2xl z-10 p-6 space-y-5 animate-scale-in max-h-[90vh] custom-scroll overflow-y-auto">
-            {/* Header */}
-            <div className="flex items-center justify-between border-b border-zinc-800/60 pb-3">
-              <div className="flex items-center gap-2">
-                <CreditCard className="w-5 h-5 text-violet-400" />
-                <h3 className="text-lg font-bold text-white font-mono">
-                  Payment Details: {selectedPaymentDetail.paymentId.startsWith("LEGACY-") ? "#LEGACY" : selectedPaymentDetail.paymentId}
-                </h3>
-              </div>
-              <button
-                onClick={() => setSelectedPaymentDetail(null)}
-                className="text-zinc-500 hover:text-white transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
+          {(() => {
+            const actualGamesList = selectedPaymentDetail.bookings.filter(b => !b.id.startsWith("SNACK_") && b.game?.tag !== "SNACK");
+            const actualSnacksList = selectedPaymentDetail.bookings.filter(b => b.id.startsWith("SNACK_") || b.game?.tag === "SNACK");
+            const totalActualGamesPrice = actualGamesList.reduce((sum, b) => sum + Number(b.finalAmount), 0);
 
-            {/* Payment Info Metadata Grid */}
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-4 bg-zinc-950/40 p-4 border border-zinc-900 rounded-xl">
-              <div>
-                <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">Settled Date</p>
-                <p className="text-sm font-semibold text-white mt-1">
-                  {formatDate(selectedPaymentDetail.updatedAt)}
-                </p>
-              </div>
-              <div>
-                <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">Payment Method</p>
-                <span className="inline-block px-2 py-0.5 rounded bg-zinc-800 text-zinc-300 font-bold text-xs uppercase tracking-tight border border-zinc-700 mt-1">
-                  {selectedPaymentDetail.paymentMethod}
-                </span>
-              </div>
-              <div>
-                <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">Actual Games</p>
-                <p className="text-xs font-bold text-zinc-400 mt-1">
-                  {formatCurrency(selectedPaymentDetail.totalActual)}
-                </p>
-              </div>
-              <div>
-                <p className="text-[10px] text-violet-400 font-bold uppercase tracking-wider">Games Settled</p>
-                <p className="text-xs font-bold text-zinc-200 mt-1">
-                  {formatCurrency(selectedPaymentDetail.totalNegotiated)}
-                </p>
-              </div>
-              <div>
-                <p className="text-[10px] text-violet-400 font-bold uppercase tracking-wider">Snacks Paid</p>
-                <p className="text-xs font-bold text-zinc-200 mt-1">
-                  {formatCurrency(selectedPaymentDetail.totalSnacks)}
-                </p>
-              </div>
-            </div>
-
-            {/* Overall settled total */}
-            <div className="flex items-center justify-between text-xs bg-emerald-500/5 p-3 border border-emerald-500/10 rounded-xl">
-              <p className="text-emerald-400 font-bold">Overall Transaction Settled Total (Games + Snacks):</p>
-              <p className="text-sm font-extrabold text-emerald-400">
-                {formatCurrency(selectedPaymentDetail.totalNegotiated + selectedPaymentDetail.totalSnacks)}
-              </p>
-            </div>
-
-            {/* Split breakdown for MIXED payments */}
-            {selectedPaymentDetail.paymentMethod === "MIXED" && (
-              <div className="flex items-center gap-6 text-xs bg-zinc-950/20 p-3 border border-zinc-800/60 rounded-xl">
-                <p className="text-zinc-400 font-medium">Split Breakdown:</p>
-                <p className="text-zinc-300">
-                  <span className="font-semibold text-white">Cash Amount:</span> {formatCurrency(selectedPaymentDetail.totalCash)}
-                </p>
-                <p className="text-zinc-300">
-                  <span className="font-semibold text-white">Online Amount:</span> {formatCurrency(selectedPaymentDetail.totalOnline)}
-                </p>
-              </div>
-            )}
-
-            {/* List of bookings table inside the payment */}
-            <div className="space-y-2.5">
-              <h4 className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Bookings Included ({selectedPaymentDetail.bookings.length})</h4>
-              <div className="border border-zinc-800/60 rounded-xl overflow-hidden">
-                <table className="w-full text-left text-xs text-zinc-300 divide-y divide-zinc-800/40">
-                  <thead className="bg-zinc-950/40 font-bold text-zinc-500 uppercase text-[10px] tracking-wider">
-                    <tr>
-                      <th className="p-3">Customer</th>
-                      <th className="p-3">Game / Slot</th>
-                      <th className="p-3 text-right">Actual Price</th>
-                      <th className="p-3 text-right">Settled Price</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-zinc-800/40">
-                    {selectedPaymentDetail.bookings.map((bk) => (
-                      <tr key={bk.id} className="hover:bg-zinc-800/20 transition-colors">
-                        <td className="p-3">
-                          <p className="font-semibold text-white">{bk.user?.name ?? bk.guestName ?? "Guest"}</p>
-                          {bk.user?.phone || bk.guestPhone ? (
-                            <p className="text-[10px] text-zinc-600 mt-0.5">{bk.user?.phone ?? bk.guestPhone}</p>
-                          ) : null}
-                        </td>
-                        <td className="p-3">
-                          <p className="font-medium text-zinc-200">{bk.game.name}</p>
-                          <p className="text-[10px] text-zinc-500 mt-0.5">
-                            {formatDate(bk.startDateTime)} ({formatTimeRange(bk.startDateTime, bk.endDateTime)})
-                          </p>
-                        </td>
-                        <td className="p-3 text-right text-zinc-400 font-medium">
-                          {formatCurrency(Number(bk.finalAmount))}
-                        </td>
-                        <td className="p-3 text-right text-emerald-400 font-semibold">
-                          {formatCurrency(Number(bk.negotiatedAmount ?? bk.finalAmount))}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            {/* Actions */}
-            <div className="flex border-t border-zinc-800/60 pt-4">
-              <button
-                type="button"
-                onClick={() => setSelectedPaymentDetail(null)}
-                className="w-full py-2.5 bg-zinc-800 border border-zinc-700 text-zinc-300 text-sm font-semibold rounded-xl hover:text-white hover:bg-zinc-700 transition-all"
-              >
-                Close Details
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Standalone Snack Sale Modal */}
-      {showSnackSaleModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div
-            className="absolute inset-0 bg-black/75 backdrop-blur-sm transition-opacity"
-            onClick={() => !submittingSnackSale && handleCloseSnackSaleModal()}
-          />
-
-          <div className="relative glass-card bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-lg overflow-hidden flex flex-col shadow-2xl z-10 p-6 space-y-5 animate-scale-in max-h-[90vh] custom-scroll overflow-y-auto">
-            {/* Header */}
-            <div className="flex items-center justify-between border-b border-zinc-800/60 pb-3">
-              <div className="flex items-center gap-2">
-                <Coins className="w-5 h-5 text-violet-400" />
-                <h3 className="text-lg font-bold text-white">Record Snack Sale</h3>
-              </div>
-              <button
-                onClick={handleCloseSnackSaleModal}
-                disabled={submittingSnackSale}
-                className="text-zinc-500 hover:text-white transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Customer Toggle */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <label className="text-xs text-zinc-400 font-semibold uppercase tracking-wider">Customer Type</label>
-                <div className="flex items-center gap-2 bg-zinc-800/60 rounded-xl p-1">
+            return (
+              <div className="relative glass-card bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-2xl overflow-hidden flex flex-col shadow-2xl z-10 p-6 space-y-5 animate-scale-in max-h-[90vh] custom-scroll overflow-y-auto">
+                {/* Header */}
+                <div className="flex items-center justify-between border-b border-zinc-800/60 pb-3">
+                  <div className="flex items-center gap-2">
+                    <CreditCard className="w-5 h-5 text-violet-400" />
+                    <h3 className="text-lg font-bold text-white font-mono">
+                      Payment Details: {selectedPaymentDetail.paymentId.startsWith("LEGACY-") ? "#LEGACY" : selectedPaymentDetail.paymentId}
+                    </h3>
+                  </div>
                   <button
-                    type="button"
-                    onClick={() => setSnackGuestMode(false)}
-                    className={cn(
-                      "px-3 py-1.5 rounded-lg text-xs font-medium transition-all",
-                      !snackGuestMode ? "bg-violet-600 text-white" : "text-zinc-400 hover:text-zinc-200"
-                    )}
+                    onClick={() => setSelectedPaymentDetail(null)}
+                    className="text-zinc-500 hover:text-white transition-colors"
                   >
-                    Registered
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setSnackGuestMode(true)}
-                    className={cn(
-                      "px-3 py-1.5 rounded-lg text-xs font-medium transition-all",
-                      snackGuestMode ? "bg-violet-600 text-white" : "text-zinc-400 hover:text-zinc-200"
-                    )}
-                  >
-                    Guest
+                    <X className="w-5 h-5" />
                   </button>
                 </div>
-              </div>
 
-              {snackGuestMode ? (
-                <div className="grid grid-cols-2 gap-3">
+                {/* Payment Info Metadata Grid */}
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-4 bg-zinc-950/40 p-4 border border-zinc-900 rounded-xl">
                   <div>
-                    <label className="text-xs text-zinc-500 font-medium block mb-1">Guest Name (optional)</label>
-                    <input
-                      value={snackGuestName}
-                      onChange={(e) => setSnackGuestName(e.target.value)}
-                      placeholder="e.g. Ahmed Ali"
-                      className="input-field"
-                    />
+                    <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">Settled Date</p>
+                    <p className="text-sm font-semibold text-white mt-1">
+                      {formatDate(selectedPaymentDetail.updatedAt)}
+                    </p>
                   </div>
                   <div>
-                    <label className="text-xs text-zinc-500 font-medium block mb-1">Mobile Number (optional)</label>
-                    <div className="relative">
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-zinc-500 font-bold">+91</span>
-                      <input
-                        type="tel"
-                        maxLength={10}
-                        value={snackGuestPhone}
-                        onChange={(e) => {
-                          const val = e.target.value.replace(/\D/g, "").slice(0, 10);
-                          setSnackGuestPhone(val);
-                        }}
-                        placeholder="9876543210"
-                        className="input-field pl-10"
-                      />
-                    </div>
+                    <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">Payment Method</p>
+                    <span className="inline-block px-2 py-0.5 rounded bg-zinc-800 text-zinc-300 font-bold text-xs uppercase tracking-tight border border-zinc-700 mt-1">
+                      {selectedPaymentDetail.paymentMethod}
+                    </span>
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">Actual Games</p>
+                    <p className="text-xs font-bold text-zinc-400 mt-1">
+                      {formatCurrency(totalActualGamesPrice)}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-violet-400 font-bold uppercase tracking-wider">Games Settled</p>
+                    <p className="text-xs font-bold text-zinc-200 mt-1">
+                      {formatCurrency(selectedPaymentDetail.totalNegotiated)}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-violet-400 font-bold uppercase tracking-wider">Snacks Paid</p>
+                    <p className="text-xs font-bold text-zinc-200 mt-1">
+                      {formatCurrency(selectedPaymentDetail.totalSnacks)}
+                    </p>
                   </div>
                 </div>
-              ) : (
-                <div className="relative">
-                  <label className="text-xs text-zinc-500 font-medium block mb-1">Search Registered User</label>
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
-                    {snackSelectedUser ? (
-                      <div className="input-field pl-9 flex items-center justify-between">
-                        <span className="text-sm text-white">
-                          {snackSelectedUser.name} <span className="text-zinc-500 text-xs">· {snackSelectedUser.phone}</span>
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setSnackSelectedUser(null);
-                            setSnackSearchQuery("");
-                          }}
-                        >
-                          <X className="w-4 h-4 text-zinc-500 hover:text-white" />
-                        </button>
-                      </div>
-                    ) : (
-                      <input
-                        value={snackSearchQuery}
-                        onChange={(e) => setSnackSearchQuery(e.target.value)}
-                        placeholder="Search by name or phone…"
-                        className="input-field pl-9"
-                      />
-                    )}
-                  </div>
-                  {snackUserResults.length > 0 && !snackSelectedUser && (
-                    <div className="absolute top-full left-0 right-0 z-20 mt-1 bg-zinc-900 border border-zinc-700 rounded-xl shadow-xl max-h-48 overflow-y-auto">
-                      {snackUserResults.map((u) => (
-                        <button
-                          key={u.id}
-                          type="button"
-                          onClick={() => {
-                            setSnackSelectedUser(u);
-                            setSnackSearchQuery("");
-                            setSnackUserResults([]);
-                          }}
-                          className="w-full px-4 py-2 text-left hover:bg-zinc-800 transition-colors flex items-center justify-between text-sm"
-                        >
-                          <span className="text-white">{u.name}</span>
-                          <span className="text-xs text-zinc-500">{u.phone}</span>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
 
-            {/* Snack Amount */}
-            <div>
-              <label className="text-xs text-zinc-400 font-semibold uppercase tracking-wider block mb-1">Snacks Amount (₹) *</label>
-              <input
-                type="number"
-                value={snackAmountInput}
-                onChange={(e) => setSnackAmountInput(e.target.value)}
-                disabled={submittingSnackSale}
-                placeholder="Enter snacks amount"
-                className="input-field"
-              />
-            </div>
-
-            {/* Payment Method Selector */}
-            <div className="space-y-2">
-              <label className="text-xs text-zinc-400 font-semibold uppercase tracking-wider block">Way of Payment</label>
-              <div className="grid grid-cols-3 gap-2">
-                {(["ONLINE", "CASH", "MIXED"] as const).map((method) => (
-                  <button
-                    key={method}
-                    type="button"
-                    onClick={() => setSnackPaymentMethod(method)}
-                    disabled={submittingSnackSale}
-                    className={cn(
-                      "py-3 rounded-xl border text-xs font-semibold uppercase transition-all flex flex-col items-center justify-center gap-1.5",
-                      snackPaymentMethod === method
-                        ? "bg-violet-600/10 border-violet-500 text-violet-400 shadow-md shadow-violet-950/20"
-                        : "bg-zinc-800/30 border-zinc-800/60 text-zinc-500 hover:text-zinc-300 hover:border-zinc-700"
-                    )}
-                  >
-                    <span>{method === "MIXED" ? "Cash + Online" : method.toLowerCase()}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Mixed Payment Split Inputs */}
-            {snackPaymentMethod === "MIXED" && (
-              <div className="grid grid-cols-2 gap-4 bg-zinc-950/20 p-4 border border-zinc-800/60 rounded-xl animate-fade-in">
-                <div>
-                  <label className="text-xs text-zinc-500 font-medium block mb-1">Cash Amount</label>
-                  <input
-                    type="number"
-                    value={snackCashInput}
-                    onChange={(e) => setSnackCashInput(e.target.value)}
-                    disabled={submittingSnackSale}
-                    placeholder="Cash amount"
-                    className="input-field"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs text-zinc-500 font-medium block mb-1">Online Amount</label>
-                  <input
-                    type="number"
-                    value={snackOnlineInput}
-                    onChange={(e) => setSnackOnlineInput(e.target.value)}
-                    disabled={submittingSnackSale}
-                    placeholder="Online amount"
-                    className="input-field"
-                  />
-                </div>
-
-                {/* Validation check message */}
-                <div className="col-span-2 flex items-start gap-2 text-[11px] text-amber-500 bg-amber-500/5 border border-amber-500/10 p-2.5 rounded-lg">
-                  <Info className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
-                  <p className="leading-relaxed">
-                    Note: Combined sum of Cash (₹{Number(snackCashInput) || 0}) + Online (₹{Number(snackOnlineInput) || 0}) must exactly equal the Snacks Amount (₹{Number(snackAmountInput) || 0}).
+                {/* Overall settled total */}
+                <div className="flex items-center justify-between text-xs bg-emerald-500/5 p-3 border border-emerald-500/10 rounded-xl">
+                  <p className="text-emerald-400 font-bold">Overall Transaction Settled Total (Games + Snacks):</p>
+                  <p className="text-sm font-extrabold text-emerald-400">
+                    {formatCurrency(selectedPaymentDetail.totalNegotiated + selectedPaymentDetail.totalSnacks)}
                   </p>
                 </div>
-              </div>
-            )}
 
-            {/* Mathematical Error split */}
-            {snackPaymentMethod === "MIXED" && Math.abs((Number(snackCashInput) || 0) + (Number(snackOnlineInput) || 0) - (Number(snackAmountInput) || 0)) > 0.01 && (
-              <div className="flex items-start gap-2 p-3 bg-red-500/10 border border-red-500/20 text-red-400 rounded-xl text-xs">
-                <Info className="w-4 h-4 flex-shrink-0 mt-0.5" />
-                <p>
-                  Mathematical error: Cash + Online (₹{((Number(snackCashInput) || 0) + (Number(snackOnlineInput) || 0)).toFixed(2)}) does not match snacks amount (₹{(Number(snackAmountInput) || 0).toFixed(2)}).
-                </p>
-              </div>
-            )}
+                {/* Split breakdown for MIXED payments */}
+                {selectedPaymentDetail.paymentMethod === "MIXED" && (
+                  <div className="flex items-center gap-6 text-xs bg-zinc-950/20 p-3 border border-zinc-800/60 rounded-xl">
+                    <p className="text-zinc-400 font-medium">Split Breakdown:</p>
+                    <p className="text-zinc-300">
+                      <span className="font-semibold text-white">Cash Amount:</span> {formatCurrency(selectedPaymentDetail.totalCash)}
+                    </p>
+                    <p className="text-zinc-300">
+                      <span className="font-semibold text-white">Online Amount:</span> {formatCurrency(selectedPaymentDetail.totalOnline)}
+                    </p>
+                  </div>
+                )}
 
-            {/* Actions */}
-            <div className="flex gap-2 border-t border-zinc-800/60 pt-4">
-              <button
-                type="button"
-                onClick={handleCloseSnackSaleModal}
-                disabled={submittingSnackSale}
-                className="flex-1 py-2.5 bg-zinc-800 border border-zinc-700 text-zinc-300 text-sm font-semibold rounded-xl hover:text-white hover:bg-zinc-700 transition-all"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleConfirmSnackSale}
-                disabled={
-                  submittingSnackSale ||
-                  (Number(snackAmountInput) || 0) <= 0 ||
-                  (!snackGuestMode && !snackSelectedUser) ||
-                  (snackGuestMode && snackGuestPhone && snackGuestPhone.length !== 10) ||
-                  (snackPaymentMethod === "MIXED" && Math.abs((Number(snackCashInput) || 0) + (Number(snackOnlineInput) || 0) - (Number(snackAmountInput) || 0)) > 0.01)
-                }
-                className={cn(
-                  "flex-1 py-2.5 bg-violet-600 hover:bg-violet-500 text-white text-sm font-bold rounded-xl transition-all shadow-lg flex items-center justify-center gap-2",
-                  (submittingSnackSale ||
-                    (Number(snackAmountInput) || 0) <= 0 ||
-                    (!snackGuestMode && !snackSelectedUser) ||
-                    (snackGuestMode && snackGuestPhone && snackGuestPhone.length !== 10) ||
-                    (snackPaymentMethod === "MIXED" && Math.abs((Number(snackCashInput) || 0) + (Number(snackOnlineInput) || 0) - (Number(snackAmountInput) || 0)) > 0.01))
-                    ? "opacity-50 cursor-not-allowed"
-                    : "shadow-violet-900/30 hover:shadow-violet-800/40"
+                {/* Bookings Included (Games) */}
+                {actualGamesList.length > 0 && (
+                  <div className="space-y-2.5">
+                    <h4 className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Bookings Included ({actualGamesList.length})</h4>
+                    <div className="border border-zinc-800/60 rounded-xl overflow-hidden">
+                      <table className="w-full text-left text-xs text-zinc-300 divide-y divide-zinc-800/40">
+                        <thead className="bg-zinc-950/40 font-bold text-zinc-500 uppercase text-[10px] tracking-wider">
+                          <tr>
+                            <th className="p-3">Customer</th>
+                            <th className="p-3">Game / Slot</th>
+                            <th className="p-3 text-right">Actual Price</th>
+                            <th className="p-3 text-right">Settled Price</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-zinc-800/40">
+                          {actualGamesList.map((bk) => (
+                            <tr key={bk.id} className="hover:bg-zinc-800/20 transition-colors">
+                              <td className="p-3">
+                                <p className="font-semibold text-white">{bk.user?.name ?? bk.guestName ?? "Guest"}</p>
+                                {bk.user?.phone || bk.guestPhone ? (
+                                  <p className="text-[10px] text-zinc-600 mt-0.5">{bk.user?.phone ?? bk.guestPhone}</p>
+                                ) : null}
+                              </td>
+                              <td className="p-3">
+                                <p className="font-medium text-zinc-200">{bk.game.name}</p>
+                                <p className="text-[10px] text-zinc-500 mt-0.5">
+                                  {formatDate(bk.startDateTime)} ({formatTimeRange(bk.startDateTime, bk.endDateTime)})
+                                </p>
+                              </td>
+                              <td className="p-3 text-right text-zinc-400 font-medium">
+                                {formatCurrency(Number(bk.finalAmount))}
+                              </td>
+                              <td className="p-3 text-right text-emerald-400 font-semibold">
+                                {formatCurrency(Number(bk.negotiatedAmount ?? bk.finalAmount))}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
                 )}
-              >
-                {submittingSnackSale ? (
-                  <>
-                    <RefreshCw className="w-4 h-4 animate-spin" />
-                    Recording...
-                  </>
-                ) : (
-                  <>
-                    <CheckCircle className="w-4 h-4" />
-                    Record Sale
-                  </>
+
+                {/* Snacks Purchased */}
+                {actualSnacksList.length > 0 && (
+                  <div className="space-y-2.5">
+                    <h4 className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Snacks Purchased ({actualSnacksList.length})</h4>
+                    <div className="border border-zinc-800/60 rounded-xl overflow-hidden">
+                      <table className="w-full text-left text-xs text-zinc-300 divide-y divide-zinc-800/40">
+                        <thead className="bg-zinc-950/40 font-bold text-zinc-500 uppercase text-[10px] tracking-wider">
+                          <tr>
+                            <th className="p-3">Customer</th>
+                            <th className="p-3">Item</th>
+                            <th className="p-3 text-right">Amount</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-zinc-800/40">
+                          {actualSnacksList.map((sn) => (
+                            <tr key={sn.id} className="hover:bg-zinc-800/20 transition-colors">
+                              <td className="p-3">
+                                <p className="font-semibold text-white">{sn.user?.name ?? sn.guestName ?? "Guest"}</p>
+                                {sn.user?.phone || sn.guestPhone ? (
+                                  <p className="text-[10px] text-zinc-600 mt-0.5">{sn.user?.phone ?? sn.guestPhone}</p>
+                                ) : null}
+                              </td>
+                              <td className="p-3">
+                                <p className="font-medium text-zinc-200">Snacks</p>
+                              </td>
+                              <td className="p-3 text-right text-emerald-400 font-semibold">
+                                {formatCurrency(Number(sn.finalAmount))}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
                 )}
-              </button>
-            </div>
-          </div>
+
+                {/* Actions */}
+                <div className="flex border-t border-zinc-800/60 pt-4">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedPaymentDetail(null)}
+                    className="w-full py-2.5 bg-zinc-800 border border-zinc-700 text-zinc-300 text-sm font-semibold rounded-xl hover:text-white hover:bg-zinc-700 transition-all"
+                  >
+                    Close Details
+                  </button>
+                </div>
+              </div>
+            );
+          })()}
         </div>
       )}
+
+
     </div>
   );
 }

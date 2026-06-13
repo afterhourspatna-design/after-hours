@@ -51,7 +51,15 @@ export async function GET(req: NextRequest) {
       startDateTime: { gte: since },
       bookingStatus: { in: [BookingStatus.CONFIRMED, BookingStatus.COMPLETED] },
     },
-    select: { startDateTime: true, finalAmount: true, negotiatedAmount: true, snacksAmount: true, paymentStatus: true, gameId: true, userId: true },
+    select: { startDateTime: true, finalAmount: true, negotiatedAmount: true, paymentStatus: true, gameId: true, userId: true },
+  });
+
+  // Daily standalone snacks
+  const standaloneSnacks = await prisma.snackOrder.findMany({
+    where: {
+      createdAt: { gte: since },
+    },
+    select: { createdAt: true, amount: true }
   });
 
   // Group by day using IST formatting
@@ -68,8 +76,14 @@ export async function GET(req: NextRequest) {
       const baseRev = isPaid 
         ? Number(b.negotiatedAmount ?? b.finalAmount) 
         : Number(b.finalAmount);
-      const snacksRev = Number(b.snacksAmount ?? 0);
-      dayMap[key] += baseRev + snacksRev;
+      dayMap[key] += baseRev;
+    }
+  }
+
+  for (const s of standaloneSnacks) {
+    const key = formatInIST(s.createdAt);
+    if (key in dayMap) {
+      dayMap[key] += Number(s.amount);
     }
   }
 

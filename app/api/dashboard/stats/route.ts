@@ -62,7 +62,7 @@ export async function GET() {
   const monthBounds = getISTMonthBounds(now);
 
   const [
-    totalBookings, todayBookings, activeNow, weeklyBookings, monthlyBookings, holdCount,
+    totalBookings, todayBookings, activeNow, weeklyBookings, monthlyBookings, holdCount, weeklyBookings_snacks, monthlyBookings_snacks
   ] = await Promise.all([
     // Total all-time
     prisma.booking.count(),
@@ -87,7 +87,7 @@ export async function GET() {
         startDateTime: { gte: weekBounds.start, lte: weekBounds.end },
         bookingStatus: { in: [BookingStatus.CONFIRMED, BookingStatus.COMPLETED] },
       },
-      select: { finalAmount: true, negotiatedAmount: true, snacksAmount: true, paymentStatus: true },
+      select: { finalAmount: true, negotiatedAmount: true, paymentStatus: true },
     }),
 
     // Monthly bookings (CONFIRMED + COMPLETED)
@@ -96,32 +96,50 @@ export async function GET() {
         startDateTime: { gte: monthBounds.start, lte: monthBounds.end },
         bookingStatus: { in: [BookingStatus.CONFIRMED, BookingStatus.COMPLETED] },
       },
-      select: { finalAmount: true, negotiatedAmount: true, snacksAmount: true, paymentStatus: true },
+      select: { finalAmount: true, negotiatedAmount: true, paymentStatus: true },
     }),
 
     // Active holds
     prisma.booking.count({
       where: { bookingStatus: BookingStatus.HOLD, holdExpiresAt: { gt: now } },
     }),
+
+    // Weekly standalone snacks
+    prisma.snackOrder.findMany({
+      where: {
+        createdAt: { gte: weekBounds.start, lte: weekBounds.end },
+      },
+      select: { amount: true }
+    }),
+
+    // Monthly standalone snacks
+    prisma.snackOrder.findMany({
+      where: {
+        createdAt: { gte: monthBounds.start, lte: monthBounds.end },
+      },
+      select: { amount: true }
+    }),
   ]);
 
-  const weeklyRevenue = weeklyBookings.reduce((sum, b) => {
+  const weeklyBookingRevenue = weeklyBookings.reduce((sum, b) => {
     const isPaid = b.paymentStatus === "PAID";
     const baseRev = isPaid 
       ? Number(b.negotiatedAmount ?? b.finalAmount) 
       : Number(b.finalAmount);
-    const snacksRev = Number(b.snacksAmount ?? 0);
-    return sum + baseRev + snacksRev;
+    return sum + baseRev;
   }, 0);
+  const weeklySnacksRevenue = weeklyBookings_snacks.reduce((sum, p) => sum + Number(p.amount), 0);
+  const weeklyRevenue = weeklyBookingRevenue + weeklySnacksRevenue;
 
-  const monthlyRevenue = monthlyBookings.reduce((sum, b) => {
+  const monthlyBookingRevenue = monthlyBookings.reduce((sum, b) => {
     const isPaid = b.paymentStatus === "PAID";
     const baseRev = isPaid 
       ? Number(b.negotiatedAmount ?? b.finalAmount) 
       : Number(b.finalAmount);
-    const snacksRev = Number(b.snacksAmount ?? 0);
-    return sum + baseRev + snacksRev;
+    return sum + baseRev;
   }, 0);
+  const monthlySnacksRevenue = monthlyBookings_snacks.reduce((sum, p) => sum + Number(p.amount), 0);
+  const monthlyRevenue = monthlyBookingRevenue + monthlySnacksRevenue;
 
   return NextResponse.json({
     totalBookings,
