@@ -46,7 +46,9 @@ export async function GET(req: NextRequest) {
   const dateTo = searchParams.get("to");
   const forCalendar = searchParams.get("calendar") === "1";
 
-  const where: any = {};
+  const where: any = {
+    durationMinutes: { gt: 0 } // Hide legacy dummy snack bookings
+  };
 
   // Role-based visibility
   if (role === "STAFF") {
@@ -90,7 +92,9 @@ export async function GET(req: NextRequest) {
     return NextResponse.json(bookings);
   }
 
-  const [bookings, total] = await Promise.all([
+  const includeSnacks = searchParams.get("includeSnacks") === "1";
+
+  const [bookings, total, snackOrders] = await Promise.all([
     prisma.booking.findMany({
       where,
       include: {
@@ -103,9 +107,46 @@ export async function GET(req: NextRequest) {
       take: limit,
     }),
     prisma.booking.count({ where }),
+    // Fetch snack orders only if requested and matching the same payment status criteria
+    (includeSnacks && !status ? prisma.snackOrder.findMany({
+      where: paymentStatus ? { paymentStatus } : {},
+      include: {
+        user: { select: { name: true, phone: true } },
+      },
+      orderBy: { createdAt: "desc" }
+    }) : Promise.resolve([]))
   ]);
 
-  return NextResponse.json({ bookings, total, page, limit });
+  // Map snack orders to dummy booking shape
+  const mappedSnacks = includeSnacks ? snackOrders.map((snack: any) => ({
+    id: `SNACK_${snack.id}`,
+    userId: snack.userId,
+    guestName: snack.guestName,
+    guestPhone: snack.guestPhone,
+    startDateTime: snack.createdAt.toISOString(),
+    endDateTime: snack.createdAt.toISOString(),
+    durationMinutes: 0,
+    bookingStatus: "COMPLETED",
+    paymentStatus: snack.paymentStatus,
+    finalAmount: Number(snack.amount),
+    negotiatedAmount: 0,
+    paymentMethod: null,
+    cashAmount: null,
+    onlineAmount: null,
+    source: "WALK_IN",
+    game: { name: "Snack Sale", tag: "snack" },
+    resourceUnit: null,
+    user: snack.user ? { name: snack.user.name, phone: snack.user.phone } : null,
+    updatedAt: snack.updatedAt.toISOString(),
+    paymentId: snack.paymentId,
+    snacksAmount: Number(snack.amount),
+  })) : [];
+
+  const combinedBookings = [...bookings, ...mappedSnacks].sort((a: any, b: any) => 
+    new Date(b.startDateTime).getTime() - new Date(a.startDateTime).getTime()
+  );
+
+  return NextResponse.json({ bookings: combinedBookings, total: total + mappedSnacks.length, page, limit });
 }
 
 export async function POST(req: NextRequest) {
