@@ -237,10 +237,10 @@ async function getDashboardData(period: string = "today", from?: string, to?: st
     }))
     .sort((a, b) => b.revenue - a.revenue);
 
-  const dailyMap: Record<string, number> = {};
+  const dailyMap: Record<string, { game: number; snacks: number }> = {};
   for (let i = 6; i >= 0; i--) {
     const day = subDays(now, i);
-    dailyMap[formatInIST(day)] = 0;
+    dailyMap[formatInIST(day)] = { game: 0, snacks: 0 };
   }
 
   for (const b of last7DaysBookings) {
@@ -250,24 +250,26 @@ async function getDashboardData(period: string = "today", from?: string, to?: st
       const baseRev = isPaid 
         ? Number(b.negotiatedAmount ?? b.finalAmount) 
         : Number(b.finalAmount);
-      dailyMap[key] += baseRev;
+      dailyMap[key].game += baseRev;
     }
   }
 
   for (const s of last7DaysStandaloneSnacks) {
     const key = formatInIST(s.createdAt);
     if (key in dailyMap) {
-      dailyMap[key] += Number(s.amount);
+      dailyMap[key].snacks += Number(s.amount);
     }
   }
 
-  const last7DaysRevenue = Object.entries(dailyMap).map(([date, amount]) => {
+  const last7DaysRevenue = Object.entries(dailyMap).map(([date, data]) => {
     const dateObj = new Date(date);
     const dayName = dateObj.toLocaleDateString("en-US", { weekday: "narrow" });
     return {
       date,
       dayName,
-      amount,
+      gameAmount: data.game,
+      snacksAmount: data.snacks,
+      amount: data.game + data.snacks,
     };
   });
 
@@ -554,26 +556,40 @@ export default async function AdminDashboard({
               {data.last7DaysRevenue.map((d, i) => {
                 const maxVal = Math.max(...data.last7DaysRevenue.map(item => item.amount), 100);
                 const heightPct = maxVal > 0 ? (d.amount / maxVal) * 100 : 0;
+                
+                const gamePct = d.amount > 0 ? (d.gameAmount / d.amount) * 100 : 0;
+                const snacksPct = d.amount > 0 ? (d.snacksAmount / d.amount) * 100 : 0;
+
                 const formattedAmount = d.amount >= 1000 
                   ? `₹${(d.amount / 1000).toFixed(1)}k` 
                   : `₹${d.amount}`;
                 
                 return (
-                  <div key={d.date} className="flex-1 h-full flex flex-col justify-end items-center group">
-                    <div className="w-full h-24 flex items-end relative">
+                  <div key={d.date} className="flex-1 h-full flex flex-col justify-end items-center group relative">
+                    <div className="absolute -top-5 text-[9px] font-bold text-zinc-400 whitespace-nowrap z-0">
+                      {d.amount > 0 ? formattedAmount : ""}
+                    </div>
+                    <div className="absolute -top-14 bg-zinc-900 text-[10px] font-bold text-white px-2 py-1.5 rounded-lg border border-zinc-700 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-20 flex flex-col items-center gap-1 shadow-xl pointer-events-none">
+                      <span>Total: ₹{d.amount.toLocaleString()}</span>
+                      {d.gameAmount > 0 && <span className="text-zinc-400 text-[9px]">Game: ₹{d.gameAmount.toLocaleString()}</span>}
+                      {d.snacksAmount > 0 && <span className="text-amber-400 text-[9px]">Snacks: ₹{d.snacksAmount.toLocaleString()}</span>}
+                    </div>
+                    <div className="w-full h-24 flex items-end relative z-10">
                       <div
                         className={cn(
-                          "w-full rounded-t-md transition-all duration-500 cursor-help relative",
-                          i === 6 ? "bg-violet-500 shadow-[0_0_15px_rgba(139,92,246,0.3)]" : "bg-zinc-800 hover:bg-zinc-700"
+                          "w-full rounded-t-md transition-all duration-500 cursor-help flex flex-col justify-end overflow-hidden",
+                          i === 6 ? "shadow-[0_0_15px_rgba(139,92,246,0.3)]" : ""
                         )}
                         style={{ height: `${heightPct}%` }}
                       >
-                        <div className="absolute -top-5 left-1/2 -translate-x-1/2 text-[9px] font-bold text-zinc-400 whitespace-nowrap">
-                          {d.amount > 0 ? formattedAmount : ""}
-                        </div>
-                        <div className="absolute -top-10 left-1/2 -translate-x-1/2 bg-zinc-900 text-[10px] font-bold text-white px-2 py-1 rounded border border-zinc-700 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
-                          ₹{d.amount.toLocaleString()}
-                        </div>
+                        <div 
+                          className={cn("w-full transition-all duration-500", i === 6 ? "bg-amber-400" : "bg-amber-500/80 group-hover:bg-amber-400")} 
+                          style={{ height: `${snacksPct}%` }} 
+                        />
+                        <div 
+                          className={cn("w-full transition-all duration-500", i === 6 ? "bg-violet-500" : "bg-zinc-800 group-hover:bg-zinc-700")} 
+                          style={{ height: `${gamePct}%` }} 
+                        />
                       </div>
                     </div>
                     <span className="text-[10px] font-black text-zinc-600 uppercase mt-2">{d.dayName}</span>
@@ -610,7 +626,7 @@ export default async function AdminDashboard({
                     </div>
                   </div>
                   <div className="text-[11px] font-mono font-bold text-emerald-400 bg-emerald-500/10 px-2 py-1 rounded border border-emerald-500/20 flex-shrink-0">
-                    {new Date(b.endDateTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                    {new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit' }).format(new Date(b.endDateTime))}
                   </div>
                 </div>
               )) : (

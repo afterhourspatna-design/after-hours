@@ -18,6 +18,7 @@ export default async function EditBookingPage({
     include: {
       game: true,
       resourceUnit: true,
+      coupon: true,
       user: { select: { id: true, name: true, phone: true } },
     },
   });

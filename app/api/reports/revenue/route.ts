@@ -63,10 +63,10 @@ export async function GET(req: NextRequest) {
   });
 
   // Group by day using IST formatting
-  const dayMap: Record<string, number> = {};
+  const dayMap: Record<string, { game: number; snacks: number }> = {};
   const interval = eachDayOfInterval({ start: since, end: now });
   for (const day of interval) {
-    dayMap[formatInIST(day)] = 0;
+    dayMap[formatInIST(day)] = { game: 0, snacks: 0 };
   }
   
   for (const b of bookings) {
@@ -76,18 +76,23 @@ export async function GET(req: NextRequest) {
       const baseRev = isPaid 
         ? Number(b.negotiatedAmount ?? b.finalAmount) 
         : Number(b.finalAmount);
-      dayMap[key] += baseRev;
+      dayMap[key].game += baseRev;
     }
   }
 
   for (const s of standaloneSnacks) {
     const key = formatInIST(s.createdAt);
     if (key in dayMap) {
-      dayMap[key] += Number(s.amount);
+      dayMap[key].snacks += Number(s.amount);
     }
   }
 
-  const daily = Object.entries(dayMap).map(([date, revenue]) => ({ date, revenue }));
+  const daily = Object.entries(dayMap).map(([date, data]) => ({ 
+    date, 
+    revenue: data.game + data.snacks,
+    gameRevenue: data.game,
+    snacksRevenue: data.snacks
+  }));
   const totalRevenue = daily.reduce((s, d) => s + d.revenue, 0);
 
   // Revenue by game
