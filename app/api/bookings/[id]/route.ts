@@ -226,6 +226,10 @@ export async function PUT(
     data.userId !== undefined ||
     data.guestPhone !== undefined;
 
+  if (needsPriceRecalculation && existing.paymentStatus === "PAID") {
+    return NextResponse.json({ error: "Cannot modify details (duration, game, time, etc.) of a booking that is already paid." }, { status: 400 });
+  }
+
   if (needsPriceRecalculation) {
     const accessories = updateData.accessoriesCount ?? existing.accessoriesCount;
 
@@ -295,8 +299,8 @@ export async function PUT(
 
   await prisma.auditLog.create({
     data: {
-      actorId: (session.user as any).id,
-      actorName: session.user.name ?? undefined,
+      actorId: (session?.user as any)?.id,
+      actorName: session?.user?.name ?? undefined,
       action: "UPDATE_BOOKING",
       entityType: "Booking",
       entityId: booking.id,
@@ -317,6 +321,29 @@ export async function DELETE(
   if (role !== "ADMIN") return NextResponse.json({ error: "Admin only" }, { status: 403 });
 
   const { id } = await params;
-  await prisma.booking.delete({ where: { id } });
+  
+  const booking = await prisma.booking.findUnique({ where: { id } });
+  if (!booking) return NextResponse.json({ error: "Booking not found" }, { status: 404 });
+
+  await prisma.$transaction(async (tx) => {
+    await tx.booking.delete({ where: { id } });
+    if (booking.couponId) {
+      await tx.coupon.updateMany({
+        where: { id: booking.couponId, usedCount: { gt: 0 } },
+        data: { usedCount: { decrement: 1 } },
+      });
+    }
+    await tx.auditLog.create({
+      data: {
+        actorId: (session?.user as any)?.id,
+        actorName: session?.user?.name ?? undefined,
+        action: "DELETE_BOOKING",
+        entityType: "Booking",
+        entityId: id,
+        meta: { bookingDetails: booking },
+      },
+    });
+  });
+
   return NextResponse.json({ success: true });
 }

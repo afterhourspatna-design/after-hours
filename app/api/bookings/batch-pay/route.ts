@@ -153,6 +153,7 @@ export async function POST(req: NextRequest) {
 
     const snackOrders = await prisma.snackOrder.findMany({
       where: { id: { in: snackOrderIds } },
+      include: { user: true }
     });
 
     if (bookings.length !== actualBookingIds.length || snackOrders.length !== snackOrderIds.length) {
@@ -188,7 +189,11 @@ export async function POST(req: NextRequest) {
       const n = b.user?.name ?? b.guestName ?? "Guest";
       allNames.add(n);
     });
-    const customerNamesStr = Array.from(allNames).join(", ");
+    snackOrders.forEach(s => {
+      const n = s.user?.name ?? s.guestName ?? "Guest";
+      allNames.add(n);
+    });
+    const customerNamesStr = Array.from(allNames).join(", ") || "Guest";
 
     // Create Payment record
     const payment = await prisma.payment.create({

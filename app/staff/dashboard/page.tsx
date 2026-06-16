@@ -147,7 +147,7 @@ export default async function StaffDashboard() {
                     </div>
                   </div>
                   <div className="text-[11px] font-mono font-bold text-emerald-400 bg-emerald-500/10 px-2 py-1 rounded border border-emerald-500/20 flex-shrink-0">
-                    {new Date(b.endDateTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                    {new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit' }).format(new Date(b.endDateTime))}
                   </div>
                 </div>
               )) : (

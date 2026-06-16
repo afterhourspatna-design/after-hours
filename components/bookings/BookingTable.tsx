@@ -318,7 +318,11 @@ function BookingTableInner({ role = "ADMIN" }: BookingTableProps) {
       <ConfirmDialog
         open={!!deleteId}
         title="Delete Booking"
-        description="This action cannot be undone. The booking will be permanently removed."
+        description={
+          bookings.find(b => b.id === deleteId)?.paymentStatus === "PAID"
+            ? "This booking is marked as PAID. Deleting it will NOT adjust the overarching payment automatically. You must manually adjust the Payment History. This action cannot be undone."
+            : "This action cannot be undone. The booking will be permanently removed."
+        }
         confirmLabel="Delete"
         onConfirm={handleDelete}
         onCancel={() => setDeleteId(null)}

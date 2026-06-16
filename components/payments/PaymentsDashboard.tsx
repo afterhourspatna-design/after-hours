@@ -198,7 +198,10 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
   };
 
   // Math totals for checkout
-  const selectedBookings = bookings.filter((b) => selectedIds.has(b.id));
+  const selectedBookings = editPaymentId 
+    ? paymentHistory.find(p => p.paymentId === editPaymentId)?.bookings || []
+    : bookings.filter((b) => selectedIds.has(b.id));
+
   const totalActualAmount = selectedBookings.reduce((sum, b) => sum + Number(b.finalAmount), 0);
   const totalActualGamesAmount = selectedBookings
     .filter((b) => !b.id.startsWith("SNACK_"))
@@ -696,7 +699,7 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
                   if (checked) {
                     setNegotiatedInput("0");
                   } else {
-                    setNegotiatedInput(String(totalActualAmount));
+                    setNegotiatedInput(String(totalActualGamesAmount));
                   }
                 }}
                 disabled={submittingPayment}

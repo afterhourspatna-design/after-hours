@@ -7,7 +7,7 @@ import { formatCurrency, generateCSV } from "@/lib/utils";
 import { CardGridSkeleton } from "@/components/ui/LoadingSkeleton";
 
 interface RevenueData {
-  daily: { date: string; revenue: number }[];
+  daily: { date: string; revenue: number; gameRevenue: number; snacksRevenue: number }[];
   totalRevenue: number;
   revenueByGame: { game: string; tag: string; revenue: number }[];
   guestCount: number;
@@ -27,7 +27,9 @@ function CustomTooltip({ active, payload, label }: any) {
   return (
     <div className="bg-zinc-900 border border-zinc-700 rounded-xl p-3 shadow-xl">
       <p className="text-xs text-zinc-400 mb-1">{label}</p>
-      <p className="text-sm font-bold text-white">{formatCurrency(payload[0].value)}</p>
+      <p className="text-sm font-bold text-white mb-1">Total: {formatCurrency(payload[0].payload.revenue)}</p>
+      <p className="text-xs text-zinc-400">Game: {formatCurrency(payload[0].payload.gameRevenue)}</p>
+      <p className="text-xs text-amber-400">Snacks: {formatCurrency(payload[0].payload.snacksRevenue)}</p>
     </div>
   );
 }
@@ -110,7 +112,8 @@ export default function ReportsPage() {
             <YAxis tick={{ fill: "#71717a", fontSize: 10 }} axisLine={false} tickLine={false}
               tickFormatter={v => `Rs ${(v / 1000).toFixed(0)}k`} />
             <Tooltip content={<CustomTooltip />} cursor={{ fill: "rgba(124,58,237,0.08)" }} />
-            <Bar dataKey="revenue" fill="#7c3aed" radius={[4, 4, 0, 0]} />
+            <Bar dataKey="gameRevenue" stackId="a" fill="#7c3aed" radius={[0, 0, 0, 0]} />
+            <Bar dataKey="snacksRevenue" stackId="a" fill="#f59e0b" radius={[4, 4, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
       </div>

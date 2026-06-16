@@ -338,8 +338,21 @@ export default function BookingForm({ mode = "create", initialData, prefillDate,
     ? format(addMinutes(new Date(`${bookingDate}T${startTime}:00`), durationMinutes), "HH:mm")
     : "";
 
+  const isPaidLocked = mode === "edit" && initialData?.paymentStatus === "PAID";
+
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
+      {mode === "edit" && initialData?.paymentStatus === "PAID" && (
+        <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-4 flex items-start gap-3">
+          <AlertCircle className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
+          <div>
+            <h4 className="text-sm font-bold text-amber-400">Booking is Paid</h4>
+            <p className="text-xs text-amber-400/80 mt-1">
+              You cannot modify price-affecting details (game, duration, time, etc.) for a booking that is already paid.
+            </p>
+          </div>
+        </div>
+      )}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left col — main form */}
         <div className="lg:col-span-2 space-y-5">
@@ -354,13 +367,13 @@ export default function BookingForm({ mode = "create", initialData, prefillDate,
                 </div>
                 {/* Guest toggle */}
                 <div className="flex items-center gap-2 bg-zinc-800/60 rounded-xl p-1">
-                  <button type="button" onClick={() => setIsGuest(false)}
-                    className={cn("px-3 py-1.5 rounded-lg text-xs font-medium transition-all",
+                  <button type="button" onClick={() => setIsGuest(false)} disabled={isPaidLocked}
+                    className={cn("px-3 py-1.5 rounded-lg text-xs font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed",
                       !isGuest ? "bg-violet-600 text-white" : "text-zinc-400 hover:text-zinc-200")}>
                     <User className="w-3 h-3 inline mr-1" />Registered
                   </button>
-                  <button type="button" onClick={() => setIsGuest(true)}
-                    className={cn("px-3 py-1.5 rounded-lg text-xs font-medium transition-all",
+                  <button type="button" onClick={() => setIsGuest(true)} disabled={isPaidLocked}
+                    className={cn("px-3 py-1.5 rounded-lg text-xs font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed",
                       isGuest ? "bg-violet-600 text-white" : "text-zinc-400 hover:text-zinc-200")}>
                     Guest
                   </button>
@@ -372,7 +385,7 @@ export default function BookingForm({ mode = "create", initialData, prefillDate,
                   <div>
                     <label className="text-xs text-zinc-400 mb-1 block">Guest Name *</label>
                     <input value={guestName} onChange={e => setGuestName(e.target.value)}
-                      placeholder="e.g. Ahmed Ali" className="input-field" />
+                      placeholder="e.g. Ahmed Ali" className="input-field disabled:opacity-50 disabled:cursor-not-allowed" disabled={isPaidLocked} />
                   </div>
                   <div>
                     <label className="text-xs text-zinc-400 mb-1 block">Mobile Number (10 Digits) *</label>
@@ -387,7 +400,8 @@ export default function BookingForm({ mode = "create", initialData, prefillDate,
                            setGuestPhone(val);
                          }}
                          placeholder="3000000000" 
-                         className="input-field pl-12" 
+                         className="input-field pl-12 disabled:opacity-50 disabled:cursor-not-allowed" 
+                         disabled={isPaidLocked}
                        />
                     </div>
                   </div>
@@ -408,7 +422,7 @@ export default function BookingForm({ mode = "create", initialData, prefillDate,
                       </div>
                     ) : (
                       <input value={userSearch} onChange={e => setUserSearch(e.target.value)}
-                        placeholder="Search by name or phone…" className="input-field pl-9" />
+                        placeholder="Search by name or phone…" className="input-field pl-9 disabled:opacity-50 disabled:cursor-not-allowed" disabled={isPaidLocked} />
                     )}
                   </div>
                   {userResults.length > 0 && !selectedUser && (
@@ -449,7 +463,8 @@ export default function BookingForm({ mode = "create", initialData, prefillDate,
                       setAccessoriesCount(0);
                     }
                   }}
-                  className="input-field"
+                  className="input-field disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={isPaidLocked}
                 >
                   <option value="">Select game…</option>
                   {games.map(g => (
@@ -578,14 +593,15 @@ export default function BookingForm({ mode = "create", initialData, prefillDate,
               <div>
                 <label className="text-xs text-zinc-400 mb-1 block">Date *</label>
                 <input type="date" value={bookingDate} onChange={e => setBookingDate(e.target.value)}
-                  className="input-field" min={format(new Date(), "yyyy-MM-dd")} />
+                  className="input-field disabled:opacity-50 disabled:cursor-not-allowed" min={format(new Date(), "yyyy-MM-dd")} disabled={isPaidLocked} />
               </div>
               <div>
                 <label className="text-xs text-zinc-400 mb-1 block">Start Time *</label>
                 <select 
                   value={startTime} 
                   onChange={e => setStartTime(e.target.value)}
-                  className="input-field"
+                  className="input-field disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={isPaidLocked}
                 >
                   {currentOptions.map(time => (
                     <option key={time} value={time}>{time}</option>
@@ -605,7 +621,8 @@ export default function BookingForm({ mode = "create", initialData, prefillDate,
                   {gameDurations.map(d => (
                     <button key={d} type="button"
                       onClick={() => setDurationMinutes(d)}
-                      className={cn("px-2.5 py-1.5 rounded-lg text-xs font-medium border transition-all",
+                      disabled={isPaidLocked}
+                      className={cn("px-2.5 py-1.5 rounded-lg text-xs font-medium border transition-all disabled:opacity-50 disabled:cursor-not-allowed",
                         durationMinutes === d
                           ? "bg-violet-600 border-violet-600 text-white"
                           : "bg-zinc-800/60 border-zinc-700 text-zinc-400 hover:border-zinc-600")}>
@@ -719,11 +736,12 @@ export default function BookingForm({ mode = "create", initialData, prefillDate,
                   value={couponCode} 
                   onChange={e => setCouponCode(e.target.value.toUpperCase())}
                   placeholder="ENTER PROMO CODE" 
-                  className="input-field font-mono uppercase tracking-widest pl-4 pr-24" 
+                  className="input-field font-mono uppercase tracking-widest pl-4 pr-24 disabled:opacity-50 disabled:cursor-not-allowed" 
+                  disabled={isPaidLocked}
                 />
                 
                 {/* Promos Quick Selector Trigger */}
-                {availableCoupons.length > 0 && (
+                {availableCoupons.length > 0 && !isPaidLocked && (
                   <button
                     type="button"
                     onClick={() => setShowPromos(!showPromos)}
@@ -735,6 +753,13 @@ export default function BookingForm({ mode = "create", initialData, prefillDate,
 
                 <button
                   type="button"
+                  disabled={isPaidLocked}
+                  className={cn(
+                    "px-4 py-2 rounded-xl text-xs font-bold transition-all active:scale-95 flex items-center justify-center min-w-[80px] disabled:opacity-50 disabled:cursor-not-allowed",
+                    appliedCoupon 
+                      ? "bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20" 
+                      : "bg-violet-600 text-white hover:bg-violet-500 shadow-md shadow-violet-950/20"
+                  )}
                   onClick={() => {
                     if (appliedCoupon) {
                       // Clear coupon
@@ -751,12 +776,6 @@ export default function BookingForm({ mode = "create", initialData, prefillDate,
                       toast.success("Applying promo code...");
                     }
                   }}
-                  className={cn(
-                    "px-4 py-2 rounded-xl text-xs font-bold transition-all active:scale-95 flex items-center justify-center min-w-[80px]",
-                    appliedCoupon 
-                      ? "bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20" 
-                      : "bg-violet-600 text-white hover:bg-violet-500 shadow-md shadow-violet-950/20"
-                  )}
                 >
                   {appliedCoupon ? "Remove" : "Apply"}
                 </button>

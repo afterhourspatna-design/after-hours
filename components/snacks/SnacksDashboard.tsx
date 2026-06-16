@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { Coins, Search, X, Edit, Trash2, CheckCircle2, ChevronLeft, ChevronRight, Info } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, formatDate } from "@/lib/utils";
 import { toast } from "sonner";
 
 interface SnackOrder {
@@ -200,8 +200,6 @@ export default function SnacksDashboard() {
   };
 
   const formatCurrency = (val: number) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', minimumFractionDigits: 0 }).format(val);
-  const formatDate = (ds: string) => new Date(ds).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
-
   const totalPages = Math.ceil(total / LIMIT);
 
   return (
