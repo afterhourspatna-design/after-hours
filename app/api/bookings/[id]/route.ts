@@ -299,8 +299,8 @@ export async function PUT(
 
   await prisma.auditLog.create({
     data: {
-      actorId: (session.user as any).id,
-      actorName: session.user.name ?? undefined,
+      actorId: (session?.user as any)?.id,
+      actorName: session?.user?.name ?? undefined,
       action: "UPDATE_BOOKING",
       entityType: "Booking",
       entityId: booking.id,
@@ -335,8 +335,8 @@ export async function DELETE(
     }
     await tx.auditLog.create({
       data: {
-        actorId: (session.user as any).id,
-        actorName: session.user.name ?? undefined,
+        actorId: (session?.user as any)?.id,
+        actorName: session?.user?.name ?? undefined,
         action: "DELETE_BOOKING",
         entityType: "Booking",
         entityId: id,
