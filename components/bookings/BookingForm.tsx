@@ -59,6 +59,30 @@ for (let h = 10; h <= 23; h++) {
 }
 TIME_OPTIONS.push("00:00"); // Midnight / closing
 
+function getNextTimeSlot(): string {
+  const now = new Date();
+  const minutes = now.getMinutes();
+  const hours = now.getHours();
+  
+  let targetMins = Math.ceil(minutes / 5) * 5;
+  let targetHours = hours;
+  
+  if (targetMins >= 60) {
+    targetMins = 0;
+    targetHours += 1;
+  }
+  
+  if (targetHours < 10) {
+    return "10:00";
+  }
+  
+  if (targetHours >= 24 || (targetHours === 23 && targetMins > 55)) {
+    return "10:00";
+  }
+  
+  return `${targetHours.toString().padStart(2, "0")}:${targetMins.toString().padStart(2, "0")}`;
+}
+
 export default function BookingForm({ mode = "create", initialData, prefillDate, role = "ADMIN", currentUser }: BookingFormProps) {
   const router = useRouter();
 
@@ -82,7 +106,7 @@ export default function BookingForm({ mode = "create", initialData, prefillDate,
   const defaultDate = initialData?.startDateTime ? new Date(initialData.startDateTime) : (prefillDate ? new Date(prefillDate) : new Date());
   const initialStartTime = initialData?.startDateTime 
     ? format(new Date(initialData.startDateTime), "HH:mm") 
-    : (prefillDate ? format(defaultDate, "HH:mm") : "14:00");
+    : (prefillDate ? format(defaultDate, "HH:mm") : getNextTimeSlot());
     
   const [bookingDate, setBookingDate] = useState(format(defaultDate, "yyyy-MM-dd"));
   const [startTime, setStartTime] = useState(initialStartTime);
