@@ -274,8 +274,6 @@ export async function POST(req: NextRequest) {
     ? data.priceOverride
     : pricing.finalAmount;
 
-  const holdExpiresAt = addMinutes(new Date(), parseInt(process.env.HOLD_EXPIRY_MINUTES ?? "15"));
-
   const booking = await prisma.booking.create({
     data: {
       userId: resolvedUserId,
@@ -295,10 +293,10 @@ export async function POST(req: NextRequest) {
       couponDiscount: pricing.couponDiscount ?? 0,
       finalAmount,
       paymentStatus: data.paymentStatus,
-      bookingStatus: role === "CUSTOMER" ? BookingStatus.CONFIRMED : BookingStatus.HOLD,
+      bookingStatus: BookingStatus.CONFIRMED,
       source: data.source,
       notes: data.notes ?? null,
-      holdExpiresAt,
+      holdExpiresAt: null,
       createdById: actorId,
     },
     include: {

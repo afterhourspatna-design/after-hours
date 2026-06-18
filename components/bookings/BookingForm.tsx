@@ -324,7 +324,7 @@ export default function BookingForm({ mode = "create", initialData, prefillDate,
         return;
       }
 
-      toast.success(mode === "edit" ? "Booking updated!" : "Booking created — on hold for 15 min");
+      toast.success(mode === "edit" ? "Booking updated!" : "Booking created successfully!");
       router.push(role === "CUSTOMER" ? "/customer/bookings" : role === "STAFF" ? "/staff/bookings" : "/admin/bookings");
       router.refresh();
     } catch {
@@ -355,11 +355,11 @@ export default function BookingForm({ mode = "create", initialData, prefillDate,
       )}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left col — main form */}
-        <div className="lg:col-span-2 space-y-5">
+        <div className="lg:col-span-2 space-y-5 relative z-10">
 
           {/* ── Customer / Guest Section ── */}
           {role !== "CUSTOMER" && (
-            <div className="glass-card p-5 space-y-4">
+            <div className="glass-card p-5 space-y-4 relative z-30">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2 text-sm font-semibold text-white">
                   <Users className="w-4 h-4 text-violet-400" />
@@ -698,7 +698,7 @@ export default function BookingForm({ mode = "create", initialData, prefillDate,
           </div>
 
           {/* ── Details ── */}
-          <div className="glass-card p-5 space-y-4">
+          <div className="glass-card p-5 space-y-4 relative z-20">
             <h3 className="text-sm font-semibold text-white">Booking Details</h3>
             {role !== "CUSTOMER" && (
               <div className="space-y-4 max-w-xs">
@@ -787,7 +787,7 @@ export default function BookingForm({ mode = "create", initialData, prefillDate,
                       <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Available Promos</span>
                       <button type="button" onClick={() => setShowPromos(false)} className="text-zinc-500 hover:text-white text-xs font-bold">Close</button>
                     </div>
-                    <div className="max-h-48 overflow-y-auto space-y-2 custom-scroll pr-1">
+                    <div className="max-h-48 overflow-y-auto space-y-2 custom-scroll pr-3 pb-3">
                       {availableCoupons.map((c) => (
                         <button
                           key={c.id}
@@ -798,16 +798,16 @@ export default function BookingForm({ mode = "create", initialData, prefillDate,
                             setShowPromos(false);
                             toast.success(`Promo code ${c.code} selected!`);
                           }}
-                          className="w-full text-left p-2.5 rounded-lg bg-zinc-900/60 hover:bg-zinc-900 hover:border-violet-500/30 border border-zinc-800/80 transition-all flex items-center justify-between group"
+                          className="w-full text-left p-2.5 rounded-lg bg-zinc-900/60 hover:bg-zinc-900 hover:border-violet-500/30 border border-zinc-800/80 transition-all flex items-center justify-between gap-3 group"
                         >
-                          <div>
-                            <span className="text-xs font-bold font-mono text-white group-hover:text-violet-400 transition-colors uppercase tracking-wider">{c.code}</span>
-                            <p className="text-[9px] text-zinc-500 mt-0.5">
+                          <div className="min-w-0">
+                            <span className="text-xs font-bold font-mono text-white group-hover:text-violet-400 transition-colors uppercase tracking-wider block truncate">{c.code}</span>
+                            <p className="text-[9px] text-zinc-500 mt-0.5 truncate" title={c.discountType === "PERCENTAGE" ? `${Number(c.discountValue)}% off` : `Rs. ${Number(c.discountValue)} off`}>
                               {c.discountType === "PERCENTAGE" ? `${Number(c.discountValue)}% off` : `Rs. ${Number(c.discountValue)} off`}
                               {Number(c.minBookingAmount) > 0 && ` • Min Booking: Rs. ${Number(c.minBookingAmount)}`}
                             </p>
                           </div>
-                          <span className="text-[9px] font-bold text-violet-400 bg-violet-500/5 px-2 py-1 rounded border border-violet-500/10 uppercase group-hover:bg-violet-600 group-hover:text-white transition-all">Apply</span>
+                          <span className="text-[9px] font-bold text-violet-400 bg-violet-500/5 px-2 py-1 rounded border border-violet-500/10 uppercase group-hover:bg-violet-600 group-hover:text-white transition-all flex-shrink-0">Apply</span>
                         </button>
                       ))}
                     </div>
@@ -915,11 +915,7 @@ export default function BookingForm({ mode = "create", initialData, prefillDate,
                 <><Loader2 className="w-4 h-4 animate-spin" /> Saving…</>
               ) : mode === "edit" ? "Update Booking" : "Create Booking"}
             </button>
-            {mode === "create" && (
-              <p className="text-xs text-zinc-600 text-center">
-                Booking will be placed on 15-min hold
-              </p>
-            )}
+
           </div>
         </div>
       </div>
