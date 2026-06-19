@@ -5,6 +5,14 @@ import { Coins, Search, X, Edit, Trash2, CheckCircle2, ChevronLeft, ChevronRight
 import { cn, formatDate } from "@/lib/utils";
 import { toast } from "sonner";
 
+export interface SnackOrderItem {
+  id: string;
+  amount: string;
+  notes: string | null;
+  addedBy: { name: string } | null;
+  createdAt: string;
+}
+
 interface SnackOrder {
   id: string;
   userId: string | null;
