@@ -156,16 +156,14 @@ export async function GET(req: NextRequest) {
       
       // Fix payment split by falling back to the linked payment model if booking model fields are missing (legacy records)
       const pMethod = b.paymentMethod || b.payment?.paymentMethod;
-      const cAmt = Number(b.cashAmount ?? b.payment?.cashAmount ?? 0);
-      const oAmt = Number(b.onlineAmount ?? b.payment?.onlineAmount ?? 0);
 
       if (pMethod === "CASH") {
-        cashTotal += cAmt > 0 ? cAmt : netAmt;
+        cashTotal += netAmt;
       } else if (pMethod === "ONLINE") {
-        onlineTotal += oAmt > 0 ? oAmt : netAmt;
+        onlineTotal += netAmt;
       } else if (pMethod === "MIXED") {
-        cashTotal += cAmt;
-        onlineTotal += oAmt;
+        cashTotal += Number(b.cashAmount || 0);
+        onlineTotal += Number(b.onlineAmount || 0);
       } else {
         // Absolute fallback if everything is completely missing
         cashTotal += netAmt;
@@ -217,12 +215,26 @@ export async function GET(req: NextRequest) {
       // wait, the previous logic said "we ONLY want to show revenue for PAID bookings... maybe for snacks we can still show total amount"
       // So standalone snacks are added to daily net revenue regardless, so we must add to gross as well.
       grossRevenue += Number(s.amount);
-      
-      if (s.payment?.paymentMethod === "CASH") cashTotal += Number(s.amount);
-      else if (s.payment?.paymentMethod === "ONLINE") onlineTotal += Number(s.amount);
-      else if (s.payment?.paymentMethod === "MIXED") {
-        cashTotal += Number(s.payment.cashAmount || 0);
-        onlineTotal += Number(s.payment.onlineAmount || 0);
+      const pMethod = s.payment?.paymentMethod;
+
+      if (pMethod === "CASH") {
+        cashTotal += Number(s.amount);
+      } else if (pMethod === "ONLINE") {
+        onlineTotal += Number(s.amount);
+      } else if (pMethod === "MIXED") {
+        const pCash = Number(s.payment?.cashAmount || 0);
+        const pOnline = Number(s.payment?.onlineAmount || 0);
+        const pTotal = pCash + pOnline;
+        
+        if (pTotal > 0) {
+          const cashRatio = pCash / pTotal;
+          const sCash = Number(s.amount) * cashRatio;
+          const sOnline = Number(s.amount) - sCash;
+          cashTotal += sCash;
+          onlineTotal += sOnline;
+        } else {
+          cashTotal += Number(s.amount);
+        }
       } else {
         // Fallback for unpaid standalone snacks or undefined
         cashTotal += Number(s.amount);
