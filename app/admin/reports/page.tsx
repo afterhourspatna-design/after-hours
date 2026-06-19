@@ -185,52 +185,88 @@ export default function ReportsPage() {
         </div>
       </div>
 
-      {/* Charts Row */}
+      {/* Pie Charts Row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         
-        {/* Peak Hours */}
-        <div className="glass-card p-5">
-          <h2 className="text-sm font-semibold text-white mb-4 flex items-center gap-2">
-            <Flame className="w-4 h-4 text-orange-500" /> Peak Hours Heatmap
-          </h2>
-          <ResponsiveContainer width="100%" height={220}>
-            <BarChart data={data.peakHours} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-              <XAxis dataKey="hour" tick={{ fill: "#71717a", fontSize: 10 }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fill: "#71717a", fontSize: 10 }} axisLine={false} tickLine={false} />
-              <Tooltip content={<CustomTooltip />} cursor={{ fill: "rgba(249,115,22,0.08)" }} />
-              <Bar name="Bookings" dataKey="count" fill="#f97316" radius={[4, 4, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
+        {/* Revenue by Game */}
+        <div className="glass-card p-5 flex flex-col">
+          <h2 className="text-sm font-semibold text-white mb-4">Revenue by Game</h2>
+          {data.revenueByGame.length > 0 ? (
+            <div className="flex-1 flex flex-col min-h-0">
+              <div className="h-[160px] flex-shrink-0">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie data={data.revenueByGame} dataKey="revenue" nameKey="game" cx="50%" cy="50%" outerRadius={75} innerRadius={45}>
+                      {data.revenueByGame.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+                    </Pie>
+                    <Tooltip formatter={(v: number) => formatCurrency(v)} contentStyle={{ background: "#18181b", border: "1px solid #3f3f46", borderRadius: "12px" }} />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+              <div className="mt-4 flex-1 space-y-2">
+                {data.revenueByGame.map((g, i) => (
+                  <div key={g.game} className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: COLORS[i % COLORS.length] }} />
+                      <span className="text-xs text-zinc-300 truncate max-w-[120px]">{g.game}</span>
+                    </div>
+                    <span className="text-xs font-medium text-white">{formatCurrency(g.revenue)}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : <p className="text-sm text-zinc-600 py-8 text-center">No revenue data yet</p>}
         </div>
 
         {/* Source Breakdown */}
-        <div className="glass-card p-5 flex">
-          <div className="w-1/2">
-            <h2 className="text-sm font-semibold text-white mb-4">Acquisition Source</h2>
-            {data.sources.length > 0 ? (
-              <ResponsiveContainer width="100%" height={220}>
-                <PieChart>
-                  <Pie data={data.sources} dataKey="count" nameKey="source" cx="50%" cy="50%" outerRadius={80} innerRadius={50}>
-                    {data.sources.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
-                  </Pie>
-                  <Tooltip contentStyle={{ background: "#18181b", border: "1px solid #3f3f46", borderRadius: "12px" }} />
-                </PieChart>
-              </ResponsiveContainer>
-            ) : <p className="text-sm text-zinc-600 py-8 text-center">No data</p>}
-          </div>
-          <div className="w-1/2 flex flex-col justify-center space-y-3 pl-4 border-l border-zinc-800/60">
-            {data.sources.map((s, i) => (
-              <div key={s.source} className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full" style={{ background: PIE_COLORS[i % PIE_COLORS.length] }} />
-                  <span className="text-xs text-zinc-300 capitalize">{s.source.toLowerCase().replace('_', ' ')}</span>
-                </div>
-                <span className="text-xs font-bold text-white">{s.count}</span>
+        <div className="glass-card p-5 flex flex-col">
+          <h2 className="text-sm font-semibold text-white mb-4">Acquisition Source</h2>
+          {data.sources.length > 0 ? (
+            <div className="flex-1 flex flex-col min-h-0">
+              <div className="h-[160px] flex-shrink-0">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie data={data.sources} dataKey="count" nameKey="source" cx="50%" cy="50%" outerRadius={75} innerRadius={45}>
+                      {data.sources.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
+                    </Pie>
+                    <Tooltip contentStyle={{ background: "#18181b", border: "1px solid #3f3f46", borderRadius: "12px" }} />
+                  </PieChart>
+                </ResponsiveContainer>
               </div>
-            ))}
-          </div>
+              <div className="mt-4 flex-1 space-y-2">
+                {data.sources.map((s, i) => (
+                  <div key={s.source} className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: PIE_COLORS[i % PIE_COLORS.length] }} />
+                      <span className="text-xs text-zinc-300 capitalize truncate max-w-[120px]">{s.source.toLowerCase().replace('_', ' ')}</span>
+                    </div>
+                    <span className="text-xs font-bold text-white">{s.count}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : <p className="text-sm text-zinc-600 py-8 text-center">No data</p>}
         </div>
 
+      </div>
+
+      {/* Peak Hours Heatmap Row */}
+      <div className="grid grid-cols-1 gap-6">
+        <div className="glass-card p-5 flex flex-col h-[300px]">
+          <h2 className="text-sm font-semibold text-white mb-4 flex items-center gap-2">
+            <Flame className="w-4 h-4 text-orange-500" /> Peak Hours Heatmap
+          </h2>
+          <div className="flex-1 min-h-0 pt-2">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={data.peakHours} margin={{ top: 0, right: 10, left: -20, bottom: 0 }}>
+                <XAxis dataKey="hour" tick={{ fill: "#71717a", fontSize: 10 }} tickFormatter={v => v.split(":")[0]} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fill: "#71717a", fontSize: 10 }} axisLine={false} tickLine={false} />
+                <Tooltip content={<CustomTooltip />} cursor={{ fill: "rgba(249,115,22,0.08)" }} />
+                <Bar name="Bookings" dataKey="count" fill="#f97316" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
       </div>
 
       {/* Leaderboards */}

@@ -69,7 +69,14 @@ export async function GET(req: NextRequest) {
       guestPhone: true,
       source: true,
       coupon: { select: { code: true } },
-      user: { select: { name: true, phone: true } }
+      user: { select: { name: true, phone: true } },
+      payment: {
+        select: {
+          paymentMethod: true,
+          cashAmount: true,
+          onlineAmount: true,
+        }
+      }
     },
   });
 
@@ -115,12 +122,11 @@ export async function GET(req: NextRequest) {
   const promoMap: Record<string, { code: string, uses: number, discountGiven: number }> = {};
 
   for (const b of bookings) {
-    // Basic day mapping
     const key = formatInIST(b.startDateTime);
-    if (key in dayMap) {
-      if (b.paymentStatus === "PAID") {
-        dayMap[key].game += Number(b.negotiatedAmount ?? b.finalAmount);
-      }
+    if (!(key in dayMap)) continue;
+
+    if (b.paymentStatus === "PAID") {
+      dayMap[key].game += Number(b.negotiatedAmount ?? b.finalAmount);
     }
 
     // Source breakdown
@@ -139,16 +145,31 @@ export async function GET(req: NextRequest) {
       totalPaidBookingsCount++;
       totalDurationMinutes += b.durationMinutes;
 
-      grossRevenue += Number(b.basePrice);
-      
+      const netAmt = Number(b.negotiatedAmount ?? b.finalAmount);
       const standardDiscounts = Number(b.discountAmount) + Number(b.couponDiscount);
+      const trueGross = Number(b.finalAmount) + standardDiscounts;
+      
+      grossRevenue += trueGross;
+      
       const manualDiscount = b.negotiatedAmount !== null ? Number(b.finalAmount) - Number(b.negotiatedAmount) : 0;
       totalDiscounts += standardDiscounts + manualDiscount;
       
-      cashTotal += Number(b.cashAmount || 0);
-      onlineTotal += Number(b.onlineAmount || 0);
+      // Fix payment split by falling back to the linked payment model if booking model fields are missing (legacy records)
+      const pMethod = b.paymentMethod || b.payment?.paymentMethod;
+      const cAmt = Number(b.cashAmount ?? b.payment?.cashAmount ?? 0);
+      const oAmt = Number(b.onlineAmount ?? b.payment?.onlineAmount ?? 0);
 
-      const netAmt = Number(b.negotiatedAmount ?? b.finalAmount);
+      if (pMethod === "CASH") {
+        cashTotal += cAmt > 0 ? cAmt : netAmt;
+      } else if (pMethod === "ONLINE") {
+        onlineTotal += oAmt > 0 ? oAmt : netAmt;
+      } else if (pMethod === "MIXED") {
+        cashTotal += cAmt;
+        onlineTotal += oAmt;
+      } else {
+        // Absolute fallback if everything is completely missing
+        cashTotal += netAmt;
+      }
 
       // Spenders mapping (combining registered + unregistered by phone)
       let identifier = "";
@@ -186,9 +207,9 @@ export async function GET(req: NextRequest) {
   // Snacks addition
   for (const s of standaloneSnacks) {
     const key = formatInIST(s.createdAt);
-    if (key in dayMap) {
-      dayMap[key].snacks += Number(s.amount);
-    }
+    if (!(key in dayMap)) continue;
+
+    dayMap[key].snacks += Number(s.amount);
     
     // Standalone snacks have no discount, so gross=net
     if (s.paymentStatus === "PAID" || Number(s.amount) > 0) {
@@ -217,7 +238,7 @@ export async function GET(req: NextRequest) {
   }));
   
   const totalNetRevenue = daily.reduce((s, d) => s + d.revenue, 0);
-  const aov = totalPaidBookingsCount > 0 ? totalNetRevenue / totalPaidBookingsCount : 0;
+  const aov = totalPaidBookingsCount > 0 ? Math.round(totalNetRevenue / totalPaidBookingsCount) : 0;
   const avgDuration = totalPaidBookingsCount > 0 ? Math.round(totalDurationMinutes / totalPaidBookingsCount) : 0;
 
   const peakHours = Object.entries(peakHoursMap).map(([hour, count]) => ({ hour, count }));
