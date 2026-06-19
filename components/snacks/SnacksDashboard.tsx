@@ -27,6 +27,7 @@ interface SnackOrder {
     name: string;
     phone: string;
   };
+  items?: SnackOrderItem[];
 }
 
 export default function SnacksDashboard() {
