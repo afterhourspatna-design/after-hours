@@ -5,6 +5,14 @@ import { Coins, Search, X, Edit, Trash2, CheckCircle2, ChevronLeft, ChevronRight
 import { cn, formatDate } from "@/lib/utils";
 import { toast } from "sonner";
 
+export interface SnackOrderItem {
+  id: string;
+  amount: string;
+  notes: string | null;
+  addedBy: { name: string } | null;
+  createdAt: string;
+}
+
 interface SnackOrder {
   id: string;
   userId: string | null;
@@ -19,6 +27,7 @@ interface SnackOrder {
     name: string;
     phone: string;
   };
+  items?: SnackOrderItem[];
 }
 
 export default function SnacksDashboard() {
@@ -34,6 +43,8 @@ export default function SnacksDashboard() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [deleteConfirmationId, setDeleteConfirmationId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
+  const [historyOrder, setHistoryOrder] = useState<SnackOrder | null>(null);
   
   // Form states
   const [snackGuestMode, setSnackGuestMode] = useState(false);
@@ -43,6 +54,7 @@ export default function SnacksDashboard() {
   const [snackSelectedUser, setSnackSelectedUser] = useState<any | null>(null);
   const [snackUserResults, setSnackUserResults] = useState<any[]>([]);
   const [snackAmountInput, setSnackAmountInput] = useState("");
+  const [snackNotesInput, setSnackNotesInput] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
   const fetchSnacks = useCallback(async () => {
@@ -90,7 +102,8 @@ export default function SnacksDashboard() {
   const handleOpenModal = (snack?: SnackOrder) => {
     if (snack) {
       setEditingId(snack.id);
-      setSnackAmountInput(snack.amount.toString());
+      setSnackAmountInput("");
+      setSnackNotesInput("");
       if (snack.user) {
         setSnackGuestMode(false);
         setSnackSelectedUser({ id: snack.userId, name: snack.user.name, phone: snack.user.phone });
@@ -127,7 +140,7 @@ export default function SnacksDashboard() {
 
     setSubmitting(true);
     try {
-      const payload: any = { amount: Number(snackAmountInput) };
+      const payload: any = { amount: Number(snackAmountInput), notes: snackNotesInput };
       
       if (!snackGuestMode) {
         if (!snackSelectedUser) {
@@ -149,8 +162,8 @@ export default function SnacksDashboard() {
         payload.guestPhone = snackGuestPhone;
       }
 
-      const method = editingId ? "PUT" : "POST";
-      const url = editingId ? `/api/snacks/${editingId}` : "/api/snacks";
+      const method = "POST";
+      const url = editingId ? `/api/snacks/${editingId}/items` : "/api/snacks";
 
       const res = await fetch(url, {
         method,
@@ -171,6 +184,25 @@ export default function SnacksDashboard() {
       toast.error("Network error");
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleDeleteItem = async (orderId: string, itemId: string) => {
+    if (!confirm("Are you sure you want to delete this item?")) return;
+    try {
+      const res = await fetch(`/api/snacks/${orderId}/items/${itemId}`, { method: "DELETE" });
+      if (res.ok) {
+        toast.success("Item deleted");
+        fetchSnacks();
+        // Update history modal data if open
+        const updatedOrder = await res.json();
+        setHistoryOrder(updatedOrder);
+      } else {
+        const err = await res.json();
+        toast.error(err.error || "Failed to delete item");
+      }
+    } catch (e) {
+      toast.error("Network error");
     }
   };
 
@@ -281,24 +313,36 @@ export default function SnacksDashboard() {
                       )}
                     </td>
                     <td className="px-4 py-4 text-right">
-                      {snack.paymentStatus !== "PAID" && (
-                        <div className="flex items-center justify-end gap-2">
-                          <button
-                            onClick={() => handleOpenModal(snack)}
-                            className="p-1.5 text-zinc-400 hover:text-white hover:bg-zinc-700 rounded-lg transition-colors"
-                            title="Edit"
-                          >
-                            <Edit className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => handleDelete(snack.id)}
-                            className="p-1.5 text-red-400 hover:text-red-300 hover:bg-red-950/30 rounded-lg transition-colors"
-                            title="Delete"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                      )}
+                      <div className="flex items-center justify-end gap-2">
+                        <button
+                          onClick={() => {
+                            setHistoryOrder(snack);
+                            setShowHistoryModal(true);
+                          }}
+                          className="p-1.5 text-blue-400 hover:text-blue-300 hover:bg-blue-950/30 rounded-lg transition-colors"
+                          title="History"
+                        >
+                          <Info className="w-4 h-4" />
+                        </button>
+                        {snack.paymentStatus !== "PAID" && (
+                          <>
+                            <button
+                              onClick={() => handleOpenModal(snack)}
+                              className="p-1.5 text-zinc-400 hover:text-white hover:bg-zinc-700 rounded-lg transition-colors"
+                              title="Add Amount"
+                            >
+                              <Coins className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => handleDelete(snack.id)}
+                              className="p-1.5 text-red-400 hover:text-red-300 hover:bg-red-950/30 rounded-lg transition-colors"
+                              title="Delete"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -346,7 +390,7 @@ export default function SnacksDashboard() {
             <div className="flex items-center justify-between border-b border-zinc-800/60 pb-3">
               <div className="flex items-center gap-2">
                 <Coins className="w-5 h-5 text-violet-400" />
-                <h3 className="text-lg font-bold text-white">{editingId ? "Edit Snack Order" : "Record Snack Sale"}</h3>
+                <h3 className="text-lg font-bold text-white">{editingId ? "Add to Open Tab" : "Record Snack Sale"}</h3>
               </div>
               <button
                 onClick={handleCloseModal}
@@ -357,8 +401,16 @@ export default function SnacksDashboard() {
               </button>
             </div>
 
+            {editingId && (
+              <div className="p-3 rounded-xl bg-zinc-800/50 border border-zinc-700/50 mb-2">
+                <p className="text-xs text-zinc-500 uppercase font-semibold mb-1">Adding to Tab For</p>
+                <p className="text-sm text-white font-medium">{snackGuestMode ? snackGuestName || "Guest" : snackSelectedUser?.name}</p>
+                <p className="text-xs text-zinc-400">{snackGuestMode ? snackGuestPhone : snackSelectedUser?.phone}</p>
+              </div>
+            )}
+            
             {/* Customer Toggle */}
-            <div className="space-y-2">
+            <div className={cn("space-y-2", editingId && "hidden")}>
               <div className="flex items-center justify-between">
                 <label className="text-xs text-zinc-400 font-semibold uppercase tracking-wider">Customer Type</label>
                 <div className="flex items-center gap-2 bg-zinc-800/60 rounded-xl p-1">
@@ -468,7 +520,7 @@ export default function SnacksDashboard() {
 
             {/* Snack Amount */}
             <div>
-              <label className="text-xs text-zinc-400 font-semibold uppercase tracking-wider block mb-1">Snacks Amount (₹) *</label>
+              <label className="text-xs text-zinc-400 font-semibold uppercase tracking-wider block mb-1">Additional Amount (₹) *</label>
               <input
                 type="number"
                 value={snackAmountInput}
@@ -479,6 +531,18 @@ export default function SnacksDashboard() {
               />
             </div>
 
+            <div>
+              <label className="text-xs text-zinc-400 font-semibold uppercase tracking-wider block mb-1">Notes / Items (optional)</label>
+              <input
+                type="text"
+                value={snackNotesInput}
+                onChange={(e) => setSnackNotesInput(e.target.value)}
+                disabled={submitting}
+                placeholder="e.g. 2 Cokes, 1 Chips"
+                className="input-field"
+              />
+            </div>
+            
             <div className="bg-blue-500/10 border border-blue-500/20 p-3 rounded-xl flex gap-3 text-blue-400 mt-2">
               <Info className="w-5 h-5 flex-shrink-0" />
               <div className="text-xs leading-relaxed">
@@ -524,6 +588,87 @@ export default function SnacksDashboard() {
           </div>
         </div>
       )}
+
+      
+      {/* History Modal */}
+      {showHistoryModal && historyOrder && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-black/75 backdrop-blur-sm transition-opacity"
+            onClick={() => setShowHistoryModal(false)}
+          />
+
+          <div className="relative glass-card bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-2xl overflow-hidden flex flex-col shadow-2xl z-10 p-6 animate-scale-in max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between border-b border-zinc-800/60 pb-4 mb-4 flex-shrink-0">
+              <div>
+                <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                  <Info className="w-5 h-5 text-blue-400" />
+                  Order History
+                </h3>
+                <p className="text-sm text-zinc-400 mt-1">
+                  Tab for: <span className="text-white font-medium">{historyOrder.user?.name ?? historyOrder.guestName ?? "Guest"}</span>
+                </p>
+              </div>
+              <div className="flex items-center gap-4">
+                <div className="text-right">
+                  <p className="text-xs text-zinc-500 uppercase font-bold tracking-wider mb-0.5">Total Amount</p>
+                  <p className="text-xl font-bold text-emerald-400">{formatCurrency(Number(historyOrder.amount))}</p>
+                </div>
+                <button
+                  onClick={() => setShowHistoryModal(false)}
+                  className="p-2 text-zinc-500 hover:text-white hover:bg-zinc-800 rounded-xl transition-all"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            <div className="overflow-y-auto custom-scroll pr-2 space-y-3">
+              {historyOrder.items && historyOrder.items.length > 0 ? (
+                historyOrder.items.map((item, idx) => (
+                  <div key={item.id} className="p-4 rounded-xl bg-zinc-800/30 border border-zinc-700/50 flex items-center justify-between group">
+                    <div className="flex items-start gap-4">
+                      <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center text-xs font-bold text-zinc-400">
+                        {historyOrder.items!.length - idx}
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-white mb-0.5">{item.notes || "Added items"}</p>
+                        <div className="flex items-center gap-2 text-xs text-zinc-500">
+                          <span>{formatDate(item.createdAt)}</span>
+                          {item.addedBy && (
+                            <>
+                              <span>•</span>
+                              <span>Added by {item.addedBy.name}</span>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <p className="text-lg font-bold text-emerald-400">{formatCurrency(Number(item.amount))}</p>
+                      {historyOrder.paymentStatus === "UNPAID" && (
+                        <button
+                          onClick={() => handleDeleteItem(historyOrder.id, item.id)}
+                          className="p-1.5 text-zinc-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
+                          title="Delete line item"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="p-8 text-center text-zinc-500 bg-zinc-800/20 rounded-xl border border-zinc-800/50">
+                  <Info className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                  <p>No item history available for this order.</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
 
       {/* Delete Confirmation Modal */}
       {deleteConfirmationId && (
