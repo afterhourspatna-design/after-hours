@@ -313,34 +313,36 @@ export default function SnacksDashboard() {
                       )}
                     </td>
                     <td className="px-4 py-4 text-right">
-                      {snack.paymentStatus !== "PAID" && (
-                        <div className="flex items-center justify-end gap-2">
-                          <button
-                            onClick={() => {
-                              setHistoryOrder(snack);
-                              setShowHistoryModal(true);
-                            }}
-                            className="p-1.5 text-blue-400 hover:text-blue-300 hover:bg-blue-950/30 rounded-lg transition-colors"
-                            title="History"
-                          >
-                            <Info className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => handleOpenModal(snack)}
-                            className="p-1.5 text-zinc-400 hover:text-white hover:bg-zinc-700 rounded-lg transition-colors"
-                            title="Add Amount"
-                          >
-                            <Coins className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => handleDelete(snack.id)}
-                            className="p-1.5 text-red-400 hover:text-red-300 hover:bg-red-950/30 rounded-lg transition-colors"
-                            title="Delete"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                      )}
+                      <div className="flex items-center justify-end gap-2">
+                        <button
+                          onClick={() => {
+                            setHistoryOrder(snack);
+                            setShowHistoryModal(true);
+                          }}
+                          className="p-1.5 text-blue-400 hover:text-blue-300 hover:bg-blue-950/30 rounded-lg transition-colors"
+                          title="History"
+                        >
+                          <Info className="w-4 h-4" />
+                        </button>
+                        {snack.paymentStatus !== "PAID" && (
+                          <>
+                            <button
+                              onClick={() => handleOpenModal(snack)}
+                              className="p-1.5 text-zinc-400 hover:text-white hover:bg-zinc-700 rounded-lg transition-colors"
+                              title="Add Amount"
+                            >
+                              <Coins className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => handleDelete(snack.id)}
+                              className="p-1.5 text-red-400 hover:text-red-300 hover:bg-red-950/30 rounded-lg transition-colors"
+                              title="Delete"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}
