@@ -316,11 +316,21 @@ export default function SnacksDashboard() {
                       {snack.paymentStatus !== "PAID" && (
                         <div className="flex items-center justify-end gap-2">
                           <button
+                            onClick={() => {
+                              setHistoryOrder(snack);
+                              setShowHistoryModal(true);
+                            }}
+                            className="p-1.5 text-blue-400 hover:text-blue-300 hover:bg-blue-950/30 rounded-lg transition-colors"
+                            title="History"
+                          >
+                            <Info className="w-4 h-4" />
+                          </button>
+                          <button
                             onClick={() => handleOpenModal(snack)}
                             className="p-1.5 text-zinc-400 hover:text-white hover:bg-zinc-700 rounded-lg transition-colors"
-                            title="Edit"
+                            title="Add Amount"
                           >
-                            <Edit className="w-4 h-4" />
+                            <Coins className="w-4 h-4" />
                           </button>
                           <button
                             onClick={() => handleDelete(snack.id)}
