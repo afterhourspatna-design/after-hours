@@ -162,8 +162,16 @@ export async function GET(req: NextRequest) {
       } else if (pMethod === "ONLINE") {
         onlineTotal += netAmt;
       } else if (pMethod === "MIXED") {
-        cashTotal += Number(b.cashAmount || 0);
-        onlineTotal += Number(b.onlineAmount || 0);
+        const bCash = Number(b.cashAmount || b.payment?.cashAmount || 0);
+        const bOnline = Number(b.onlineAmount || b.payment?.onlineAmount || 0);
+        const bTotal = bCash + bOnline;
+        if (bTotal > 0) {
+          const cashRatio = bCash / bTotal;
+          cashTotal += netAmt * cashRatio;
+          onlineTotal += netAmt * (1 - cashRatio);
+        } else {
+          cashTotal += netAmt;
+        }
       } else {
         // Absolute fallback if everything is completely missing
         cashTotal += netAmt;
