@@ -122,21 +122,15 @@ export async function GET() {
   ]);
 
   const weeklyBookingRevenue = weeklyBookings.reduce((sum, b) => {
-    const isPaid = b.paymentStatus === "PAID";
-    const baseRev = isPaid 
-      ? Number(b.negotiatedAmount ?? b.finalAmount) 
-      : Number(b.finalAmount);
-    return sum + baseRev;
+    if (b.paymentStatus !== "PAID") return sum;
+    return sum + Number(b.negotiatedAmount ?? b.finalAmount);
   }, 0);
   const weeklySnacksRevenue = weeklyBookings_snacks.reduce((sum, p) => sum + Number(p.amount), 0);
   const weeklyRevenue = weeklyBookingRevenue + weeklySnacksRevenue;
 
   const monthlyBookingRevenue = monthlyBookings.reduce((sum, b) => {
-    const isPaid = b.paymentStatus === "PAID";
-    const baseRev = isPaid 
-      ? Number(b.negotiatedAmount ?? b.finalAmount) 
-      : Number(b.finalAmount);
-    return sum + baseRev;
+    if (b.paymentStatus !== "PAID") return sum;
+    return sum + Number(b.negotiatedAmount ?? b.finalAmount);
   }, 0);
   const monthlySnacksRevenue = monthlyBookings_snacks.reduce((sum, p) => sum + Number(p.amount), 0);
   const monthlyRevenue = monthlyBookingRevenue + monthlySnacksRevenue;

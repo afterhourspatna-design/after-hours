@@ -14,6 +14,7 @@ const batchPaySchema = z.object({
   userId: z.string().optional().nullable(),
   guestName: z.string().optional().nullable(),
   guestPhone: z.string().optional().nullable(),
+  couponCode: z.string().optional().nullable(),
 });
 
 const editBatchPaySchema = z.object({
@@ -56,6 +57,7 @@ export async function POST(req: NextRequest) {
       userId = null,
       guestName = null,
       guestPhone = null,
+      couponCode = null,
     } = parsed.data;
 
     const actualBookingIds = allIds.filter(id => !id.startsWith("SNACK_"));
@@ -180,6 +182,74 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // Process coupon code on un-couponed bookings
+    if (couponCode) {
+      const cleanedCode = couponCode.trim().toUpperCase();
+      const coupon = await prisma.coupon.findUnique({
+        where: { code: cleanedCode }
+      });
+
+      if (!coupon) {
+        return NextResponse.json({ error: "Invalid coupon code" }, { status: 400 });
+      } else if (!coupon.isActive) {
+        return NextResponse.json({ error: "This coupon code is inactive" }, { status: 400 });
+      } else if (!coupon.allowedRoles.includes(role as any)) {
+        return NextResponse.json({ error: "This coupon is not valid for your account role" }, { status: 400 });
+      }
+
+      // Identify eligible bookings: those without a coupon applied
+      const eligibleBookings = bookings.filter(b => !b.couponId);
+      
+      if (eligibleBookings.length > 0) {
+        const eligibleBasePriceSum = eligibleBookings.reduce((sum, b) => sum + Number(b.basePrice), 0);
+        
+        if (eligibleBasePriceSum >= Number(coupon.minBookingAmount)) {
+          let totalDiscount = 0;
+          if (coupon.discountType === "PERCENTAGE") {
+            let discount = eligibleBasePriceSum * (Number(coupon.discountValue) / 100);
+            if (coupon.maxDiscountAmount) {
+              discount = Math.min(discount, Number(coupon.maxDiscountAmount));
+            }
+            totalDiscount = Math.round(discount * 100) / 100;
+          } else {
+            totalDiscount = Math.min(eligibleBasePriceSum, Math.round(Number(coupon.discountValue) * 100) / 100);
+          }
+
+          let usedCountIncremented = false;
+
+          // Distribute discount proportionally
+          for (let i = 0; i < eligibleBookings.length; i++) {
+            const b = eligibleBookings[i];
+            let bDiscount = 0;
+            
+            if (i === eligibleBookings.length - 1) {
+              // Last item gets remainder to avoid rounding issues
+              const sumOfOthers = eligibleBookings.slice(0, -1).reduce((sum, b2) => {
+                return sum + Math.round((Number(b2.basePrice) / eligibleBasePriceSum) * totalDiscount * 100) / 100;
+              }, 0);
+              bDiscount = Number((totalDiscount - sumOfOthers).toFixed(2));
+            } else {
+              bDiscount = Math.round((Number(b.basePrice) / eligibleBasePriceSum) * totalDiscount * 100) / 100;
+            }
+
+            b.couponId = coupon.id;
+            b.couponDiscount = bDiscount as any;
+            b.finalAmount = (Number(b.basePrice) - bDiscount) as any;
+
+            if (!usedCountIncremented) {
+              await prisma.coupon.update({
+                where: { id: coupon.id },
+                data: { usedCount: { increment: 1 } }
+              });
+              usedCountIncremented = true;
+            }
+          }
+        } else {
+          return NextResponse.json({ error: `Minimum base amount of Rs. ${coupon.minBookingAmount} required for un-couponed bookings to apply this coupon.` }, { status: 400 });
+        }
+      }
+    }
+
     // Compute total final amount of selected bookings
     const totalFinalAmount = bookings.reduce((sum, b) => sum + Number(b.finalAmount), 0);
 
@@ -237,6 +307,9 @@ export async function POST(req: NextRequest) {
           cashAmount: bCash,
           onlineAmount: bOnline,
           paymentId,
+          couponId: b.couponId,
+          couponDiscount: b.couponDiscount,
+          finalAmount: b.finalAmount,
           // DO NOT store snacksAmount on booking anymore
         },
       });

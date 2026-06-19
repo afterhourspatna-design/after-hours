@@ -185,6 +185,8 @@ export default function BookingForm({ mode = "create", initialData, prefillDate,
           setSelectedGame(g);
           if (mode === "create") {
             setAccessoriesCount(g.tag === "ps5" ? 1 : g.tag === "tabletennis" ? 2 : g.tag === "pool" ? 2 : 0);
+          } else if (mode === "edit" && (!initialData?.accessoriesCount || initialData.accessoriesCount === 0)) {
+            setAccessoriesCount(g.tag === "ps5" ? 1 : g.tag === "tabletennis" ? 2 : g.tag === "pool" ? 2 : 0);
           }
         }
       }
@@ -536,6 +538,7 @@ export default function BookingForm({ mode = "create", initialData, prefillDate,
                         key={opt.count}
                         type="button"
                         onClick={() => setAccessoriesCount(opt.count)}
+                        disabled={isPaidLocked}
                         className={cn(
                           "flex flex-col items-center justify-center p-3.5 rounded-xl border text-center transition-all duration-300",
                           active
@@ -562,6 +565,7 @@ export default function BookingForm({ mode = "create", initialData, prefillDate,
                         key={opt.count}
                         type="button"
                         onClick={() => setAccessoriesCount(opt.count)}
+                        disabled={isPaidLocked}
                         className={cn(
                           "flex flex-col items-center justify-center p-3.5 rounded-xl border text-center transition-all duration-300",
                           active
@@ -588,6 +592,7 @@ export default function BookingForm({ mode = "create", initialData, prefillDate,
                         key={opt.count}
                         type="button"
                         onClick={() => setAccessoriesCount(opt.count)}
+                        disabled={isPaidLocked}
                         className={cn(
                           "flex flex-col items-center justify-center p-3.5 rounded-xl border text-center transition-all duration-300",
                           active
@@ -617,15 +622,14 @@ export default function BookingForm({ mode = "create", initialData, prefillDate,
               <div>
                 <label className="text-xs text-zinc-400 mb-1 block">Date *</label>
                 <input type="date" value={bookingDate} onChange={e => setBookingDate(e.target.value)}
-                  className="input-field disabled:opacity-50 disabled:cursor-not-allowed" min={format(new Date(), "yyyy-MM-dd")} disabled={isPaidLocked} />
+                  className="input-field" min={format(new Date(), "yyyy-MM-dd")} />
               </div>
               <div>
                 <label className="text-xs text-zinc-400 mb-1 block">Start Time *</label>
                 <select 
                   value={startTime} 
                   onChange={e => setStartTime(e.target.value)}
-                  className="input-field disabled:opacity-50 disabled:cursor-not-allowed"
-                  disabled={isPaidLocked}
+                  className="input-field"
                 >
                   {currentOptions.map(time => (
                     <option key={time} value={time}>{time}</option>

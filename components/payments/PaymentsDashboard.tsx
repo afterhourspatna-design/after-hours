@@ -32,6 +32,16 @@ interface Booking {
   updatedAt: string | null;
   paymentId: string | null;
   snacksAmount: number | null;
+  couponId: string | null;
+}
+
+interface Coupon {
+  id: string;
+  code: string;
+  discountType: "PERCENTAGE" | "FIXED";
+  discountValue: number;
+  minBookingAmount: number;
+  maxDiscountAmount: number | null;
 }
 
 interface PaymentGroup {
@@ -74,10 +84,27 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
   const [payOnlySnacks, setPayOnlySnacks] = useState(false);
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
+  const [coupons, setCoupons] = useState<Coupon[]>([]);
+  const [selectedCouponCode, setSelectedCouponCode] = useState("");
 
   useEffect(() => {
     setPage(1);
   }, [startDate, endDate]);
+
+  useEffect(() => {
+    async function fetchCoupons() {
+      try {
+        const res = await fetch("/api/coupons/available");
+        if (res.ok) {
+          const data = await res.json();
+          setCoupons(Array.isArray(data) ? data : []);
+        }
+      } catch (err) {
+        console.error("Failed to fetch coupons", err);
+      }
+    }
+    fetchCoupons();
+  }, []);
 
   useEffect(() => {
     setStartDate("");
@@ -141,6 +168,7 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
               updatedAt: p.createdAt,
               paymentId: p.id,
               snacksAmount: snack.amount,
+              couponId: null,
             }));
 
             const allBookings = [...p.bookings, ...snackBookings];
@@ -210,6 +238,41 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
     .filter((b) => b.id.startsWith("SNACK_"))
     .reduce((sum, b) => sum + Number(b.finalAmount), 0);
 
+  // Dynamic Coupon Discount Calculation
+  const eligibleBookings = selectedBookings.filter((b) => !b.couponId && !b.id.startsWith("SNACK_"));
+  const eligibleBaseAmount = eligibleBookings.reduce((sum, b) => sum + Number(b.finalAmount), 0);
+  
+  let dynamicCouponDiscount = 0;
+  if (!editPaymentId && selectedCouponCode && eligibleBaseAmount > 0) {
+    const coupon = coupons.find(c => c.code === selectedCouponCode);
+    if (coupon && eligibleBaseAmount >= Number(coupon.minBookingAmount)) {
+      if (coupon.discountType === "PERCENTAGE") {
+        let discount = eligibleBaseAmount * (Number(coupon.discountValue) / 100);
+        if (coupon.maxDiscountAmount) {
+          discount = Math.min(discount, Number(coupon.maxDiscountAmount));
+        }
+        dynamicCouponDiscount = discount;
+      } else {
+        dynamicCouponDiscount = Math.min(eligibleBaseAmount, Number(coupon.discountValue));
+      }
+    }
+  }
+
+  const handleCouponChange = (code: string) => {
+    setSelectedCouponCode(code);
+    const coupon = coupons.find(c => c.code === code);
+    let discount = 0;
+    if (coupon && eligibleBaseAmount >= Number(coupon.minBookingAmount)) {
+      if (coupon.discountType === "PERCENTAGE") {
+        discount = eligibleBaseAmount * (Number(coupon.discountValue) / 100);
+        if (coupon.maxDiscountAmount) discount = Math.min(discount, Number(coupon.maxDiscountAmount));
+      } else {
+        discount = Math.min(eligibleBaseAmount, Number(coupon.discountValue));
+      }
+    }
+    setNegotiatedInput(String(Math.max(0, totalActualGamesAmount - discount)));
+  };
+
   // Open modal and pre-fill values
   const handleOpenPayModal = () => {
     if (selectedIds.size === 0) return;
@@ -220,6 +283,7 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
     setOnlineInput("");
     setPayOnlySnacks(false);
     setEditPaymentId(null);
+    setSelectedCouponCode("");
     setShowPayModal(true);
   };
 
@@ -291,6 +355,7 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
             paymentMethod,
             cashAmount: paymentMethod === "MIXED" ? cashVal : paymentMethod === "CASH" ? totalWithSnacks : 0,
             onlineAmount: paymentMethod === "MIXED" ? onlineVal : paymentMethod === "ONLINE" ? totalWithSnacks : 0,
+            couponCode: selectedCouponCode || null,
           };
 
       const method = editPaymentId ? "PUT" : "POST";
@@ -676,8 +741,9 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
                 {selectedBookings.map((b) => (
                   <div key={b.id} className="py-2 flex justify-between text-xs">
                     <div>
-                      <p className="font-semibold text-zinc-300">
+                      <p className="font-semibold text-zinc-300 flex items-center gap-1">
                         {b.user?.name ?? b.guestName ?? "Guest"} ({b.game.name})
+                        {b.couponId && <span className="bg-violet-500/20 text-violet-400 text-[9px] px-1.5 py-0.5 rounded font-bold uppercase border border-violet-500/30">Coupon</span>}
                       </p>
                       <p className="text-zinc-600">{formatDate(b.startDateTime)}</p>
                     </div>
@@ -710,12 +776,52 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
               </label>
             </div>
 
+            {/* Coupon Code Section */}
+            {!editPaymentId && coupons.length > 0 && (
+              <div className="space-y-2">
+                <label className="text-xs text-zinc-500 font-medium block">Apply Coupon</label>
+                <select
+                  value={selectedCouponCode}
+                  onChange={(e) => handleCouponChange(e.target.value)}
+                  disabled={submittingPayment || payOnlySnacks}
+                  className="input-field text-xs w-full"
+                >
+                  <option value="">No Coupon</option>
+                  {coupons.map(c => (
+                    <option key={c.id} value={c.code}>
+                      {c.code} - {c.discountType === "PERCENTAGE" ? `${c.discountValue}% off` : `₹${c.discountValue} off`}
+                    </option>
+                  ))}
+                </select>
+                {dynamicCouponDiscount > 0 && (
+                  <p className="text-[10px] text-emerald-400 font-medium mt-1 animate-fade-in">
+                    Coupon applied! Discount: ₹{dynamicCouponDiscount.toFixed(2)} (on un-couponed bookings)
+                  </p>
+                )}
+                {selectedCouponCode && dynamicCouponDiscount === 0 && eligibleBookings.length === 0 && (
+                  <p className="text-[10px] text-amber-500 font-medium mt-1 animate-fade-in">
+                    Cannot apply: All selected bookings already have coupons applied.
+                  </p>
+                )}
+                {selectedCouponCode && dynamicCouponDiscount === 0 && eligibleBookings.length > 0 && (
+                  <p className="text-[10px] text-amber-500 font-medium mt-1 animate-fade-in">
+                    Coupon not applicable (min amount not met on the un-couponed bookings).
+                  </p>
+                )}
+              </div>
+            )}
+
             {/* Price section */}
             <div className="grid grid-cols-3 gap-3">
               <div>
                 <label className="text-xs text-zinc-500 font-medium block mb-1">Total Actual Amount</label>
-                <div className="bg-zinc-800/40 border border-zinc-800 rounded-xl px-3 py-2.5 text-xs font-bold text-zinc-400 truncate">
-                  {formatCurrency(totalActualAmount)}
+                <div className="bg-zinc-800/40 border border-zinc-800 rounded-xl px-3 py-2.5 text-xs font-bold text-zinc-400 truncate flex items-center gap-2">
+                  {dynamicCouponDiscount > 0 && (
+                    <span className="line-through text-zinc-600">{formatCurrency(totalActualAmount)}</span>
+                  )}
+                  <span className={dynamicCouponDiscount > 0 ? "text-emerald-400" : ""}>
+                    {formatCurrency(totalActualAmount - dynamicCouponDiscount)}
+                  </span>
                 </div>
               </div>
 
