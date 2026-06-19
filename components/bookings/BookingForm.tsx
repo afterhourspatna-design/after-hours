@@ -59,6 +59,30 @@ for (let h = 10; h <= 23; h++) {
 }
 TIME_OPTIONS.push("00:00"); // Midnight / closing
 
+function getNextTimeSlot(): string {
+  const now = new Date();
+  const minutes = now.getMinutes();
+  const hours = now.getHours();
+  
+  let targetMins = Math.ceil(minutes / 5) * 5;
+  let targetHours = hours;
+  
+  if (targetMins >= 60) {
+    targetMins = 0;
+    targetHours += 1;
+  }
+  
+  if (targetHours < 10) {
+    return "10:00";
+  }
+  
+  if (targetHours >= 24 || (targetHours === 23 && targetMins > 55)) {
+    return "10:00";
+  }
+  
+  return `${targetHours.toString().padStart(2, "0")}:${targetMins.toString().padStart(2, "0")}`;
+}
+
 export default function BookingForm({ mode = "create", initialData, prefillDate, role = "ADMIN", currentUser }: BookingFormProps) {
   const router = useRouter();
 
@@ -82,7 +106,7 @@ export default function BookingForm({ mode = "create", initialData, prefillDate,
   const defaultDate = initialData?.startDateTime ? new Date(initialData.startDateTime) : (prefillDate ? new Date(prefillDate) : new Date());
   const initialStartTime = initialData?.startDateTime 
     ? format(new Date(initialData.startDateTime), "HH:mm") 
-    : (prefillDate ? format(defaultDate, "HH:mm") : "14:00");
+    : (prefillDate ? format(defaultDate, "HH:mm") : getNextTimeSlot());
     
   const [bookingDate, setBookingDate] = useState(format(defaultDate, "yyyy-MM-dd"));
   const [startTime, setStartTime] = useState(initialStartTime);
@@ -160,6 +184,8 @@ export default function BookingForm({ mode = "create", initialData, prefillDate,
         if (g) {
           setSelectedGame(g);
           if (mode === "create") {
+            setAccessoriesCount(g.tag === "ps5" ? 1 : g.tag === "tabletennis" ? 2 : g.tag === "pool" ? 2 : 0);
+          } else if (mode === "edit" && (!initialData?.accessoriesCount || initialData.accessoriesCount === 0)) {
             setAccessoriesCount(g.tag === "ps5" ? 1 : g.tag === "tabletennis" ? 2 : g.tag === "pool" ? 2 : 0);
           }
         }
@@ -512,6 +538,7 @@ export default function BookingForm({ mode = "create", initialData, prefillDate,
                         key={opt.count}
                         type="button"
                         onClick={() => setAccessoriesCount(opt.count)}
+                        disabled={isPaidLocked}
                         className={cn(
                           "flex flex-col items-center justify-center p-3.5 rounded-xl border text-center transition-all duration-300",
                           active
@@ -538,6 +565,7 @@ export default function BookingForm({ mode = "create", initialData, prefillDate,
                         key={opt.count}
                         type="button"
                         onClick={() => setAccessoriesCount(opt.count)}
+                        disabled={isPaidLocked}
                         className={cn(
                           "flex flex-col items-center justify-center p-3.5 rounded-xl border text-center transition-all duration-300",
                           active
@@ -564,6 +592,7 @@ export default function BookingForm({ mode = "create", initialData, prefillDate,
                         key={opt.count}
                         type="button"
                         onClick={() => setAccessoriesCount(opt.count)}
+                        disabled={isPaidLocked}
                         className={cn(
                           "flex flex-col items-center justify-center p-3.5 rounded-xl border text-center transition-all duration-300",
                           active
@@ -593,15 +622,14 @@ export default function BookingForm({ mode = "create", initialData, prefillDate,
               <div>
                 <label className="text-xs text-zinc-400 mb-1 block">Date *</label>
                 <input type="date" value={bookingDate} onChange={e => setBookingDate(e.target.value)}
-                  className="input-field disabled:opacity-50 disabled:cursor-not-allowed" min={format(new Date(), "yyyy-MM-dd")} disabled={isPaidLocked} />
+                  className="input-field" min={format(new Date(), "yyyy-MM-dd")} />
               </div>
               <div>
                 <label className="text-xs text-zinc-400 mb-1 block">Start Time *</label>
                 <select 
                   value={startTime} 
                   onChange={e => setStartTime(e.target.value)}
-                  className="input-field disabled:opacity-50 disabled:cursor-not-allowed"
-                  disabled={isPaidLocked}
+                  className="input-field"
                 >
                   {currentOptions.map(time => (
                     <option key={time} value={time}>{time}</option>

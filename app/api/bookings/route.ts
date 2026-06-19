@@ -52,8 +52,20 @@ export async function GET(req: NextRequest) {
 
   // Role-based visibility
   if (role === "STAFF") {
-    // Staff: today + future only
-    where.startDateTime = { gte: new Date(new Date().setHours(0, 0, 0, 0)) };
+    // Staff: today + future only in IST timezone
+    const now = new Date();
+    const formatter = new Intl.DateTimeFormat("en-US", {
+      timeZone: "Asia/Kolkata",
+      year: "numeric",
+      month: "numeric",
+      day: "numeric",
+    });
+    const parts = formatter.formatToParts(now);
+    const year = parseInt(parts.find(p => p.type === "year")!.value, 10);
+    const month = parseInt(parts.find(p => p.type === "month")!.value, 10) - 1;
+    const day = parseInt(parts.find(p => p.type === "day")!.value, 10);
+    const todayStartIST = new Date(Date.UTC(year, month, day, 0, 0, 0, 0) - (5.5 * 60 * 60 * 1000));
+    where.startDateTime = { gte: todayStartIST };
   } else if (role === "CUSTOMER") {
     // Customer: own bookings only
     where.userId = userId;

@@ -72,11 +72,9 @@ export async function GET(req: NextRequest) {
   for (const b of bookings) {
     const key = formatInIST(b.startDateTime);
     if (key in dayMap) {
-      const isPaid = b.paymentStatus === "PAID";
-      const baseRev = isPaid 
-        ? Number(b.negotiatedAmount ?? b.finalAmount) 
-        : Number(b.finalAmount);
-      dayMap[key].game += baseRev;
+      if (b.paymentStatus === "PAID") {
+        dayMap[key].game += Number(b.negotiatedAmount ?? b.finalAmount);
+      }
     }
   }
 
@@ -100,11 +98,8 @@ export async function GET(req: NextRequest) {
   const revenueByGame = games.map((g) => {
     const gameBookings = bookings.filter((b) => b.gameId === g.id);
     const revenue = gameBookings.reduce((sum, b) => {
-      const isPaid = b.paymentStatus === "PAID";
-      const baseRev = isPaid 
-        ? Number(b.negotiatedAmount ?? b.finalAmount) 
-        : Number(b.finalAmount);
-      return sum + baseRev;
+      if (b.paymentStatus !== "PAID") return sum;
+      return sum + Number(b.negotiatedAmount ?? b.finalAmount);
     }, 0);
     return {
       game: g.name,

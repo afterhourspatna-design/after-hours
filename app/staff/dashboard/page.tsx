@@ -7,16 +7,33 @@ import { BookingStatusBadge, PaymentStatusBadge } from "@/components/ui/StatusBa
 import HoldAlert from "@/components/bookings/HoldAlert";
 import StatCard from "@/components/ui/StatCard";
 import { BookOpen, Clock, Zap, Plus, Calendar, Search, Users } from "lucide-react";
-import { startOfDay, endOfDay, addDays } from "date-fns";
+
+function getISTStartAndEnd(date: Date) {
+  const formatter = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Kolkata",
+    year: "numeric",
+    month: "numeric",
+    day: "numeric",
+  });
+  const parts = formatter.formatToParts(date);
+  const year = parseInt(parts.find(p => p.type === "year")!.value, 10);
+  const month = parseInt(parts.find(p => p.type === "month")!.value, 10) - 1;
+  const day = parseInt(parts.find(p => p.type === "day")!.value, 10);
+
+  const start = new Date(Date.UTC(year, month, day, 0, 0, 0, 0) - (5.5 * 60 * 60 * 1000));
+  const end = new Date(Date.UTC(year, month, day, 23, 59, 59, 999) - (5.5 * 60 * 60 * 1000));
+  return { start, end };
+}
 
 export default async function StaffDashboard() {
   const session = await auth();
   if (!session?.user) redirect("/login");
 
   const now = new Date();
-  const todayStart = startOfDay(now);
-  const todayEnd = endOfDay(now);
-  const nextWeek = addDays(now, 7);
+  const bounds = getISTStartAndEnd(now);
+  const todayStart = bounds.start;
+  const todayEnd = bounds.end;
+  const nextWeek = new Date(todayEnd.getTime() + (7 * 24 * 60 * 60 * 1000));
 
   const [todayBookings, upcomingBookings, activeNow, holds] = await Promise.all([
     prisma.booking.findMany({

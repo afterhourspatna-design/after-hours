@@ -1,6 +1,6 @@
 import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
-import { format, formatDistanceToNow, isToday, isTomorrow, isYesterday } from "date-fns";
+import { format, formatDistanceToNow } from "date-fns";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -11,16 +11,100 @@ export function formatCurrency(amount: number | string | null | undefined): stri
   return `Rs ${num.toLocaleString("en-PK")}`;
 }
 
+function getPartsInTimeZone(date: Date, timeZone: string = "Asia/Kolkata") {
+  try {
+    const formatter = new Intl.DateTimeFormat("en-US", {
+      timeZone,
+      year: "numeric",
+      month: "numeric",
+      day: "numeric",
+      hour: "numeric",
+      minute: "numeric",
+      hour12: false
+    });
+    const parts = formatter.formatToParts(date);
+    const yearPart = parts.find(p => p.type === "year");
+    const monthPart = parts.find(p => p.type === "month");
+    const dayPart = parts.find(p => p.type === "day");
+    const hourPart = parts.find(p => p.type === "hour");
+    const minutePart = parts.find(p => p.type === "minute");
+
+    return {
+      year: yearPart ? parseInt(yearPart.value, 10) : date.getFullYear(),
+      month: monthPart ? parseInt(monthPart.value, 10) : date.getMonth() + 1,
+      day: dayPart ? parseInt(dayPart.value, 10) : date.getDate(),
+      hour: hourPart ? parseInt(hourPart.value, 10) : date.getHours(),
+      minute: minutePart ? parseInt(minutePart.value, 10) : date.getMinutes()
+    };
+  } catch (e) {
+    // Return standard system local components if timezone formatting fails
+    return {
+      year: date.getFullYear(),
+      month: date.getMonth() + 1,
+      day: date.getDate(),
+      hour: date.getHours(),
+      minute: date.getMinutes()
+    };
+  }
+}
+
+function getISTDayRelative(date: Date): "today" | "tomorrow" | "yesterday" | "other" {
+  const target = getPartsInTimeZone(date);
+  const now = getPartsInTimeZone(new Date());
+
+  const targetMidnight = Date.UTC(target.year, target.month - 1, target.day);
+  const nowMidnight = Date.UTC(now.year, now.month - 1, now.day);
+  
+  const diffDays = Math.round((targetMidnight - nowMidnight) / (24 * 60 * 60 * 1000));
+  
+  if (diffDays === 0) return "today";
+  if (diffDays === 1) return "tomorrow";
+  if (diffDays === -1) return "yesterday";
+  return "other";
+}
+
+function formatTimeInIST(date: Date): string {
+  try {
+    const formatter = new Intl.DateTimeFormat("en-US", {
+      timeZone: "Asia/Kolkata",
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+    });
+    // Replace any narrow no-break space or non-standard space with normal spaces to prevent NextJS hydration errors
+    return formatter.format(date).replace(/\s+/g, " ");
+  } catch (e) {
+    return format(date, "h:mm a");
+  }
+}
+
+function formatDateInISTFull(date: Date): string {
+  const parts = getPartsInTimeZone(date);
+  const timeStr = formatTimeInIST(date);
+  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const monthName = months[Math.max(0, Math.min(parts.month - 1, 11))];
+  return `${parts.day} ${monthName} ${parts.year}, ${timeStr}`;
+}
+
 export function formatDate(date: Date | string): string {
   const d = new Date(date);
-  if (isToday(d)) return `Today, ${format(d, "h:mm a")}`;
-  if (isTomorrow(d)) return `Tomorrow, ${format(d, "h:mm a")}`;
-  if (isYesterday(d)) return `Yesterday, ${format(d, "h:mm a")}`;
-  return format(d, "d MMM yyyy, h:mm a");
+  if (isNaN(d.getTime())) return "Invalid Date";
+  
+  const relative = getISTDayRelative(d);
+  const timeStr = formatTimeInIST(d);
+  
+  if (relative === "today") return `Today, ${timeStr}`;
+  if (relative === "tomorrow") return `Tomorrow, ${timeStr}`;
+  if (relative === "yesterday") return `Yesterday, ${timeStr}`;
+  
+  return formatDateInISTFull(d);
 }
 
 export function formatTimeRange(start: Date | string, end: Date | string): string {
-  return `${format(new Date(start), "h:mm a")} – ${format(new Date(end), "h:mm a")}`;
+  const s = new Date(start);
+  const e = new Date(end);
+  if (isNaN(s.getTime()) || isNaN(e.getTime())) return "Invalid Time Range";
+  return `${formatTimeInIST(s)} – ${formatTimeInIST(e)}`;
 }
 
 export function formatDuration(minutes: number): string {
