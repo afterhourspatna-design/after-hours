@@ -162,7 +162,7 @@ export default function SnacksDashboard() {
         payload.guestPhone = snackGuestPhone;
       }
 
-      const method = editingId ? "PUT" : "POST";
+      const method = "POST";
       const url = editingId ? `/api/snacks/${editingId}/items` : "/api/snacks";
 
       const res = await fetch(url, {
