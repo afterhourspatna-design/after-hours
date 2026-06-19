@@ -28,6 +28,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     }
 
     // Add item and increment order total
+    const userIdFromSession = (session.user as any).id;
+    const validUser = await prisma.appUser.findUnique({ where: { id: userIdFromSession } });
+
     const updated = await prisma.snackOrder.update({
       where: { id },
       data: {
@@ -36,7 +39,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
           create: {
             amount: Number(amount),
             notes: notes || "Added items",
-            addedById: (session.user as any).id
+            addedById: validUser ? userIdFromSession : null
           }
         }
       },

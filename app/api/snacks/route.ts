@@ -18,6 +18,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid amount" }, { status: 400 });
   }
 
+  const userIdFromSession = (session.user as any).id;
+  const validUser = await prisma.appUser.findUnique({ where: { id: userIdFromSession } });
+
   const snackOrder = await prisma.snackOrder.create({
     data: {
       userId: userId || null,
@@ -29,7 +32,7 @@ export async function POST(req: NextRequest) {
         create: {
           amount,
           notes: notes || "Initial Amount",
-          addedById: (session.user as any).id,
+          addedById: validUser ? userIdFromSession : null,
         }
       }
     },
