@@ -68,6 +68,7 @@ model AppUser {
   payments     Payment[]
   feedback     Feedback[]
   snackOrders  SnackOrder[]
+  addedSnackItems SnackOrderItem[]
 
   // Referral System Fields
   referredById           String?
@@ -203,11 +204,27 @@ model SnackOrder {
 
   user          AppUser?      @relation(fields: [userId], references: [id], onDelete: SetNull)
   payment       Payment?      @relation(fields: [paymentId], references: [id], onDelete: SetNull)
+  items         SnackOrderItem[]
 
   @@index([userId])
   @@index([paymentId])
   @@index([paymentStatus])
   @@map("snack_orders")
+}
+
+model SnackOrderItem {
+  id           String      @id @default(cuid())
+  snackOrderId String
+  amount       Decimal     @db.Decimal(10, 2)
+  notes        String?     // Optional description of items added
+  addedById    String?
+  createdAt    DateTime    @default(now())
+
+  snackOrder   SnackOrder  @relation(fields: [snackOrderId], references: [id], onDelete: Cascade)
+  addedBy      AppUser?    @relation(fields: [addedById], references: [id], onDelete: SetNull)
+
+  @@index([snackOrderId])
+  @@map("snack_order_items")
 }
 
 model DiscountRule {

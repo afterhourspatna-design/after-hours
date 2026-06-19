@@ -12,7 +12,7 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json();
-  const { userId, guestName, guestPhone, amount, paymentStatus } = body;
+  const { userId, guestName, guestPhone, amount, paymentStatus, notes } = body;
 
   if (!amount || amount <= 0) {
     return NextResponse.json({ error: "Invalid amount" }, { status: 400 });
@@ -25,6 +25,13 @@ export async function POST(req: NextRequest) {
       guestPhone: guestPhone || null,
       amount,
       paymentStatus: paymentStatus || "UNPAID",
+      items: {
+        create: {
+          amount,
+          notes: notes || "Initial Amount",
+          addedById: (session.user as any).id,
+        }
+      }
     },
   });
 
@@ -72,6 +79,10 @@ export async function GET(req: NextRequest) {
         where,
         include: {
           user: { select: { name: true, phone: true } },
+          items: {
+            orderBy: { createdAt: "desc" },
+            include: { addedBy: { select: { name: true } } }
+          }
         },
         orderBy: { createdAt: "desc" },
         skip: (page - 1) * limit,
