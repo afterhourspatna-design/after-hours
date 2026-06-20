@@ -192,12 +192,16 @@ async function getDashboardData(period: string = "today", from?: string, to?: st
       select: { startDateTime: true, finalAmount: true, negotiatedAmount: true, paymentStatus: true },
     }),
     prisma.snackOrder.findMany({
-      where: paymentWhereRange,
+      where: {
+        ...paymentWhereRange,
+        paymentStatus: "PAID"
+      },
       select: { amount: true }
     }),
     prisma.snackOrder.findMany({
       where: {
-        createdAt: { gte: bounds7Days.start, lte: bounds7Days.end }
+        createdAt: { gte: bounds7Days.start, lte: bounds7Days.end },
+        paymentStatus: "PAID"
       },
       select: { createdAt: true, amount: true }
     }),
@@ -211,7 +215,7 @@ async function getDashboardData(period: string = "today", from?: string, to?: st
     const isPaid = b.paymentStatus === "PAID";
     const baseRev = isPaid 
       ? Number(b.negotiatedAmount ?? b.finalAmount) 
-      : Number(b.finalAmount);
+      : 0;
     
     periodGameRevenue += baseRev;
 
@@ -249,7 +253,7 @@ async function getDashboardData(period: string = "today", from?: string, to?: st
       const isPaid = b.paymentStatus === "PAID";
       const baseRev = isPaid 
         ? Number(b.negotiatedAmount ?? b.finalAmount) 
-        : Number(b.finalAmount);
+        : 0;
       dailyMap[key].game += baseRev;
     }
   }
