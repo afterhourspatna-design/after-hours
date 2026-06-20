@@ -14,8 +14,12 @@ export interface WhatsAppBookingData {
 export function generateBookingConfirmationMessage(data: WhatsAppBookingData): string {
   const { guestName, guestPhone, gameName, startDateTime, durationMinutes, paymentStatus, finalAmount, totalPaid } = data;
   
-  const dateStr = formatDate(startDateTime);
-  const timeStr = formatTimeRange(startDateTime, durationMinutes);
+  const start = new Date(startDateTime);
+  const end = new Date(start.getTime() + durationMinutes * 60000);
+  
+  const formatterDate = new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Kolkata", day: "numeric", month: "short", year: "numeric" });
+  const dateStr = formatterDate.format(start);
+  const timeStr = formatTimeRange(start, end);
   
   let paymentText = "";
   if (paymentStatus === "PAID") {
