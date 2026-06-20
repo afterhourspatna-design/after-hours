@@ -875,6 +875,12 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
                 <span>Snacks Total</span>
                 <span>{formatCurrency(totalActualSnacksAmount)}</span>
               </div>
+              {dynamicCouponDiscount > 0 && (
+                <div className="flex justify-between text-xs text-emerald-400 font-medium">
+                  <span>Coupon Discount</span>
+                  <span>-{formatCurrency(dynamicCouponDiscount)}</span>
+                </div>
+              )}
               {previouslyPaidTotal > 0 && (
                 <div className="flex justify-between text-xs text-amber-400">
                   <span>Previously Paid (Advance)</span>
@@ -883,7 +889,7 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
               )}
               <div className="border-t border-zinc-800/60 pt-2 flex justify-between text-sm font-bold text-white">
                 <span>Total Outstanding</span>
-                <span>{formatCurrency(totalActualAmount + totalActualSnacksAmount - (editPaymentId ? 0 : previouslyPaidTotal))}</span>
+                <span>{formatCurrency(totalActualAmount - dynamicCouponDiscount - (editPaymentId ? 0 : previouslyPaidTotal))}</span>
               </div>
             </div>
 
