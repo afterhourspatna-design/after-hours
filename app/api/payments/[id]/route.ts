@@ -17,15 +17,19 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     const payment = await prisma.payment.findUnique({
       where: { id },
       include: {
-        bookings: {
+        allocations: {
           include: {
-            game: { select: { name: true } },
-            user: { select: { name: true } }
-          }
-        },
-        snackOrders: {
-          include: {
-            user: { select: { name: true } }
+            booking: {
+              include: {
+                game: { select: { name: true } },
+                user: { select: { name: true } }
+              }
+            },
+            snackOrder: {
+              include: {
+                user: { select: { name: true } }
+              }
+            }
           }
         }
       }

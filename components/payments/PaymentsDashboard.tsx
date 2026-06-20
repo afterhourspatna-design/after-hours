@@ -33,6 +33,7 @@ interface Booking {
   paymentId: string | null;
   snacksAmount: number | null;
   couponId: string | null;
+  allocations?: any[];
 }
 
 interface Coupon {
@@ -75,6 +76,7 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
 
   // Payment Form States
   const [negotiatedInput, setNegotiatedInput] = useState("");
+  const [amountPayingNowInput, setAmountPayingNowInput] = useState("");
   const [snacksInput, setSnacksInput] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<"CASH" | "ONLINE" | "MIXED">("ONLINE");
   const [cashInput, setCashInput] = useState("");
@@ -147,33 +149,44 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
         if (res.ok) {
           const data = await res.json();
           const mappedGroups: PaymentGroup[] = (data.payments ?? []).map((p: any) => {
-            const snackBookings = (p.snackOrders ?? []).map((snack: any) => ({
-              id: `SNACK_${snack.id}`,
-              guestName: snack.guestName,
-              guestPhone: snack.guestPhone,
-              startDateTime: p.createdAt,
-              endDateTime: p.createdAt,
-              durationMinutes: 0,
-              bookingStatus: "COMPLETED",
-              paymentStatus: "PAID",
-              finalAmount: snack.amount,
-              negotiatedAmount: snack.amount,
-              paymentMethod: p.paymentMethod,
-              cashAmount: 0,
-              onlineAmount: 0,
-              source: "WALK_IN",
-              game: { name: "Snacks", tag: "SNACK" },
-              resourceUnit: null,
-              user: snack.user,
-              updatedAt: p.createdAt,
-              paymentId: p.id,
-              snacksAmount: snack.amount,
-              couponId: null,
-            }));
+            const bookings: any[] = [];
+            const snackBookings: any[] = [];
+            
+            for (const alloc of p.allocations || []) {
+               if (alloc.booking) {
+                  bookings.push(alloc.booking);
+               }
+               if (alloc.snackOrder) {
+                  const snack = alloc.snackOrder;
+                  snackBookings.push({
+                    id: `SNACK_${snack.id}`,
+                    guestName: snack.guestName,
+                    guestPhone: snack.guestPhone,
+                    startDateTime: p.createdAt,
+                    endDateTime: p.createdAt,
+                    durationMinutes: 0,
+                    bookingStatus: "COMPLETED",
+                    paymentStatus: "PAID",
+                    finalAmount: snack.amount,
+                    negotiatedAmount: snack.amount,
+                    paymentMethod: p.paymentMethod,
+                    cashAmount: 0,
+                    onlineAmount: 0,
+                    source: "WALK_IN",
+                    game: { name: "Snacks", tag: "SNACK" },
+                    resourceUnit: null,
+                    user: snack.user,
+                    updatedAt: p.createdAt,
+                    paymentId: p.id,
+                    snacksAmount: snack.amount,
+                    couponId: null,
+                  });
+               }
+            }
 
-            const allBookings = [...p.bookings, ...snackBookings];
+            const allBookings = [...bookings, ...snackBookings];
             const totalActual = allBookings.reduce((sum, b) => sum + Number(b.finalAmount), 0);
-            const totalSnacks = (p.snackOrders ?? []).reduce((sum: number, s: any) => sum + Number(s.amount), 0);
+            const totalSnacks = snackBookings.reduce((sum, s) => sum + Number(s.snacksAmount), 0);
 
             return {
               paymentId: p.id,
@@ -238,6 +251,24 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
     .filter((b) => b.id.startsWith("SNACK_"))
     .reduce((sum, b) => sum + Number(b.finalAmount), 0);
 
+  const totalBalanceDueGames = selectedBookings
+    .filter((b) => !b.id.startsWith("SNACK_"))
+    .reduce((sum, b) => {
+      const paid = b.allocations?.reduce((s: any, a: any) => s + Number(a.amount), 0) || 0;
+      return sum + Math.max(0, Number(b.finalAmount) - paid);
+    }, 0);
+
+  const totalBalanceDueSnacks = selectedBookings
+    .filter((b) => b.id.startsWith("SNACK_"))
+    .reduce((sum, b) => {
+      const paid = b.allocations?.reduce((s: any, a: any) => s + Number(a.amount), 0) || 0;
+      return sum + Math.max(0, Number(b.finalAmount) - paid);
+    }, 0);
+
+  const totalPreviouslyPaidGames = totalActualGamesAmount - totalBalanceDueGames;
+  const totalPreviouslyPaidSnacks = totalActualSnacksAmount - totalBalanceDueSnacks;
+  const previouslyPaidTotal = totalPreviouslyPaidGames + totalPreviouslyPaidSnacks;
+
   // Dynamic Coupon Discount Calculation
   const eligibleBookings = selectedBookings.filter((b) => !b.couponId && !b.id.startsWith("SNACK_"));
   const eligibleBaseAmount = eligibleBookings.reduce((sum, b) => sum + Number(b.finalAmount), 0);
@@ -270,7 +301,13 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
         discount = Math.min(eligibleBaseAmount, Number(coupon.discountValue));
       }
     }
-    setNegotiatedInput(String(Math.max(0, totalActualGamesAmount - discount)));
+    const newGamesAmount = Math.max(0, totalActualGamesAmount - discount);
+    setNegotiatedInput(String(newGamesAmount));
+    
+    // Auto-update Amount Paying Now to reflect the new discount while accounting for prior payments
+    const currentSnacks = Number(snacksInput) || 0;
+    const newTotalToPay = newGamesAmount + currentSnacks - (editPaymentId ? 0 : previouslyPaidTotal);
+    setAmountPayingNowInput(String(Math.max(0, newTotalToPay)));
   };
 
   // Open modal and pre-fill values
@@ -278,6 +315,7 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
     if (selectedIds.size === 0) return;
     setNegotiatedInput(String(totalActualGamesAmount));
     setSnacksInput(totalActualSnacksAmount > 0 ? String(totalActualSnacksAmount) : "");
+    setAmountPayingNowInput(String(totalBalanceDueGames + totalBalanceDueSnacks));
     setPaymentMethod("ONLINE");
     setCashInput("");
     setOnlineInput("");
@@ -293,6 +331,7 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
     setSelectedIds(new Set(bookingIds));
     setNegotiatedInput(String(p.totalNegotiated));
     setSnacksInput(String(p.totalSnacks));
+    setAmountPayingNowInput(String(p.totalCash + p.totalOnline));
     setPaymentMethod(p.paymentMethod as "CASH" | "ONLINE" | "MIXED");
     setCashInput(p.totalCash ? String(p.totalCash) : "");
     setOnlineInput(p.totalOnline ? String(p.totalOnline) : "");
@@ -315,24 +354,25 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
   const cashVal = Number(cashInput) || 0;
   const onlineVal = Number(onlineInput) || 0;
   const totalWithSnacks = totalNegotiatedVal + snacksVal;
+  const amountPayingNowVal = Number(amountPayingNowInput) || 0;
 
   // Real-time validations
-  const isSplitInvalid = paymentMethod === "MIXED" && Math.abs(cashVal + onlineVal - totalWithSnacks) > 0.01;
+  const isSplitInvalid = paymentMethod === "MIXED" && Math.abs(cashVal + onlineVal - amountPayingNowVal) > 0.01;
   const isNegotiatedInvalid = totalNegotiatedVal < 0;
   const isSnacksInvalid = editPaymentId ? snacksVal < 0 : snacksVal < totalActualSnacksAmount;
-  const isSubmitDisabled = isNegotiatedInvalid || isSnacksInvalid || isSplitInvalid || submittingPayment;
+  const isAmountPayingNowInvalid = amountPayingNowVal < 0;
+  const isSubmitDisabled = isNegotiatedInvalid || isSnacksInvalid || isSplitInvalid || isAmountPayingNowInvalid || submittingPayment;
 
-  // Auto-fill simple Cash/Online values when Negotiated or Snacks changes
+  // Auto-fill simple Cash/Online values when Amount Paying Now changes
   useEffect(() => {
-    const totalVal = totalNegotiatedVal + snacksVal;
     if (paymentMethod === "CASH") {
-      setCashInput(String(totalVal));
+      setCashInput(String(amountPayingNowVal));
       setOnlineInput("");
     } else if (paymentMethod === "ONLINE") {
-      setOnlineInput(String(totalVal));
+      setOnlineInput(String(amountPayingNowVal));
       setCashInput("");
     }
-  }, [totalNegotiatedVal, snacksVal, paymentMethod]);
+  }, [amountPayingNowVal, paymentMethod]);
 
   const handleConfirmPayment = async () => {
     if (isSubmitDisabled) return;
@@ -344,17 +384,19 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
             paymentId: editPaymentId,
             negotiatedAmount: totalNegotiatedVal,
             snacksAmount: snacksVal,
+            amountPayingNow: amountPayingNowVal,
             paymentMethod,
-            cashAmount: paymentMethod === "MIXED" ? cashVal : paymentMethod === "CASH" ? totalWithSnacks : 0,
-            onlineAmount: paymentMethod === "MIXED" ? onlineVal : paymentMethod === "ONLINE" ? totalWithSnacks : 0,
+            cashAmount: paymentMethod === "MIXED" ? cashVal : paymentMethod === "CASH" ? amountPayingNowVal : 0,
+            onlineAmount: paymentMethod === "MIXED" ? onlineVal : paymentMethod === "ONLINE" ? amountPayingNowVal : 0,
           }
         : {
             bookingIds: Array.from(selectedIds),
             negotiatedAmount: totalNegotiatedVal,
             snacksAmount: snacksVal,
+            amountPayingNow: amountPayingNowVal,
             paymentMethod,
-            cashAmount: paymentMethod === "MIXED" ? cashVal : paymentMethod === "CASH" ? totalWithSnacks : 0,
-            onlineAmount: paymentMethod === "MIXED" ? onlineVal : paymentMethod === "ONLINE" ? totalWithSnacks : 0,
+            cashAmount: paymentMethod === "MIXED" ? cashVal : paymentMethod === "CASH" ? amountPayingNowVal : 0,
+            onlineAmount: paymentMethod === "MIXED" ? onlineVal : paymentMethod === "ONLINE" ? amountPayingNowVal : 0,
             couponCode: selectedCouponCode || null,
           };
 
@@ -507,7 +549,7 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
                     <th>Game / Unit</th>
                     <th>Date & Time</th>
                     <th>Duration</th>
-                    <th>Actual Amount</th>
+                    <th>Total / Balance Due</th>
                     <th>Status</th>
                   </tr>
                 </thead>
@@ -552,7 +594,14 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
                           {formatDuration(b.durationMinutes)}
                         </td>
                         <td className="text-sm font-medium text-white whitespace-nowrap">
-                          {formatCurrency(Number(b.finalAmount))}
+                          {b.paymentStatus === "PARTIAL" ? (
+                            <div className="flex flex-col">
+                              <span className="text-zinc-500 line-through text-xs">{formatCurrency(Number(b.finalAmount))}</span>
+                              <span className="text-amber-400 font-bold">{formatCurrency(Number(b.finalAmount) - (b.allocations?.reduce((s: any, a: any) => s + Number(a.amount), 0) || 0))}</span>
+                            </div>
+                          ) : (
+                            formatCurrency(Number(b.finalAmount))
+                          )}
                         </td>
                         <td>
                           <span className={cn(
@@ -764,8 +813,12 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
                   setPayOnlySnacks(checked);
                   if (checked) {
                     setNegotiatedInput("0");
+                    const t = snacksVal - (editPaymentId ? 0 : totalPreviouslyPaidSnacks);
+                    setAmountPayingNowInput(String(Math.max(0, t)));
                   } else {
                     setNegotiatedInput(String(totalActualGamesAmount));
+                    const t = totalActualGamesAmount + snacksVal - (editPaymentId ? 0 : previouslyPaidTotal);
+                    setAmountPayingNowInput(String(Math.max(0, t)));
                   }
                 }}
                 disabled={submittingPayment}
@@ -812,40 +865,54 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
             )}
 
             {/* Price section */}
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="text-xs text-zinc-500 font-medium block mb-1">Total Actual Amount</label>
-                <div className="bg-zinc-800/40 border border-zinc-800 rounded-xl px-3 py-2.5 text-xs font-bold text-zinc-400 truncate flex items-center gap-2">
-                  {dynamicCouponDiscount > 0 && (
-                    <span className="line-through text-zinc-600">{formatCurrency(totalActualAmount)}</span>
-                  )}
-                  <span className={dynamicCouponDiscount > 0 ? "text-emerald-400" : ""}>
-                    {formatCurrency(totalActualAmount - dynamicCouponDiscount)}
-                  </span>
+                <label className="text-xs text-zinc-500 font-medium block mb-1">Final Invoice (Games + Snacks)</label>
+                <div className="flex gap-2">
+                  <input
+                    type="number"
+                    value={payOnlySnacks ? "0" : negotiatedInput}
+                    onChange={(e) => {
+                      setNegotiatedInput(e.target.value);
+                      const newGamesAmount = Number(e.target.value) || 0;
+                      const t = newGamesAmount + snacksVal - (editPaymentId ? 0 : previouslyPaidTotal);
+                      setAmountPayingNowInput(String(Math.max(0, t)));
+                    }}
+                    disabled={submittingPayment || payOnlySnacks}
+                    placeholder="Games"
+                    className="input-field text-xs w-full"
+                    title="Games Negotiated Amount"
+                  />
+                  <input
+                    type="number"
+                    value={snacksInput}
+                    onChange={(e) => {
+                      setSnacksInput(e.target.value);
+                      const newSnacksAmount = Number(e.target.value) || 0;
+                      const t = totalNegotiatedVal + newSnacksAmount - (editPaymentId ? 0 : previouslyPaidTotal);
+                      setAmountPayingNowInput(String(Math.max(0, t)));
+                    }}
+                    disabled={submittingPayment}
+                    placeholder="Snacks"
+                    className="input-field text-xs w-full"
+                    title="Snacks Amount"
+                  />
+                </div>
+                <div className="text-[10px] text-zinc-500 mt-1 flex justify-between">
+                  <span>Actual: {formatCurrency(totalActualAmount)}</span>
+                  <span className="font-semibold">Invoice: {formatCurrency(totalWithSnacks)}</span>
                 </div>
               </div>
 
               <div>
-                <label className="text-xs text-violet-400 font-bold block mb-1">Negotiated Amount</label>
+                <label className="text-xs text-emerald-400 font-bold block mb-1">Amount Paying Now</label>
                 <input
                   type="number"
-                  value={payOnlySnacks ? "0" : negotiatedInput}
-                  onChange={(e) => setNegotiatedInput(e.target.value)}
-                  disabled={submittingPayment || payOnlySnacks}
-                  placeholder="Games amount"
-                  className="input-field text-xs"
-                />
-              </div>
-
-              <div>
-                <label className="text-xs text-violet-400 font-bold block mb-1">Snacks Amount</label>
-                <input
-                  type="number"
-                  value={snacksInput}
-                  onChange={(e) => setSnacksInput(e.target.value)}
+                  value={amountPayingNowInput}
+                  onChange={(e) => setAmountPayingNowInput(e.target.value)}
                   disabled={submittingPayment}
-                  placeholder="Snacks amount"
-                  className="input-field text-xs"
+                  placeholder="Total to Pay Today"
+                  className="input-field text-sm font-bold text-emerald-400 bg-emerald-400/5 border-emerald-400/30"
                 />
               </div>
             </div>
@@ -903,7 +970,7 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
                 <div className="col-span-2 flex items-start gap-2 text-[11px] text-amber-500 bg-amber-500/5 border border-amber-500/10 p-2.5 rounded-lg">
                   <Info className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
                   <p className="leading-relaxed">
-                    Note: Combined sum of Cash (₹{cashVal}) + Online (₹{onlineVal}) must exactly equal the Overall Settled Amount (₹{totalWithSnacks}).
+                    Note: Combined sum of Cash (₹{cashVal}) + Online (₹{onlineVal}) must exactly equal the Amount Paying Now (₹{amountPayingNowVal}).
                   </p>
                 </div>
               </div>
@@ -912,17 +979,40 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
             {/* Summary details */}
             <div className="flex flex-col gap-1.5 bg-zinc-950/20 p-3 border border-zinc-800/60 rounded-xl">
               <div className="flex items-center justify-between text-xs text-zinc-400">
-                <span>Games Settled Total:</span>
+                <span>Games Invoice:</span>
                 <span className="font-semibold text-white">{formatCurrency(totalNegotiatedVal)}</span>
               </div>
-              <div className="flex items-center justify-between text-xs text-zinc-400">
-                <span>Snacks Total:</span>
-                <span className="font-semibold text-white">{formatCurrency(snacksVal)}</span>
+              {snacksVal > 0 && (
+                <div className="flex items-center justify-between text-xs text-zinc-400">
+                  <span>Snacks Invoice:</span>
+                  <span className="font-semibold text-white">{formatCurrency(snacksVal)}</span>
+                </div>
+              )}
+              {previouslyPaidTotal > 0 && !editPaymentId && (
+                <div className="flex items-center justify-between text-xs text-emerald-400/80">
+                  <span>Previously Paid:</span>
+                  <span className="font-semibold">-{formatCurrency(previouslyPaidTotal)}</span>
+                </div>
+              )}
+              
+              <div className="flex items-center justify-between text-xs text-zinc-400 border-t border-zinc-800/40 pt-1.5 mt-0.5">
+                <span>Balance Due:</span>
+                <span className="font-semibold text-white">
+                  {formatCurrency(Math.max(0, totalWithSnacks - (editPaymentId ? 0 : previouslyPaidTotal)))}
+                </span>
               </div>
-              <div className="flex items-center justify-between text-xs font-bold text-zinc-300 border-t border-zinc-800/40 pt-1.5 mt-0.5">
-                <span>Overall Total to Pay:</span>
-                <span className="text-sm text-emerald-400 font-extrabold">{formatCurrency(totalWithSnacks)}</span>
+              
+              <div className="flex items-center justify-between text-xs font-bold text-zinc-300">
+                <span>Amount Paying Today:</span>
+                <span className="text-sm text-emerald-400 font-extrabold">{formatCurrency(amountPayingNowVal)}</span>
               </div>
+              
+              {amountPayingNowVal > Math.max(0, totalWithSnacks - (editPaymentId ? 0 : previouslyPaidTotal)) && (
+                <div className="flex items-center justify-between text-[11px] text-amber-400 border-t border-amber-500/20 pt-1.5 mt-0.5 bg-amber-500/5 -mx-3 -mb-3 px-3 pb-3 rounded-b-xl">
+                  <span>Excess / Tip (Unallocated Revenue):</span>
+                  <span className="font-bold">+{formatCurrency(amountPayingNowVal - Math.max(0, totalWithSnacks - (editPaymentId ? 0 : previouslyPaidTotal)))}</span>
+                </div>
+              )}
             </div>
 
             {/* Warning alert if sum is wrong */}
@@ -930,7 +1020,7 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
               <div className="flex items-start gap-2 p-3 bg-red-500/10 border border-red-500/20 text-red-400 rounded-xl text-xs">
                 <Info className="w-4 h-4 flex-shrink-0 mt-0.5" />
                 <p>
-                  Mathematical error: Cash + Online (₹{(cashVal + onlineVal).toFixed(2)}) does not match overall total (₹{totalWithSnacks.toFixed(2)}).
+                  Mathematical error: Cash + Online (₹{(cashVal + onlineVal).toFixed(2)}) does not match Amount Paying Now (₹{amountPayingNowVal.toFixed(2)}).
                 </p>
               </div>
             )}

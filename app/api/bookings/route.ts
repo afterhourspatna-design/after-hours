@@ -23,6 +23,10 @@ const createBookingSchema = z.object({
   accessoriesCount: z.number().int().min(0).default(0),
   couponCode: z.string().optional().nullable(),
   referredByPhone: z.string().optional().nullable(),
+  advanceAmount: z.number().nonnegative().optional(),
+  paymentMethod: z.enum(["CASH", "ONLINE", "MIXED"]).optional(),
+  cashAmount: z.number().nonnegative().optional(),
+  onlineAmount: z.number().nonnegative().optional(),
 });
 
 export async function GET(req: NextRequest) {
@@ -72,7 +76,11 @@ export async function GET(req: NextRequest) {
   }
 
   if (status) where.bookingStatus = status;
-  if (paymentStatus) where.paymentStatus = paymentStatus;
+  if (paymentStatus === "UNPAID") {
+    where.paymentStatus = { in: ["UNPAID", "PARTIAL"] };
+  } else if (paymentStatus) {
+    where.paymentStatus = paymentStatus;
+  }
   if (gameId) where.gameId = gameId;
   if (dateFrom || dateTo) {
     where.startDateTime = {
@@ -98,6 +106,7 @@ export async function GET(req: NextRequest) {
         game: { select: { name: true, tag: true } },
         resourceUnit: { select: { unitName: true } },
         user: { select: { name: true, phone: true } },
+        allocations: true,
       },
       orderBy: { startDateTime: "asc" },
     });
@@ -113,6 +122,7 @@ export async function GET(req: NextRequest) {
         game: { select: { name: true, tag: true } },
         resourceUnit: { select: { unitName: true } },
         user: { select: { name: true, phone: true } },
+        allocations: true,
       },
       orderBy: { startDateTime: "desc" },
       skip: (page - 1) * limit,
@@ -121,9 +131,10 @@ export async function GET(req: NextRequest) {
     prisma.booking.count({ where }),
     // Fetch snack orders only if requested and matching the same payment status criteria
     (includeSnacks && !status ? prisma.snackOrder.findMany({
-      where: paymentStatus ? { paymentStatus } : {},
+      where: paymentStatus === "UNPAID" ? { paymentStatus: { in: ["UNPAID", "PARTIAL"] } } : (paymentStatus ? { paymentStatus } : {}),
       include: {
         user: { select: { name: true, phone: true } },
+        allocations: true,
       },
       orderBy: { createdAt: "desc" }
     }) : Promise.resolve([]))
@@ -152,9 +163,19 @@ export async function GET(req: NextRequest) {
     updatedAt: snack.updatedAt.toISOString(),
     paymentId: snack.paymentId,
     snacksAmount: Number(snack.amount),
+    allocations: snack.allocations ?? [],
   })) : [];
 
-  const combinedBookings = [...bookings, ...mappedSnacks].sort((a: any, b: any) => 
+  // Map bookings to calculate balance due and clean up big decimals
+  const mappedBookings = bookings.map((b: any) => ({
+    ...b,
+    finalAmount: Number(b.finalAmount),
+    negotiatedAmount: b.negotiatedAmount !== null ? Number(b.negotiatedAmount) : null,
+    discountAmount: Number(b.discountAmount),
+    couponDiscount: Number(b.couponDiscount),
+  }));
+
+  const combinedBookings = [...mappedBookings, ...mappedSnacks].sort((a: any, b: any) => 
     new Date(b.startDateTime).getTime() - new Date(a.startDateTime).getTime()
   );
 
@@ -286,6 +307,15 @@ export async function POST(req: NextRequest) {
     ? data.priceOverride
     : pricing.finalAmount;
 
+  let initialPaymentStatus = data.paymentStatus;
+  if (data.advanceAmount && data.advanceAmount > 0) {
+    if (data.advanceAmount >= finalAmount) {
+       initialPaymentStatus = PaymentStatus.PAID;
+    } else {
+       initialPaymentStatus = PaymentStatus.PARTIAL;
+    }
+  }
+
   const booking = await prisma.booking.create({
     data: {
       userId: resolvedUserId,
@@ -304,7 +334,7 @@ export async function POST(req: NextRequest) {
       couponId: dbCouponId,
       couponDiscount: pricing.couponDiscount ?? 0,
       finalAmount,
-      paymentStatus: data.paymentStatus,
+      paymentStatus: initialPaymentStatus,
       bookingStatus: BookingStatus.CONFIRMED,
       source: data.source,
       notes: data.notes ?? null,
@@ -322,6 +352,33 @@ export async function POST(req: NextRequest) {
     await prisma.coupon.update({
       where: { id: dbCouponId },
       data: { usedCount: { increment: 1 } }
+    });
+  }
+
+  if (data.advanceAmount && data.advanceAmount > 0 && data.paymentMethod) {
+    const pmMethod = data.paymentMethod;
+    const cashAmt = pmMethod === "MIXED" ? (data.cashAmount || 0) : pmMethod === "CASH" ? data.advanceAmount : 0;
+    const onlineAmt = pmMethod === "MIXED" ? (data.onlineAmount || 0) : pmMethod === "ONLINE" ? data.advanceAmount : 0;
+    
+    // Create actual payment receipt
+    const payment = await prisma.payment.create({
+      data: {
+        paymentMethod: pmMethod,
+        negotiatedAmount: data.advanceAmount,
+        cashAmount: cashAmt,
+        onlineAmount: onlineAmt,
+        userId: resolvedUserId,
+        customerNames: data.guestName ?? "Guest",
+      }
+    });
+    
+    // Allocate that payment exactly to this new booking
+    await prisma.paymentAllocation.create({
+      data: {
+        amount: data.advanceAmount,
+        paymentId: payment.id,
+        bookingId: booking.id,
+      }
     });
   }
 

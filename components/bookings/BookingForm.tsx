@@ -162,6 +162,12 @@ export default function BookingForm({ mode = "create", initialData, prefillDate,
     (initialData?.gameId ? 0 : 0)
   );
 
+  // Advance Payment
+  const [advanceAmount, setAdvanceAmount] = useState<number | "">("");
+  const [paymentMethod, setPaymentMethod] = useState<string>("CASH");
+  const [cashAmount, setCashAmount] = useState<number | "">("");
+  const [onlineAmount, setOnlineAmount] = useState<number | "">("");
+
   // Coupon states
   const [couponCode, setCouponCode] = useState(initialData?.coupon?.code ?? "");
   const [appliedCoupon, setAppliedCoupon] = useState<string>(initialData?.coupon?.code ?? "");
@@ -315,6 +321,15 @@ export default function BookingForm({ mode = "create", initialData, prefillDate,
     }
     if (!isGuest && !selectedUser) { toast.error("Please select a user or switch to Guest mode"); return; }
     if (unitAvailability === false) { toast.error("This unit is not available at the selected time"); return; }
+    
+    if (mode === "create" && advanceAmount !== "" && advanceAmount > 0) {
+      if (paymentMethod === "MIXED") {
+        if (Number(cashAmount) + Number(onlineAmount) !== Number(advanceAmount)) {
+          toast.error("Cash and Online amounts must equal the total Advance Amount");
+          return;
+        }
+      }
+    }
 
     const startDT = new Date(`${bookingDate}T${startTime}:00`);
     const payload = {
@@ -332,6 +347,12 @@ export default function BookingForm({ mode = "create", initialData, prefillDate,
       referredByPhone: (isGuest && source === "REFERRAL") ? referredByPhone : null,
       notes: notes || null,
       couponCode: appliedCoupon || null,
+      ...(mode === "create" && advanceAmount !== "" && advanceAmount > 0 ? {
+        advanceAmount: Number(advanceAmount),
+        paymentMethod,
+        cashAmount: paymentMethod === "MIXED" ? Number(cashAmount) : undefined,
+        onlineAmount: paymentMethod === "MIXED" ? Number(onlineAmount) : undefined,
+      } : {})
     };
 
     setSubmitting(true);
@@ -861,6 +882,54 @@ export default function BookingForm({ mode = "create", initialData, prefillDate,
                 rows={3} placeholder="Any notes for this booking…"
                 className="input-field resize-none" />
             </div>
+
+            {mode === "create" && (
+              <div className="pt-4 border-t border-zinc-800/60 space-y-4">
+                <h4 className="text-xs font-semibold text-zinc-300">Advance Deposit (Optional)</h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs text-zinc-400 mb-1 block">Amount</label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500">₹</span>
+                      <input
+                        type="number"
+                        value={advanceAmount}
+                        onChange={e => setAdvanceAmount(e.target.value ? Number(e.target.value) : "")}
+                        className="input-field pl-8"
+                        placeholder="0"
+                        min="0"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-xs text-zinc-400 mb-1 block">Method</label>
+                    <select 
+                      value={paymentMethod}
+                      onChange={e => setPaymentMethod(e.target.value)}
+                      className="input-field"
+                      disabled={!advanceAmount || advanceAmount === 0}
+                    >
+                      <option value="CASH">Cash</option>
+                      <option value="ONLINE">Online</option>
+                      <option value="MIXED">Mixed</option>
+                    </select>
+                  </div>
+                </div>
+                
+                {paymentMethod === "MIXED" && advanceAmount && advanceAmount > 0 && (
+                  <div className="grid grid-cols-2 gap-3 mt-2 animate-in fade-in slide-in-from-top-1">
+                    <div>
+                      <label className="text-xs text-zinc-400 mb-1 block">Cash Amount</label>
+                      <input type="number" value={cashAmount} onChange={e => setCashAmount(e.target.value ? Number(e.target.value) : "")} className="input-field" placeholder="0" min="0" />
+                    </div>
+                    <div>
+                      <label className="text-xs text-zinc-400 mb-1 block">Online Amount</label>
+                      <input type="number" value={onlineAmount} onChange={e => setOnlineAmount(e.target.value ? Number(e.target.value) : "")} className="input-field" placeholder="0" min="0" />
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
