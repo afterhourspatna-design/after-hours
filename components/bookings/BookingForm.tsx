@@ -97,6 +97,9 @@ export default function BookingForm({ mode = "create", initialData, prefillDate,
   const [guestName, setGuestName] = useState(initialData?.guestName ?? "");
   const [guestPhone, setGuestPhone] = useState(initialData?.guestPhone ?? "");
 
+  // Referrer search
+  const [referrerResults, setReferrerResults] = useState<AppUser[]>([]);
+
   // Game/unit
   const [games, setGames] = useState<Game[]>([]);
   const [selectedGame, setSelectedGame] = useState<Game | null>(null);
@@ -222,6 +225,19 @@ export default function BookingForm({ mode = "create", initialData, prefillDate,
     return () => clearTimeout(t);
   }, [userSearch, isGuest]);
 
+  // Referrer search debounce
+  useEffect(() => {
+    if (source !== "REFERRAL" || referredByPhone.length < 2) { setReferrerResults([]); return; }
+    const t = setTimeout(async () => {
+      const res = await fetch(`/api/users?q=${encodeURIComponent(referredByPhone)}&limit=8`);
+      if (res.ok) {
+        const data = await res.json();
+        setReferrerResults(data.users ?? []);
+      }
+    }, 300);
+    return () => clearTimeout(t);
+  }, [referredByPhone, source]);
+
   // Calculate price whenever inputs change
   const calcPrice = useCallback(async () => {
     if (!selectedGame) return;
@@ -311,11 +327,11 @@ export default function BookingForm({ mode = "create", initialData, prefillDate,
     if (!selectedGame) { toast.error("Please select a game"); return; }
     if (isGuest && (!guestName || !guestPhone)) { toast.error("Guest name and phone are required"); return; }
     if (isGuest && source === "REFERRAL") {
-      if (!referredByPhone) {
-        toast.error("Please enter the phone number of the person who referred this guest");
+      if (!referredByPhone || referredByPhone.replace(/\D/g, "").length !== 10) {
+        toast.error("Please enter or select a valid 10-digit phone number for the referral");
         return;
       }
-      if (referredByPhone === guestPhone) {
+      if (referredByPhone.replace(/\D/g, "") === guestPhone.replace(/\D/g, "")) {
         toast.error("A guest cannot refer themselves");
         return;
       }
@@ -345,7 +361,7 @@ export default function BookingForm({ mode = "create", initialData, prefillDate,
       bookingType,
       paymentStatus,
       source: role === "CUSTOMER" ? "ONLINE" : source,
-      referredByPhone: (isGuest && source === "REFERRAL") ? referredByPhone : null,
+      referredByPhone: (isGuest && source === "REFERRAL") ? referredByPhone.replace(/\D/g, "") : null,
       notes: notes || null,
       couponCode: appliedCoupon || null,
       ...(mode === "create" && advanceAmount !== "" && advanceAmount > 0 ? {
@@ -785,19 +801,30 @@ export default function BookingForm({ mode = "create", initialData, prefillDate,
                   </select>
                 </div>
                 {isGuest && source === "REFERRAL" && (
-                  <div>
-                    <label className="text-xs text-zinc-400 mb-1 block">Referrer Phone Number (10 Digits)</label>
+                  <div className="relative">
+                    <label className="text-xs text-zinc-400 mb-1 block">Referrer (Search Name or Mobile)</label>
                     <div className="relative">
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-zinc-500 font-bold">+91</span>
+                      <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
                       <input
-                        type="tel"
-                        maxLength={10}
+                        type="text"
                         value={referredByPhone}
-                        onChange={e => setReferredByPhone(e.target.value.replace(/\D/g, "").slice(0, 10))}
-                        placeholder="3000000000"
-                        className="input-field pl-12"
+                        onChange={e => setReferredByPhone(e.target.value)}
+                        placeholder="Search or enter 10 digits..."
+                        className="input-field pl-10"
                       />
                     </div>
+                    {referrerResults.length > 0 && (
+                      <div className="absolute top-full left-0 right-0 z-30 mt-1 bg-zinc-900 border border-zinc-700 rounded-xl shadow-xl overflow-hidden">
+                        {referrerResults.map(u => (
+                          <button key={u.id} type="button"
+                            onClick={() => { setReferredByPhone(u.phone); setReferrerResults([]); }}
+                            className="w-full px-4 py-2.5 text-left hover:bg-zinc-800 transition-colors flex items-center justify-between">
+                            <span className="text-sm text-white">{u.name}</span>
+                            <span className="text-xs text-zinc-500">{u.phone}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

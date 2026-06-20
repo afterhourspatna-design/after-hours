@@ -864,57 +864,77 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
               </div>
             )}
 
+            {/* Invoice Summary (Read-Only) */}
+            <div className="bg-zinc-950/40 rounded-xl p-3 border border-zinc-800/40 space-y-2">
+              <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider mb-2">Invoice Summary</p>
+              <div className="flex justify-between text-xs text-zinc-400">
+                <span>Games Total</span>
+                <span>{formatCurrency(totalActualGamesAmount)}</span>
+              </div>
+              <div className="flex justify-between text-xs text-zinc-400">
+                <span>Snacks Total</span>
+                <span>{formatCurrency(totalActualSnacksAmount)}</span>
+              </div>
+              {previouslyPaidTotal > 0 && (
+                <div className="flex justify-between text-xs text-amber-400">
+                  <span>Previously Paid (Advance)</span>
+                  <span>-{formatCurrency(previouslyPaidTotal)}</span>
+                </div>
+              )}
+              <div className="border-t border-zinc-800/60 pt-2 flex justify-between text-sm font-bold text-white">
+                <span>Total Outstanding</span>
+                <span>{formatCurrency(totalActualAmount + totalActualSnacksAmount - (editPaymentId ? 0 : previouslyPaidTotal))}</span>
+              </div>
+            </div>
+
             {/* Price section */}
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="text-xs text-zinc-500 font-medium block mb-1">Final Invoice (Games + Snacks)</label>
-                <div className="flex gap-2">
-                  <input
-                    type="number"
-                    value={payOnlySnacks ? "0" : negotiatedInput}
-                    onChange={(e) => {
-                      setNegotiatedInput(e.target.value);
-                      const newGamesAmount = Number(e.target.value) || 0;
-                      const t = newGamesAmount + snacksVal - (editPaymentId ? 0 : previouslyPaidTotal);
-                      setAmountPayingNowInput(String(Math.max(0, t)));
-                    }}
-                    disabled={submittingPayment || payOnlySnacks}
-                    placeholder="Games"
-                    className="input-field text-xs w-full"
-                    title="Games Negotiated Amount"
-                  />
-                  <input
-                    type="number"
-                    value={snacksInput}
-                    onChange={(e) => {
-                      setSnacksInput(e.target.value);
-                      const newSnacksAmount = Number(e.target.value) || 0;
-                      const t = totalNegotiatedVal + newSnacksAmount - (editPaymentId ? 0 : previouslyPaidTotal);
-                      setAmountPayingNowInput(String(Math.max(0, t)));
-                    }}
-                    disabled={submittingPayment}
-                    placeholder="Snacks"
-                    className="input-field text-xs w-full"
-                    title="Snacks Amount"
-                  />
-                </div>
-                <div className="text-[10px] text-zinc-500 mt-1 flex justify-between">
-                  <span>Actual: {formatCurrency(totalActualAmount)}</span>
-                  <span className="font-semibold">Invoice: {formatCurrency(totalWithSnacks)}</span>
-                </div>
-              </div>
-
-              <div>
-                <label className="text-xs text-emerald-400 font-bold block mb-1">Amount Paying Now</label>
+                <label className="text-[10px] uppercase tracking-wider text-zinc-500 font-bold block mb-1.5">Final Games Price</label>
                 <input
                   type="number"
-                  value={amountPayingNowInput}
-                  onChange={(e) => setAmountPayingNowInput(e.target.value)}
-                  disabled={submittingPayment}
-                  placeholder="Total to Pay Today"
-                  className="input-field text-sm font-bold text-emerald-400 bg-emerald-400/5 border-emerald-400/30"
+                  value={payOnlySnacks ? "0" : negotiatedInput}
+                  onChange={(e) => {
+                    setNegotiatedInput(e.target.value);
+                    const newGamesAmount = Number(e.target.value) || 0;
+                    const t = newGamesAmount + snacksVal - (editPaymentId ? 0 : previouslyPaidTotal);
+                    setAmountPayingNowInput(String(Math.max(0, t)));
+                  }}
+                  disabled={submittingPayment || payOnlySnacks}
+                  placeholder="Games Price"
+                  className="input-field text-sm font-semibold w-full"
+                  title="Final Games Price"
                 />
               </div>
+              <div>
+                <label className="text-[10px] uppercase tracking-wider text-zinc-500 font-bold block mb-1.5">Final Snacks Price</label>
+                <input
+                  type="number"
+                  value={snacksInput}
+                  onChange={(e) => {
+                    setSnacksInput(e.target.value);
+                    const newSnacksAmount = Number(e.target.value) || 0;
+                    const t = totalNegotiatedVal + newSnacksAmount - (editPaymentId ? 0 : previouslyPaidTotal);
+                    setAmountPayingNowInput(String(Math.max(0, t)));
+                  }}
+                  disabled={submittingPayment}
+                  placeholder="Snacks Price"
+                  className="input-field text-sm font-semibold w-full"
+                  title="Final Snacks Price"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="text-[10px] uppercase tracking-wider text-emerald-400 font-bold block mb-1.5">Amount Paying Now</label>
+              <input
+                type="number"
+                value={amountPayingNowInput}
+                onChange={(e) => setAmountPayingNowInput(e.target.value)}
+                disabled={submittingPayment}
+                placeholder="Total to Pay Today"
+                className="input-field text-lg font-bold text-emerald-400 bg-emerald-400/5 border-emerald-400/30 w-full py-2.5"
+              />
             </div>
 
             {/* Payment Method Selector */}
