@@ -11,7 +11,7 @@ export interface WhatsAppBookingData {
   totalPaid: number;
 }
 
-export function generateWhatsAppBookingConfirmation(data: WhatsAppBookingData): string {
+export function generateBookingConfirmationMessage(data: WhatsAppBookingData): string {
   const { guestName, guestPhone, gameName, startDateTime, durationMinutes, paymentStatus, finalAmount, totalPaid } = data;
   
   const dateStr = formatDate(startDateTime);
@@ -40,9 +40,5 @@ ${paymentText}
 
 Please arrive 5 minutes early to get settled in. See you soon! 👾`;
 
-  let phone = guestPhone.replace(/\D/g, "");
-  if (phone.length === 10) phone = `91${phone}`;
-
-  const encodedMessage = encodeURIComponent(message);
-  return `https://wa.me/${phone}?text=${encodedMessage}`;
+  return message;
 }

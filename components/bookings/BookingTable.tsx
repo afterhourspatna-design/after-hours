@@ -5,7 +5,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import {
-  Plus, Search, Download, Edit2, XCircle, Trash2, RefreshCw, ChevronLeft, ChevronRight, MessageCircle,
+  Plus, Search, Download, Edit2, XCircle, Trash2, RefreshCw, ChevronLeft, ChevronRight, Copy,
 } from "lucide-react";
 import {
   cn, formatCurrency, formatDate, formatTimeRange, formatDuration,
@@ -15,7 +15,7 @@ import { BookingStatusBadge, PaymentStatusBadge } from "@/components/ui/StatusBa
 import EmptyState from "@/components/ui/EmptyState";
 import { TableSkeleton } from "@/components/ui/LoadingSkeleton";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
-import { generateWhatsAppBookingConfirmation } from "@/lib/whatsapp";
+import { generateBookingConfirmationMessage } from "@/lib/whatsapp";
 
 interface Booking {
   id: string;
@@ -264,7 +264,7 @@ function BookingTableInner({ role = "ADMIN" }: BookingTableProps) {
                               onClick={() => {
                                 const invoiceAmt = b.negotiatedAmount ?? b.finalAmount;
                                 const paid = b.allocations?.reduce((sum, a) => sum + Number(a.amount), 0) ?? 0;
-                                const link = generateWhatsAppBookingConfirmation({
+                                const msg = generateBookingConfirmationMessage({
                                   guestName: customerName,
                                   guestPhone: customerPhone,
                                   gameName: b.game.name,
@@ -274,12 +274,13 @@ function BookingTableInner({ role = "ADMIN" }: BookingTableProps) {
                                   finalAmount: invoiceAmt,
                                   totalPaid: paid,
                                 });
-                                window.open(link, "_blank");
+                                navigator.clipboard.writeText(msg);
+                                toast.success("Confirmation message copied to clipboard!");
                               }}
                               className="p-1.5 rounded-lg text-emerald-500 hover:text-emerald-400 hover:bg-emerald-500/10 transition-all"
-                              title="Share via WhatsApp"
+                              title="Copy Confirmation Message"
                             >
-                              <MessageCircle className="w-3.5 h-3.5" />
+                              <Copy className="w-3.5 h-3.5" />
                             </button>
                           )}
                           {isHold && (
