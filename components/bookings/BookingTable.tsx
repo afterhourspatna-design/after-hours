@@ -211,7 +211,6 @@ function BookingTableInner({ role = "ADMIN" }: BookingTableProps) {
                   <th>Date & Time</th>
                   <th>Duration</th>
                   <th>Total Amount</th>
-                  <th>Balance Due</th>
                   <th>Status</th>
                   <th>Payment</th>
                   <th>Source</th>
@@ -254,14 +253,6 @@ function BookingTableInner({ role = "ADMIN" }: BookingTableProps) {
                             {formatCurrency(b.finalAmount)}
                           </span>
                         )}
-                      </td>
-                      <td className="text-sm font-medium text-amber-400 whitespace-nowrap">
-                        {(() => {
-                           const invoiceAmt = b.negotiatedAmount ?? b.finalAmount;
-                           const paid = b.allocations?.reduce((sum, a) => sum + Number(a.amount), 0) ?? 0;
-                           const balance = Math.max(0, invoiceAmt - paid);
-                           return balance > 0 ? formatCurrency(balance) : "—";
-                        })()}
                       </td>
                       <td><BookingStatusBadge status={b.bookingStatus as any} /></td>
                       <td><PaymentStatusBadge status={b.paymentStatus as any} /></td>
