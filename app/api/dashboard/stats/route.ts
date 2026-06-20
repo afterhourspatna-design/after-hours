@@ -62,7 +62,8 @@ export async function GET() {
   const monthBounds = getISTMonthBounds(now);
 
   const [
-    totalBookings, todayBookings, activeNow, weeklyBookings, monthlyBookings, holdCount, weeklyBookings_snacks, monthlyBookings_snacks
+    totalBookings, todayBookings, activeNow, holdCount,
+    weeklyBookingRev, monthlyBookingRev, weeklySnacksRev, monthlySnacksRev
   ] = await Promise.all([
     // Total all-time
     prisma.booking.count(),
@@ -81,59 +82,50 @@ export async function GET() {
       },
     }),
 
-    // Weekly bookings (CONFIRMED + COMPLETED)
-    prisma.booking.findMany({
-      where: {
-        startDateTime: { gte: weekBounds.start, lte: weekBounds.end },
-        bookingStatus: { in: [BookingStatus.CONFIRMED, BookingStatus.COMPLETED] },
-      },
-      select: { finalAmount: true, negotiatedAmount: true, paymentStatus: true },
-    }),
 
-    // Monthly bookings (CONFIRMED + COMPLETED)
-    prisma.booking.findMany({
-      where: {
-        startDateTime: { gte: monthBounds.start, lte: monthBounds.end },
-        bookingStatus: { in: [BookingStatus.CONFIRMED, BookingStatus.COMPLETED] },
-      },
-      select: { finalAmount: true, negotiatedAmount: true, paymentStatus: true },
-    }),
 
     // Active holds
     prisma.booking.count({
       where: { bookingStatus: BookingStatus.HOLD, holdExpiresAt: { gt: now } },
     }),
 
-    // Weekly standalone snacks
-    prisma.snackOrder.findMany({
-      where: {
-        createdAt: { gte: weekBounds.start, lte: weekBounds.end },
-      },
-      select: { amount: true }
-    }),
+    // Weekly Booking Revenue
+    prisma.$queryRaw`
+      SELECT COALESCE(SUM(pa.amount), 0) as total
+      FROM payment_allocations pa
+      JOIN bookings b ON pa."bookingId" = b.id
+      WHERE b."startDateTime" >= ${weekBounds.start} AND b."startDateTime" <= ${weekBounds.end}
+      AND b."bookingStatus" IN ('CONFIRMED', 'COMPLETED')
+    `.then((res: any) => Number(res[0]?.total || 0)),
 
-    // Monthly standalone snacks
-    prisma.snackOrder.findMany({
-      where: {
-        createdAt: { gte: monthBounds.start, lte: monthBounds.end },
-      },
-      select: { amount: true }
-    }),
+    // Monthly Booking Revenue
+    prisma.$queryRaw`
+      SELECT COALESCE(SUM(pa.amount), 0) as total
+      FROM payment_allocations pa
+      JOIN bookings b ON pa."bookingId" = b.id
+      WHERE b."startDateTime" >= ${monthBounds.start} AND b."startDateTime" <= ${monthBounds.end}
+      AND b."bookingStatus" IN ('CONFIRMED', 'COMPLETED')
+    `.then((res: any) => Number(res[0]?.total || 0)),
+
+    // Weekly Snacks Revenue
+    prisma.$queryRaw`
+      SELECT COALESCE(SUM(pa.amount), 0) as total
+      FROM payment_allocations pa
+      JOIN snack_orders s ON pa."snackOrderId" = s.id
+      WHERE s."createdAt" >= ${weekBounds.start} AND s."createdAt" <= ${weekBounds.end}
+    `.then((res: any) => Number(res[0]?.total || 0)),
+
+    // Monthly Snacks Revenue
+    prisma.$queryRaw`
+      SELECT COALESCE(SUM(pa.amount), 0) as total
+      FROM payment_allocations pa
+      JOIN snack_orders s ON pa."snackOrderId" = s.id
+      WHERE s."createdAt" >= ${monthBounds.start} AND s."createdAt" <= ${monthBounds.end}
+    `.then((res: any) => Number(res[0]?.total || 0)),
   ]);
 
-  const weeklyBookingRevenue = weeklyBookings.reduce((sum, b) => {
-    if (b.paymentStatus !== "PAID") return sum;
-    return sum + Number(b.negotiatedAmount ?? b.finalAmount);
-  }, 0);
-  const weeklySnacksRevenue = weeklyBookings_snacks.reduce((sum, p) => sum + Number(p.amount), 0);
-  const weeklyRevenue = weeklyBookingRevenue + weeklySnacksRevenue;
-
-  const monthlyBookingRevenue = monthlyBookings.reduce((sum, b) => {
-    if (b.paymentStatus !== "PAID") return sum;
-    return sum + Number(b.negotiatedAmount ?? b.finalAmount);
-  }, 0);
-  const monthlySnacksRevenue = monthlyBookings_snacks.reduce((sum, p) => sum + Number(p.amount), 0);
-  const monthlyRevenue = monthlyBookingRevenue + monthlySnacksRevenue;
+  const weeklyRevenue = weeklyBookingRev + weeklySnacksRev;
+  const monthlyRevenue = monthlyBookingRev + monthlySnacksRev;
 
   return NextResponse.json({
     totalBookings,
