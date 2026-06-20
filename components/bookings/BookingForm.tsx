@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { format, addMinutes } from "date-fns";
 import { Loader2, User, Users, Gamepad2, Clock, IndianRupee, ChevronDown, Search, X, AlertCircle } from "lucide-react";
 import { cn, formatCurrency, SOURCE_LABELS } from "@/lib/utils";
+import { generateWhatsAppBookingConfirmation } from "@/lib/whatsapp";
 
 interface Game {
   id: string;
@@ -371,7 +372,30 @@ export default function BookingForm({ mode = "create", initialData, prefillDate,
         return;
       }
 
-      toast.success(mode === "edit" ? "Booking updated!" : "Booking created successfully!");
+      toast.success(mode === "edit" ? "Booking updated!" : "Booking created successfully!", {
+        action: {
+          label: "Share via WhatsApp",
+          onClick: () => {
+            const invoiceAmt = pricing?.finalAmount ?? 0;
+            let paid = 0;
+            if (paymentStatus === "PAID") paid = invoiceAmt;
+            else if (mode === "create" && advanceAmount !== "" && advanceAmount > 0) paid = Number(advanceAmount);
+            
+            const link = generateWhatsAppBookingConfirmation({
+              guestName: isGuest ? guestName : selectedUser?.name || "Guest",
+              guestPhone: isGuest ? guestPhone : selectedUser?.phone || "",
+              gameName: selectedGame?.name || "Game",
+              startDateTime: startDT,
+              durationMinutes: durationMinutes,
+              paymentStatus: paymentStatus,
+              finalAmount: invoiceAmt,
+              totalPaid: paid,
+            });
+            window.open(link, "_blank");
+          }
+        },
+        duration: 8000,
+      });
       router.push(role === "CUSTOMER" ? "/customer/bookings" : role === "STAFF" ? "/staff/bookings" : "/admin/bookings");
       router.refresh();
     } catch {

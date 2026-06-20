@@ -5,7 +5,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import {
-  Plus, Search, Download, Edit2, XCircle, Trash2, RefreshCw, ChevronLeft, ChevronRight,
+  Plus, Search, Download, Edit2, XCircle, Trash2, RefreshCw, ChevronLeft, ChevronRight, MessageCircle,
 } from "lucide-react";
 import {
   cn, formatCurrency, formatDate, formatTimeRange, formatDuration,
@@ -15,6 +15,7 @@ import { BookingStatusBadge, PaymentStatusBadge } from "@/components/ui/StatusBa
 import EmptyState from "@/components/ui/EmptyState";
 import { TableSkeleton } from "@/components/ui/LoadingSkeleton";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
+import { generateWhatsAppBookingConfirmation } from "@/lib/whatsapp";
 
 interface Booking {
   id: string;
@@ -267,6 +268,29 @@ function BookingTableInner({ role = "ADMIN" }: BookingTableProps) {
                       <td className="text-xs text-zinc-500">{SOURCE_LABELS[b.source as keyof typeof SOURCE_LABELS] ?? b.source}</td>
                       <td>
                         <div className="flex items-center gap-1 justify-end flex-wrap">
+                          {customerPhone && (
+                            <button
+                              onClick={() => {
+                                const invoiceAmt = b.negotiatedAmount ?? b.finalAmount;
+                                const paid = b.allocations?.reduce((sum, a) => sum + Number(a.amount), 0) ?? 0;
+                                const link = generateWhatsAppBookingConfirmation({
+                                  guestName: customerName,
+                                  guestPhone: customerPhone,
+                                  gameName: b.game.name,
+                                  startDateTime: b.startDateTime,
+                                  durationMinutes: b.durationMinutes,
+                                  paymentStatus: b.paymentStatus,
+                                  finalAmount: invoiceAmt,
+                                  totalPaid: paid,
+                                });
+                                window.open(link, "_blank");
+                              }}
+                              className="p-1.5 rounded-lg text-emerald-500 hover:text-emerald-400 hover:bg-emerald-500/10 transition-all"
+                              title="Share via WhatsApp"
+                            >
+                              <MessageCircle className="w-3.5 h-3.5" />
+                            </button>
+                          )}
                           {isHold && (
                             <button
                               onClick={() => handleStatusChange(b.id, "CONFIRMED")}
