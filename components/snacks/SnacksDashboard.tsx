@@ -19,7 +19,7 @@ interface SnackOrder {
   guestName: string | null;
   guestPhone: string | null;
   amount: string;
-  paymentStatus: "UNPAID" | "PAID";
+  paymentStatus: "UNPAID" | "PARTIAL" | "PAID";
   paymentId: string | null;
   createdAt: string;
   updatedAt: string;
@@ -308,8 +308,10 @@ export default function SnacksDashboard() {
                     <td className="px-4 py-4">
                       {snack.paymentStatus === "PAID" ? (
                         <span className="px-2.5 py-1 bg-emerald-500/10 text-emerald-400 text-[10px] font-bold rounded uppercase tracking-wider">PAID</span>
+                      ) : snack.paymentStatus === "PARTIAL" ? (
+                        <span className="px-2.5 py-1 bg-amber-500/10 text-amber-400 text-[10px] font-bold rounded uppercase tracking-wider">PARTIAL</span>
                       ) : (
-                        <span className="px-2.5 py-1 bg-amber-500/10 text-amber-400 text-[10px] font-bold rounded uppercase tracking-wider">UNPAID</span>
+                        <span className="px-2.5 py-1 bg-red-500/10 text-red-400 text-[10px] font-bold rounded uppercase tracking-wider">UNPAID</span>
                       )}
                     </td>
                     <td className="px-4 py-4 text-right">

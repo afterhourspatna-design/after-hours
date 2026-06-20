@@ -8,6 +8,7 @@ const batchPaySchema = z.object({
   bookingIds: z.array(z.string()).optional(),
   negotiatedAmount: z.number().nonnegative(),
   paymentMethod: z.enum(["CASH", "ONLINE", "MIXED"]),
+  amountPayingNow: z.number().nonnegative().optional(),
   cashAmount: z.number().nonnegative().optional(),
   onlineAmount: z.number().nonnegative().optional(),
   snacksAmount: z.number().nonnegative().optional(),
@@ -21,6 +22,7 @@ const editBatchPaySchema = z.object({
   paymentId: z.string(),
   negotiatedAmount: z.number().nonnegative(),
   snacksAmount: z.number().nonnegative(),
+  amountPayingNow: z.number().nonnegative().optional(),
   paymentMethod: z.enum(["CASH", "ONLINE", "MIXED"]),
   cashAmount: z.number().nonnegative().optional(),
   onlineAmount: z.number().nonnegative().optional(),
@@ -51,6 +53,7 @@ export async function POST(req: NextRequest) {
       bookingIds: allIds = [],
       negotiatedAmount,
       paymentMethod,
+      amountPayingNow,
       cashAmount = 0,
       onlineAmount = 0,
       snacksAmount = 0,
@@ -87,13 +90,18 @@ export async function POST(req: NextRequest) {
         resolvedUserId = guestUser.id;
       }
 
+      const paidToday = amountPayingNow !== undefined ? amountPayingNow : snacksAmount;
+      if (paidToday > snacksAmount) {
+        return NextResponse.json({ error: "Cannot pay more than total snacks amount" }, { status: 400 });
+      }
+      
       // Create Payment record
       const payment = await prisma.payment.create({
         data: {
           paymentMethod,
-          negotiatedAmount: 0,
-          cashAmount: paymentMethod === "MIXED" ? cashAmount : paymentMethod === "CASH" ? snacksAmount : 0,
-          onlineAmount: paymentMethod === "MIXED" ? onlineAmount : paymentMethod === "ONLINE" ? snacksAmount : 0,
+          negotiatedAmount: paidToday,
+          cashAmount: paymentMethod === "MIXED" ? cashAmount : paymentMethod === "CASH" ? paidToday : 0,
+          onlineAmount: paymentMethod === "MIXED" ? onlineAmount : paymentMethod === "ONLINE" ? paidToday : 0,
           userId: resolvedUserId,
           customerNames: guestName ?? "Guest",
         }
@@ -107,10 +115,22 @@ export async function POST(req: NextRequest) {
           guestName: resolvedUserId ? null : guestName,
           guestPhone: resolvedUserId ? null : guestPhone,
           amount: snacksAmount,
-          paymentStatus: PaymentStatus.PAID,
-          paymentId: paymentId,
+          paymentStatus: paidToday >= snacksAmount ? PaymentStatus.PAID : (paidToday > 0 ? PaymentStatus.PARTIAL : PaymentStatus.UNPAID),
+          items: {
+            create: {
+              amount: snacksAmount,
+              notes: "Initial Amount",
+              addedById: (session.user as any).id,
+            }
+          }
         },
       });
+
+      if (paidToday > 0) {
+        await prisma.paymentAllocation.create({
+          data: { amount: paidToday, paymentId, snackOrderId: newSnack.id }
+        });
+      }
 
       // Create Audit Log
       await prisma.auditLog.create({
@@ -136,12 +156,14 @@ export async function POST(req: NextRequest) {
     const isOnlySnacks = negotiatedAmount === 0 && snacksAmount > 0;
 
     // Validate MIXED payment type equation
+    const totalInvoice = Number((negotiatedAmount + snacksAmount).toFixed(2));
+    const paidToday = amountPayingNow !== undefined ? amountPayingNow : totalInvoice;
+
     if (paymentMethod === "MIXED") {
       const sum = Number((cashAmount + onlineAmount).toFixed(2));
-      const totalWithSnacks = Number((negotiatedAmount + snacksAmount).toFixed(2));
-      if (Math.abs(sum - totalWithSnacks) > 0.01) {
+      if (Math.abs(sum - paidToday) > 0.01) {
         return NextResponse.json(
-          { error: "Cash + Online amounts must equal the total settled amount (including snacks)" },
+          { error: "Cash + Online amounts must equal the amount paying now" },
           { status: 400 }
         );
       }
@@ -150,12 +172,12 @@ export async function POST(req: NextRequest) {
     // Retrieve bookings and snack orders
     const bookings = await prisma.booking.findMany({
       where: { id: { in: actualBookingIds } },
-      include: { user: true }
+      include: { user: true, allocations: true }
     });
 
     const snackOrders = await prisma.snackOrder.findMany({
       where: { id: { in: snackOrderIds } },
-      include: { user: true }
+      include: { user: true, allocations: true }
     });
 
     if (bookings.length !== actualBookingIds.length || snackOrders.length !== snackOrderIds.length) {
@@ -269,76 +291,118 @@ export async function POST(req: NextRequest) {
     const payment = await prisma.payment.create({
       data: {
         paymentMethod,
-        negotiatedAmount,
-        cashAmount,
-        onlineAmount,
+        negotiatedAmount: paidToday,
+        cashAmount: paymentMethod === "MIXED" ? cashAmount : paymentMethod === "CASH" ? paidToday : 0,
+        onlineAmount: paymentMethod === "MIXED" ? onlineAmount : paymentMethod === "ONLINE" ? paidToday : 0,
         customerNames: customerNamesStr,
       }
     });
     const paymentId = payment.id;
 
-    // Update bookings
-    const updatePromises = bookings.map((b) => {
+    // We need to distribute paidToday using Waterfall: Snacks first, then Bookings
+    const allocationsToCreate: any[] = [];
+    let remainingPaidToday = paidToday;
+
+    // 1. Process Existing Snacks
+    if (snackOrderIds.length > 0) {
+      const snackUpdatePromises = snackOrders.map(s => {
+         const previouslyPaid = s.allocations.reduce((sum: number, a: any) => sum + Number(a.amount), 0);
+         const amountNeeded = Number(s.amount) - previouslyPaid;
+         const allocation = Math.min(amountNeeded > 0 ? amountNeeded : 0, remainingPaidToday);
+         
+         if (allocation > 0) {
+            allocationsToCreate.push({ amount: allocation, paymentId, snackOrderId: s.id });
+            remainingPaidToday = Number((remainingPaidToday - allocation).toFixed(2));
+         }
+
+         const totalPaidSoFar = previouslyPaid + allocation;
+         let newStatus: PaymentStatus = PaymentStatus.UNPAID;
+         if (Math.abs(totalPaidSoFar - Number(s.amount)) < 0.01 || totalPaidSoFar >= Number(s.amount)) {
+            newStatus = PaymentStatus.PAID;
+         } else if (totalPaidSoFar > 0) {
+            newStatus = PaymentStatus.PARTIAL;
+         }
+
+         return prisma.snackOrder.update({ where: { id: s.id }, data: { paymentStatus: newStatus } });
+      });
+      await prisma.$transaction(snackUpdatePromises);
+    }
+
+    // 2. Process New Snacks
+    const newSnacksAmount = Math.max(0, snacksAmount - preExistingSnacksTotal);
+    if (newSnacksAmount > 0) {
+      const allocation = Math.min(newSnacksAmount, remainingPaidToday);
+      let newStatus: PaymentStatus = PaymentStatus.UNPAID;
+      if (Math.abs(allocation - newSnacksAmount) < 0.01 || allocation >= newSnacksAmount) {
+         newStatus = PaymentStatus.PAID;
+      } else if (allocation > 0) {
+         newStatus = PaymentStatus.PARTIAL;
+      }
+
+      const newSnack = await prisma.snackOrder.create({
+        data: {
+          amount: newSnacksAmount,
+          paymentStatus: newStatus,
+          guestName: customerNamesStr || "Snack Sale",
+          items: {
+            create: {
+              amount: newSnacksAmount,
+              notes: "Added at checkout",
+              addedById: (session.user as any).id,
+            }
+          }
+        }
+      });
+
+      if (allocation > 0) {
+         allocationsToCreate.push({ amount: allocation, paymentId, snackOrderId: newSnack.id });
+         remainingPaidToday = Number((remainingPaidToday - allocation).toFixed(2));
+      }
+    }
+
+    // 3. Process Bookings
+    const updatePromises = bookings.map(b => {
       let ratio = 1 / (bookings.length || 1);
       if (totalFinalAmount > 0) {
         ratio = Number(b.finalAmount) / totalFinalAmount;
       }
-
       const bNegotiated = Math.round(negotiatedAmount * ratio * 100) / 100;
-      let bCash = 0;
-      let bOnline = 0;
+      
+      const previouslyPaid = b.allocations.reduce((s: number, a: any) => s + Number(a.amount), 0);
+      const amountNeeded = bNegotiated - previouslyPaid;
+      const allocation = Math.min(amountNeeded > 0 ? amountNeeded : 0, remainingPaidToday);
+      
+      if (allocation > 0) {
+        allocationsToCreate.push({ amount: allocation, paymentId, bookingId: b.id });
+        remainingPaidToday = Number((remainingPaidToday - allocation).toFixed(2));
+      }
 
-      if (paymentMethod === "CASH") {
-        bCash = Number((bNegotiated).toFixed(2));
-      } else if (paymentMethod === "ONLINE") {
-        bOnline = Number((bNegotiated).toFixed(2));
-      } else if (paymentMethod === "MIXED") {
-        bCash = Math.round(cashAmount * ratio * 100) / 100;
-        bOnline = Math.round(onlineAmount * ratio * 100) / 100;
+      const totalPaidSoFar = previouslyPaid + allocation;
+      let newStatus: PaymentStatus = PaymentStatus.UNPAID;
+      if (Math.abs(totalPaidSoFar - bNegotiated) < 0.01 || totalPaidSoFar >= bNegotiated) {
+        newStatus = PaymentStatus.PAID;
+      } else if (totalPaidSoFar > 0) {
+        newStatus = PaymentStatus.PARTIAL;
       }
 
       return prisma.booking.update({
         where: { id: b.id },
         data: {
-          paymentStatus: isOnlySnacks ? PaymentStatus.UNPAID : PaymentStatus.PAID,
-          bookingStatus: isOnlySnacks ? undefined : BookingStatus.COMPLETED,
+          paymentStatus: isOnlySnacks ? b.paymentStatus : newStatus,
+          bookingStatus: isOnlySnacks ? b.bookingStatus : BookingStatus.COMPLETED,
           negotiatedAmount: bNegotiated,
-          paymentMethod,
-          cashAmount: bCash,
-          onlineAmount: bOnline,
-          paymentId,
           couponId: b.couponId,
           couponDiscount: b.couponDiscount,
           finalAmount: b.finalAmount,
-          // DO NOT store snacksAmount on booking anymore
         },
       });
     });
 
-    const updatedBookings = await prisma.$transaction(updatePromises);
+    await prisma.$transaction(updatePromises);
 
-    // Update selected existing SnackOrders
-    if (snackOrderIds.length > 0) {
-      await prisma.snackOrder.updateMany({
-        where: { id: { in: snackOrderIds } },
-        data: {
-          paymentStatus: PaymentStatus.PAID,
-          paymentId,
-        }
-      });
-    }
-
-    // Create a NEW SnackOrder for the newly entered snacksAmount if any
-    const newSnacksAmount = Math.max(0, snacksAmount - preExistingSnacksTotal);
-    if (newSnacksAmount > 0) {
-      await prisma.snackOrder.create({
-        data: {
-          amount: newSnacksAmount,
-          paymentStatus: PaymentStatus.PAID,
-          paymentId,
-          guestName: customerNamesStr || "Snack Sale",
-        }
-      });
+    // Finally insert all allocations
+    if (allocationsToCreate.length > 0) {
+      await prisma.paymentAllocation.createMany({ data: allocationsToCreate });
     }
 
     // Create Audit Log
@@ -353,15 +417,16 @@ export async function POST(req: NextRequest) {
           bookingIds: actualBookingIds,
           snackOrderIds,
           negotiatedAmount,
+          snacksAmount,
+          amountPayingNow,
           paymentMethod,
           cashAmount,
-          onlineAmount,
-          snacksAmount,
+          onlineAmount
         },
       },
     });
 
-    return NextResponse.json({ success: true, count: updatedBookings.length + snackOrderIds.length });
+    return NextResponse.json({ success: true, count: bookings.length + snackOrders.length + (newSnacksAmount > 0 ? 1 : 0) });
   } catch (error: any) {
     console.error("Batch payment failed:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
@@ -389,181 +454,145 @@ export async function PUT(req: NextRequest) {
       );
     }
 
-    const { paymentId, negotiatedAmount, snacksAmount, paymentMethod, cashAmount = 0, onlineAmount = 0 } = parsed.data;
+    const { paymentId, negotiatedAmount, snacksAmount, paymentMethod, cashAmount = 0, onlineAmount = 0, amountPayingNow } = parsed.data;
 
-    const isOnlySnacks = negotiatedAmount === 0 && snacksAmount > 0;
+    const allocations = await prisma.paymentAllocation.findMany({
+      where: { paymentId },
+      include: { booking: true, snackOrder: true }
+    });
 
-    // Validate MIXED payment type equation
-    const totalWithSnacks = Number((negotiatedAmount + snacksAmount).toFixed(2));
+    if (allocations.length === 0) {
+      return NextResponse.json({ error: "No allocations found for this payment ID" }, { status: 404 });
+    }
+
+    const bookings = Array.from(new Map(allocations.map(a => a.booking).filter(Boolean).map((b: any) => [b.id, b])).values());
+    const snackOrders = Array.from(new Map(allocations.map(a => a.snackOrder).filter(Boolean).map((s: any) => [s.id, s])).values());
+
+    const totalInvoice = Number((negotiatedAmount + snacksAmount).toFixed(2));
+    const paidToday = amountPayingNow !== undefined ? amountPayingNow : totalInvoice;
+
     if (paymentMethod === "MIXED") {
       const sum = Number((cashAmount + onlineAmount).toFixed(2));
-      if (Math.abs(sum - totalWithSnacks) > 0.01) {
+      if (Math.abs(sum - paidToday) > 0.01) {
         return NextResponse.json(
-          { error: "Cash + Online amounts must equal the total settled amount (including snacks)" },
+          { error: "Cash + Online amounts must equal the amount paying now" },
           { status: 400 }
         );
       }
     }
 
-    // Retrieve bookings with this paymentId
-    const bookings = await prisma.booking.findMany({
-      where: { paymentId },
-      include: { user: true }
-    });
-
-    if (bookings.length === 0) {
-      return NextResponse.json({ error: "No bookings found for this payment ID" }, { status: 404 });
-    }
-
-    // Retrieve associated snack orders
-    const snackOrders = await prisma.snackOrder.findMany({
-      where: { paymentId },
-    });
-
-    // Update the Payment record itself
+    // 1. Update Payment record
     await prisma.payment.update({
       where: { id: paymentId },
       data: {
         paymentMethod,
-        negotiatedAmount,
-        cashAmount,
-        onlineAmount,
+        negotiatedAmount: paidToday,
+        cashAmount: paymentMethod === "MIXED" ? cashAmount : paymentMethod === "CASH" ? paidToday : 0,
+        onlineAmount: paymentMethod === "MIXED" ? onlineAmount : paymentMethod === "ONLINE" ? paidToday : 0,
       }
     });
 
-    // Compute total final amount of selected bookings
+    // 2. Delete existing allocations for this payment
+    await prisma.paymentAllocation.deleteMany({
+      where: { paymentId }
+    });
+
+    const isOnlySnacks = negotiatedAmount === 0 && snacksAmount > 0;
+    const allocationsToCreate: any[] = [];
+    let remainingPaidToday = paidToday;
+
     const totalFinalAmount = bookings.reduce((sum, b) => sum + Number(b.finalAmount), 0);
 
-    // Update bookings using a transaction
-    const updatePromises = bookings.map((b, index) => {
-      let ratio = 1 / bookings.length;
-      if (totalFinalAmount > 0) {
-        ratio = Number(b.finalAmount) / totalFinalAmount;
+    // Re-fetch active bookings and snack orders
+    const activeBookings = await prisma.booking.findMany({
+       where: { id: { in: bookings.map((b: any) => b.id) } },
+       include: { allocations: { where: { paymentId: { not: paymentId } } } }
+    });
+    
+    const activeSnacks = await prisma.snackOrder.findMany({
+       where: { id: { in: snackOrders.map((s: any) => s.id) } },
+       include: { allocations: { where: { paymentId: { not: paymentId } } } }
+    });
+
+    // 3. Process Snacks First
+    if (activeSnacks.length > 0) {
+      const snackUpdatePromises = activeSnacks.map((s) => {
+         const previouslyPaid = s.allocations.reduce((sum: number, a: any) => sum + Number(a.amount), 0);
+         const amountNeeded = Number(s.amount) - previouslyPaid;
+         const allocation = Math.min(amountNeeded > 0 ? amountNeeded : 0, remainingPaidToday);
+
+         if (allocation > 0) {
+            allocationsToCreate.push({ amount: allocation, paymentId, snackOrderId: s.id });
+            remainingPaidToday = Number((remainingPaidToday - allocation).toFixed(2));
+         }
+
+         const totalPaidSoFar = previouslyPaid + allocation;
+         let newStatus: PaymentStatus = PaymentStatus.UNPAID;
+         if (Math.abs(totalPaidSoFar - Number(s.amount)) < 0.01 || totalPaidSoFar >= Number(s.amount)) {
+           newStatus = PaymentStatus.PAID;
+         } else if (totalPaidSoFar > 0) {
+           newStatus = PaymentStatus.PARTIAL;
+         }
+
+         return prisma.snackOrder.update({
+           where: { id: s.id },
+           data: { paymentStatus: newStatus }
+         });
+      });
+      await prisma.$transaction(snackUpdatePromises);
+    }
+
+    // 4. Process Bookings
+    const updatePromises = activeBookings.map((b) => {
+      let ratio = 1 / (activeBookings.length || 1);
+      if (totalFinalAmount > 0) ratio = Number(b.finalAmount) / totalFinalAmount;
+
+      const bNegotiated = Math.round(negotiatedAmount * ratio * 100) / 100;
+      
+      const previouslyPaid = b.allocations.reduce((s: number, a: any) => s + Number(a.amount), 0);
+      const amountNeeded = bNegotiated - previouslyPaid;
+      const allocation = Math.min(amountNeeded > 0 ? amountNeeded : 0, remainingPaidToday);
+
+      if (allocation > 0) {
+        allocationsToCreate.push({ amount: allocation, paymentId, bookingId: b.id });
+        remainingPaidToday = Number((remainingPaidToday - allocation).toFixed(2));
       }
 
-      // Calculate proportional shares
-      let bNegotiated = Math.round(negotiatedAmount * ratio * 100) / 100;
-      if (index === bookings.length - 1) {
-        const sumOfOthers = bookings.slice(0, -1).reduce((sum, b2) => {
-          let r2 = 1 / bookings.length;
-          if (totalFinalAmount > 0) r2 = Number(b2.finalAmount) / totalFinalAmount;
-          return sum + Math.round(negotiatedAmount * r2 * 100) / 100;
-        }, 0);
-        bNegotiated = Number((negotiatedAmount - sumOfOthers).toFixed(2));
-      }
-
-      let bCash = 0;
-      let bOnline = 0;
-
-      if (paymentMethod === "CASH") {
-        bCash = Number((bNegotiated).toFixed(2));
-      } else if (paymentMethod === "ONLINE") {
-        bOnline = Number((bNegotiated).toFixed(2));
-      } else if (paymentMethod === "MIXED") {
-        bCash = Math.round(cashAmount * ratio * 100) / 100;
-        bOnline = Math.round(onlineAmount * ratio * 100) / 100;
-        
-        if (index === bookings.length - 1) {
-          const cashOthers = bookings.slice(0, -1).reduce((sum, b2) => {
-            let r2 = 1 / bookings.length;
-            if (totalFinalAmount > 0) r2 = Number(b2.finalAmount) / totalFinalAmount;
-            return sum + Math.round(cashAmount * r2 * 100) / 100;
-          }, 0);
-          const onlineOthers = bookings.slice(0, -1).reduce((sum, b2) => {
-            let r2 = 1 / bookings.length;
-            if (totalFinalAmount > 0) r2 = Number(b2.finalAmount) / totalFinalAmount;
-            return sum + Math.round(onlineAmount * r2 * 100) / 100;
-          }, 0);
-          bCash = Number((cashAmount - cashOthers).toFixed(2));
-          bOnline = Number((onlineAmount - onlineOthers).toFixed(2));
-        }
+      const totalPaidSoFar = previouslyPaid + allocation;
+      let newStatus: PaymentStatus = PaymentStatus.UNPAID;
+      if (Math.abs(totalPaidSoFar - bNegotiated) < 0.01 || totalPaidSoFar >= bNegotiated) {
+        newStatus = PaymentStatus.PAID;
+      } else if (totalPaidSoFar > 0) {
+        newStatus = PaymentStatus.PARTIAL;
       }
 
       return prisma.booking.update({
         where: { id: b.id },
         data: {
-          paymentStatus: isOnlySnacks ? PaymentStatus.UNPAID : PaymentStatus.PAID,
-          bookingStatus: isOnlySnacks ? undefined : BookingStatus.COMPLETED,
+          paymentStatus: isOnlySnacks ? b.paymentStatus : newStatus,
+          bookingStatus: isOnlySnacks ? b.bookingStatus : BookingStatus.COMPLETED,
           negotiatedAmount: bNegotiated,
-          paymentMethod,
-          cashAmount: bCash,
-          onlineAmount: bOnline,
-          snacksAmount: 0,
         },
       });
     });
 
-    const updatedBookings = await prisma.$transaction(updatePromises);
+    await prisma.$transaction(updatePromises);
 
-    // Update associated SnackOrders
-    const totalExistingSnacks = snackOrders.reduce((sum, s) => sum + Number(s.amount), 0);
-    if (snacksAmount === 0 && totalExistingSnacks > 0) {
-      // Unlink existing snack orders from this payment and mark them UNPAID
-      await prisma.snackOrder.updateMany({
-        where: { paymentId },
-        data: {
-          paymentId: null,
-          paymentStatus: PaymentStatus.UNPAID,
-        }
-      });
-    } else if (totalExistingSnacks > 0) {
-      const ratio = snacksAmount / totalExistingSnacks;
-      const snackUpdatePromises = snackOrders.map((s, index) => {
-        let newAmount = Math.round(Number(s.amount) * ratio * 100) / 100;
-        if (index === snackOrders.length - 1) {
-          const sumOfOthers = snackOrders.slice(0, -1).reduce((sum, s2) => sum + Math.round(Number(s2.amount) * ratio * 100) / 100, 0);
-          newAmount = Number((snacksAmount - sumOfOthers).toFixed(2));
-        }
-        return prisma.snackOrder.update({
-          where: { id: s.id },
-          data: {
-            amount: Math.max(0, newAmount),
-            paymentStatus: PaymentStatus.PAID,
-          }
-        });
-      });
-      await Promise.all(snackUpdatePromises);
-    } else if (snacksAmount > 0) {
-      // Create a new snack order for this payment since none existed but now snacksAmount is specified
-      const firstBooking = bookings[0];
-      const allNames = new Set<string>();
-      bookings.forEach(b => {
-        const n = b.user?.name ?? b.guestName ?? "Guest";
-        allNames.add(n);
-      });
-      const customerNamesStr = Array.from(allNames).join(", ");
-      await prisma.snackOrder.create({
-        data: {
-          amount: snacksAmount,
-          paymentStatus: PaymentStatus.PAID,
-          paymentId,
-          userId: firstBooking.userId,
-          guestName: firstBooking.userId ? null : (firstBooking.guestName || customerNamesStr || "Snack Sale"),
-          guestPhone: firstBooking.userId ? null : firstBooking.guestPhone,
-        }
-      });
+    if (allocationsToCreate.length > 0) {
+      await prisma.paymentAllocation.createMany({ data: allocationsToCreate });
     }
 
-    // Create Audit Log
     await prisma.auditLog.create({
       data: {
         actorId: (session.user as any).id,
         actorName: session.user.name ?? undefined,
         action: "EDIT_BATCH_PAY_BOOKINGS",
         entityType: "Booking",
-        meta: {
-          paymentId,
-          bookingIds: bookings.map((b) => b.id),
-          negotiatedAmount,
-          paymentMethod,
-          cashAmount,
-          onlineAmount,
-          snacksAmount,
-        },
+        meta: { paymentId, negotiatedAmount, snacksAmount, amountPayingNow, paymentMethod, cashAmount, onlineAmount },
       },
     });
 
-    return NextResponse.json({ success: true, count: updatedBookings.length });
+    return NextResponse.json({ success: true, count: bookings.length + snackOrders.length });
   } catch (error: any) {
     console.error("Batch payment edit failed:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

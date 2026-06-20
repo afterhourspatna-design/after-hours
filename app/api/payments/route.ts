@@ -40,8 +40,12 @@ export async function GET(req: NextRequest) {
       prisma.payment.findMany({
         where,
         include: {
-          bookings: { select: { id: true, finalAmount: true, guestName: true, guestPhone: true, startDateTime: true, endDateTime: true, negotiatedAmount: true, game: { select: { name: true } }, user: { select: { name: true, phone: true } } } },
-          snackOrders: { select: { id: true, amount: true, guestName: true, guestPhone: true, user: { select: { name: true, phone: true } } } }
+          allocations: {
+            include: {
+              booking: { select: { id: true, finalAmount: true, guestName: true, guestPhone: true, startDateTime: true, endDateTime: true, negotiatedAmount: true, game: { select: { name: true } }, user: { select: { name: true, phone: true } }, couponId: true } },
+              snackOrder: { select: { id: true, amount: true, guestName: true, guestPhone: true, user: { select: { name: true, phone: true } } } }
+            }
+          }
         },
         orderBy: { createdAt: "desc" },
         skip: (page - 1) * limit,

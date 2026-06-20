@@ -32,6 +32,8 @@ interface Booking {
   game: { name: string; tag: string };
   resourceUnit: { unitName: string } | null;
   user: { name: string; phone: string } | null;
+  negotiatedAmount: number | null;
+  allocations?: { amount: number }[];
 }
 
 interface BookingTableProps {
@@ -123,7 +125,9 @@ function BookingTableInner({ role = "ADMIN" }: BookingTableProps) {
       Duration: formatDuration(b.durationMinutes),
       Status: b.bookingStatus,
       Payment: b.paymentStatus,
-      Amount: b.finalAmount,
+      TotalAmount: b.negotiatedAmount ?? b.finalAmount,
+      Paid: b.allocations?.reduce((sum, a) => sum + Number(a.amount), 0) ?? 0,
+      Balance: Math.max(0, (b.negotiatedAmount ?? b.finalAmount) - (b.allocations?.reduce((sum, a) => sum + Number(a.amount), 0) ?? 0)),
       Source: SOURCE_LABELS[b.source as keyof typeof SOURCE_LABELS] ?? b.source,
       Notes: b.notes ?? "",
     }));
@@ -205,7 +209,8 @@ function BookingTableInner({ role = "ADMIN" }: BookingTableProps) {
                   <th>Game / Unit</th>
                   <th>Date & Time</th>
                   <th>Duration</th>
-                  <th>Amount</th>
+                  <th>Total Amount</th>
+                  <th>Balance Due</th>
                   <th>Status</th>
                   <th>Payment</th>
                   <th>Source</th>
@@ -242,7 +247,20 @@ function BookingTableInner({ role = "ADMIN" }: BookingTableProps) {
                         {formatDuration(b.durationMinutes)}
                       </td>
                       <td className="text-sm font-medium text-white whitespace-nowrap">
-                        {formatCurrency(b.finalAmount)}
+                        {formatCurrency(b.negotiatedAmount ?? b.finalAmount)}
+                        {b.negotiatedAmount !== null && b.negotiatedAmount !== b.finalAmount && (
+                          <span className="ml-2 text-[10px] text-zinc-500 line-through">
+                            {formatCurrency(b.finalAmount)}
+                          </span>
+                        )}
+                      </td>
+                      <td className="text-sm font-medium text-amber-400 whitespace-nowrap">
+                        {(() => {
+                           const invoiceAmt = b.negotiatedAmount ?? b.finalAmount;
+                           const paid = b.allocations?.reduce((sum, a) => sum + Number(a.amount), 0) ?? 0;
+                           const balance = Math.max(0, invoiceAmt - paid);
+                           return balance > 0 ? formatCurrency(balance) : "—";
+                        })()}
                       </td>
                       <td><BookingStatusBadge status={b.bookingStatus as any} /></td>
                       <td><PaymentStatusBadge status={b.paymentStatus as any} /></td>

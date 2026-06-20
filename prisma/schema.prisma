@@ -148,10 +148,6 @@ model Booking {
   holdExpiresAt  DateTime?
   createdById    String?
   negotiatedAmount Decimal?    @db.Decimal(10, 2)
-  paymentMethod    String?
-  cashAmount       Decimal?    @db.Decimal(10, 2)
-  onlineAmount     Decimal?    @db.Decimal(10, 2)
-  paymentId        String?
   snacksAmount     Decimal?    @default(0) @db.Decimal(10, 2)
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
@@ -160,7 +156,7 @@ model Booking {
   game           Game          @relation(fields: [gameId], references: [id])
   resourceUnit   ResourceUnit? @relation(fields: [resourceUnitId], references: [id], onDelete: SetNull)
   coupon         Coupon?       @relation(fields: [couponId], references: [id], onDelete: SetNull)
-  payment        Payment?      @relation(fields: [paymentId], references: [id], onDelete: SetNull)
+  allocations    PaymentAllocation[]
 
   @@index([startDateTime])
   @@index([gameId])
@@ -183,12 +179,28 @@ model Payment {
   createdAt        DateTime      @default(now())
   updatedAt        DateTime      @updatedAt
 
-  bookings         Booking[]
-  snackOrders      SnackOrder[]
+  allocations      PaymentAllocation[]
   user             AppUser?      @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   @@index([createdAt])
   @@map("payments")
+}
+
+model PaymentAllocation {
+  id           String      @id @default(cuid())
+  amount       Decimal     @db.Decimal(10, 2)
+  paymentId    String
+  bookingId    String?
+  snackOrderId String?
+  createdAt    DateTime    @default(now())
+
+  payment      Payment     @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  booking      Booking?    @relation(fields: [bookingId], references: [id], onDelete: SetNull)
+  snackOrder   SnackOrder? @relation(fields: [snackOrderId], references: [id], onDelete: SetNull)
+
+  @@index([paymentId])
+  @@index([bookingId])
+  @@map("payment_allocations")
 }
 
 model SnackOrder {
@@ -198,16 +210,14 @@ model SnackOrder {
   guestPhone    String?
   amount        Decimal       @db.Decimal(10, 2)
   paymentStatus PaymentStatus @default(UNPAID)
-  paymentId     String?
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
 
   user          AppUser?      @relation(fields: [userId], references: [id], onDelete: SetNull)
-  payment       Payment?      @relation(fields: [paymentId], references: [id], onDelete: SetNull)
+  allocations   PaymentAllocation[]
   items         SnackOrderItem[]
 
   @@index([userId])
-  @@index([paymentId])
   @@index([paymentStatus])
   @@map("snack_orders")
 }

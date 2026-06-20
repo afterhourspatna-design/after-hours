@@ -60,9 +60,6 @@ export async function GET(req: NextRequest) {
       finalAmount: true, 
       negotiatedAmount: true, 
       paymentStatus: true, 
-      paymentMethod: true,
-      cashAmount: true,
-      onlineAmount: true,
       gameId: true, 
       userId: true,
       guestName: true,
@@ -70,12 +67,8 @@ export async function GET(req: NextRequest) {
       source: true,
       coupon: { select: { code: true } },
       user: { select: { name: true, phone: true } },
-      payment: {
-        select: {
-          paymentMethod: true,
-          cashAmount: true,
-          onlineAmount: true,
-        }
+      allocations: {
+        include: { payment: true }
       }
     },
   });
@@ -88,12 +81,8 @@ export async function GET(req: NextRequest) {
       createdAt: true, 
       amount: true,
       paymentStatus: true,
-      payment: {
-        select: {
-          paymentMethod: true,
-          cashAmount: true,
-          onlineAmount: true
-        }
+      allocations: {
+        include: { payment: true }
       }
     }
   });
@@ -125,9 +114,8 @@ export async function GET(req: NextRequest) {
     const key = formatInIST(b.startDateTime);
     if (!(key in dayMap)) continue;
 
-    if (b.paymentStatus === "PAID") {
-      dayMap[key].game += Number(b.negotiatedAmount ?? b.finalAmount);
-    }
+    const totalPaid = b.allocations.reduce((s: number, a: any) => s + Number(a.amount), 0);
+    dayMap[key].game += totalPaid;
 
     // Source breakdown
     sourceMap[b.source] = (sourceMap[b.source] || 0) + 1;
@@ -140,41 +128,40 @@ export async function GET(req: NextRequest) {
       peakHoursMap[hourKey]++;
     }
 
-    // Paid-only aggregations
-    if (b.paymentStatus === "PAID") {
+    // Only count as "paid booking" for AOV if it has any payment
+    if (totalPaid > 0 || b.paymentStatus === "PAID") {
       totalPaidBookingsCount++;
       totalDurationMinutes += b.durationMinutes;
 
-      const netAmt = Number(b.negotiatedAmount ?? b.finalAmount);
       const standardDiscounts = Number(b.discountAmount) + Number(b.couponDiscount);
       const trueGross = Number(b.finalAmount) + standardDiscounts;
-      
       grossRevenue += trueGross;
       
       const manualDiscount = b.negotiatedAmount !== null ? Number(b.finalAmount) - Number(b.negotiatedAmount) : 0;
       totalDiscounts += standardDiscounts + manualDiscount;
       
-      // Fix payment split by falling back to the linked payment model if booking model fields are missing (legacy records)
-      const pMethod = b.paymentMethod || b.payment?.paymentMethod;
+      for (const allocation of b.allocations) {
+        const allocAmount = Number(allocation.amount);
+        const paymentMethod = allocation.payment.paymentMethod;
+        const pCash = Number(allocation.payment.cashAmount || 0);
+        const pOnline = Number(allocation.payment.onlineAmount || 0);
+        const pTotal = pCash + pOnline;
 
-      if (pMethod === "CASH") {
-        cashTotal += netAmt;
-      } else if (pMethod === "ONLINE") {
-        onlineTotal += netAmt;
-      } else if (pMethod === "MIXED") {
-        const bCash = Number(b.cashAmount || b.payment?.cashAmount || 0);
-        const bOnline = Number(b.onlineAmount || b.payment?.onlineAmount || 0);
-        const bTotal = bCash + bOnline;
-        if (bTotal > 0) {
-          const cashRatio = bCash / bTotal;
-          cashTotal += netAmt * cashRatio;
-          onlineTotal += netAmt * (1 - cashRatio);
+        if (paymentMethod === "CASH") {
+          cashTotal += allocAmount;
+        } else if (paymentMethod === "ONLINE") {
+          onlineTotal += allocAmount;
+        } else if (paymentMethod === "MIXED") {
+          if (pTotal > 0) {
+            const cashRatio = pCash / pTotal;
+            cashTotal += allocAmount * cashRatio;
+            onlineTotal += allocAmount * (1 - cashRatio);
+          } else {
+            cashTotal += allocAmount;
+          }
         } else {
-          cashTotal += netAmt;
+          cashTotal += allocAmount;
         }
-      } else {
-        // Absolute fallback if everything is completely missing
-        cashTotal += netAmt;
       }
 
       // Spenders mapping (combining registered + unregistered by phone)
@@ -195,7 +182,7 @@ export async function GET(req: NextRequest) {
         if (!spendersMap[identifier]) {
           spendersMap[identifier] = { name: spName, phone: spPhone, spent: 0 };
         }
-        spendersMap[identifier].spent += netAmt;
+        spendersMap[identifier].spent += totalPaid;
       }
 
       // Promo mapping
@@ -215,37 +202,34 @@ export async function GET(req: NextRequest) {
     const key = formatInIST(s.createdAt);
     if (!(key in dayMap)) continue;
 
-    dayMap[key].snacks += Number(s.amount);
+    const totalPaid = s.allocations.reduce((sum: number, a: any) => sum + Number(a.amount), 0);
+    dayMap[key].snacks += totalPaid;
     
-    // Standalone snacks have no discount, so gross=net
-    if (s.paymentStatus === "PAID" || Number(s.amount) > 0) {
-      // If paymentStatus is UNPAID but we are recording it in daily revenue based on the earlier rule,
-      // wait, the previous logic said "we ONLY want to show revenue for PAID bookings... maybe for snacks we can still show total amount"
-      // So standalone snacks are added to daily net revenue regardless, so we must add to gross as well.
+    if (totalPaid > 0 || s.paymentStatus === "PAID") {
       grossRevenue += Number(s.amount);
-      const pMethod = s.payment?.paymentMethod;
 
-      if (pMethod === "CASH") {
-        cashTotal += Number(s.amount);
-      } else if (pMethod === "ONLINE") {
-        onlineTotal += Number(s.amount);
-      } else if (pMethod === "MIXED") {
-        const pCash = Number(s.payment?.cashAmount || 0);
-        const pOnline = Number(s.payment?.onlineAmount || 0);
+      for (const allocation of s.allocations) {
+        const allocAmount = Number(allocation.amount);
+        const paymentMethod = allocation.payment.paymentMethod;
+        const pCash = Number(allocation.payment.cashAmount || 0);
+        const pOnline = Number(allocation.payment.onlineAmount || 0);
         const pTotal = pCash + pOnline;
-        
-        if (pTotal > 0) {
-          const cashRatio = pCash / pTotal;
-          const sCash = Number(s.amount) * cashRatio;
-          const sOnline = Number(s.amount) - sCash;
-          cashTotal += sCash;
-          onlineTotal += sOnline;
+
+        if (paymentMethod === "CASH") {
+          cashTotal += allocAmount;
+        } else if (paymentMethod === "ONLINE") {
+          onlineTotal += allocAmount;
+        } else if (paymentMethod === "MIXED") {
+          if (pTotal > 0) {
+            const cashRatio = pCash / pTotal;
+            cashTotal += allocAmount * cashRatio;
+            onlineTotal += allocAmount * (1 - cashRatio);
+          } else {
+            cashTotal += allocAmount;
+          }
         } else {
-          cashTotal += Number(s.amount);
+          cashTotal += allocAmount;
         }
-      } else {
-        // Fallback for unpaid standalone snacks or undefined
-        cashTotal += Number(s.amount);
       }
     }
   }
@@ -281,8 +265,8 @@ export async function GET(req: NextRequest) {
   const revenueByGame = games.map((g) => {
     const gameBookings = bookings.filter((b) => b.gameId === g.id);
     const revenue = gameBookings.reduce((sum, b) => {
-      if (b.paymentStatus !== "PAID") return sum;
-      return sum + Number(b.negotiatedAmount ?? b.finalAmount);
+      const totalPaid = b.allocations.reduce((s: number, a: any) => s + Number(a.amount), 0);
+      return sum + totalPaid;
     }, 0);
     return {
       game: g.name,
