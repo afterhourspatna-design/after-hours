@@ -258,7 +258,7 @@ function BookingTableInner({ role = "ADMIN" }: BookingTableProps) {
                       <td><PaymentStatusBadge status={b.paymentStatus as any} /></td>
                       <td className="text-xs text-zinc-500">{SOURCE_LABELS[b.source as keyof typeof SOURCE_LABELS] ?? b.source}</td>
                       <td>
-                        <div className="flex items-center gap-1 justify-end flex-wrap">
+                        <div className="flex items-center gap-1 justify-end flex-nowrap">
                           {customerPhone && (
                             <button
                               onClick={() => {
