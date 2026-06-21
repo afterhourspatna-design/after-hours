@@ -99,7 +99,7 @@ export async function POST(req: NextRequest) {
       const payment = await prisma.payment.create({
         data: {
           paymentMethod,
-          negotiatedAmount: paidToday,
+          negotiatedAmount: 0,
           cashAmount: paymentMethod === "MIXED" ? cashAmount : paymentMethod === "CASH" ? paidToday : 0,
           onlineAmount: paymentMethod === "MIXED" ? onlineAmount : paymentMethod === "ONLINE" ? paidToday : 0,
           userId: resolvedUserId,
@@ -291,7 +291,7 @@ export async function POST(req: NextRequest) {
     const payment = await prisma.payment.create({
       data: {
         paymentMethod,
-        negotiatedAmount: paidToday,
+        negotiatedAmount: negotiatedAmount,
         cashAmount: paymentMethod === "MIXED" ? cashAmount : paymentMethod === "CASH" ? paidToday : 0,
         onlineAmount: paymentMethod === "MIXED" ? onlineAmount : paymentMethod === "ONLINE" ? paidToday : 0,
         customerNames: customerNamesStr,
@@ -486,7 +486,7 @@ export async function PUT(req: NextRequest) {
       where: { id: paymentId },
       data: {
         paymentMethod,
-        negotiatedAmount: paidToday,
+        negotiatedAmount: negotiatedAmount,
         cashAmount: paymentMethod === "MIXED" ? cashAmount : paymentMethod === "CASH" ? paidToday : 0,
         onlineAmount: paymentMethod === "MIXED" ? onlineAmount : paymentMethod === "ONLINE" ? paidToday : 0,
       }
