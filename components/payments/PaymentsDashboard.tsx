@@ -186,7 +186,9 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
 
             const allBookings = [...bookings, ...snackBookings];
             const totalActual = allBookings.reduce((sum, b) => sum + Number(b.finalAmount), 0);
-            const totalSnacks = snackBookings.reduce((sum, s) => sum + Number(s.snacksAmount), 0);
+            const totalSnacks = (p.allocations || [])
+              .filter((a: any) => a.snackOrder)
+              .reduce((sum: number, a: any) => sum + Number(a.amount), 0);
 
             return {
               paymentId: p.id,
