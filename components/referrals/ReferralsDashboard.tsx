@@ -150,64 +150,69 @@ export default function ReferralsDashboard({ role = "ADMIN" }: ReferralsDashboar
                   {/* Promoter Row */}
                   <div 
                     onClick={() => toggleExpand(r.id)} 
-                    className="flex items-center gap-4 px-6 py-5 hover:bg-zinc-900/40 cursor-pointer transition-colors group"
+                    className="flex flex-col sm:flex-row sm:items-center gap-4 px-4 sm:px-6 py-5 hover:bg-zinc-900/40 cursor-pointer transition-colors group"
                   >
-                    <div className="w-10 h-10 rounded-xl bg-violet-600/10 border border-violet-500/10 flex items-center justify-center flex-shrink-0 group-hover:bg-violet-600/20 group-hover:border-violet-500/30 transition-all duration-300">
-                      <Gift className="w-5 h-5 text-violet-400" />
-                    </div>
+                    <div className="flex items-center gap-4 flex-1 min-w-0 w-full">
+                      <div className="w-10 h-10 rounded-xl bg-violet-600/10 border border-violet-500/10 flex items-center justify-center flex-shrink-0 group-hover:bg-violet-600/20 group-hover:border-violet-500/30 transition-all duration-300">
+                        <Gift className="w-5 h-5 text-violet-400" />
+                      </div>
 
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <p className="text-sm font-bold text-white group-hover:text-violet-400 transition-colors duration-300">
-                          {r.name}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-4 mt-1">
-                        <span className="flex items-center gap-1.5 text-xs text-zinc-400 font-medium">
-                          <Phone className="w-3 h-3 text-zinc-600" /> +91 {r.phone}
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Stats */}
-                    <div className="flex items-center gap-8 mr-4 flex-shrink-0">
-                      <div className="text-center">
-                        <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block">Total</span>
-                        <span className="text-sm font-bold text-white">{r.totalReferrals}</span>
-                      </div>
-                      <div className="text-center">
-                        <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block">Claimed</span>
-                        <span className="text-sm font-bold text-zinc-500">{r.referralRewardsClaimed}</span>
-                      </div>
-                      <div className="text-center">
-                        <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block">Unclaimed</span>
-                        <span className={cn(
-                          "text-sm font-bold", 
-                          canAvail ? "text-emerald-400" : "text-violet-400"
-                        )}>
-                          {r.unclaimedReferrals}
-                        </span>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm font-bold text-white group-hover:text-violet-400 transition-colors duration-300">
+                            {r.name}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-4 mt-1">
+                          <span className="flex items-center gap-1.5 text-xs text-zinc-400 font-medium">
+                            <Phone className="w-3 h-3 text-zinc-600" /> +91 {r.phone}
+                          </span>
+                        </div>
                       </div>
                     </div>
 
-                    {/* Actions */}
-                    <div className="flex items-center gap-3 flex-shrink-0" onClick={e => e.stopPropagation()}>
-                      <button
-                        disabled={!canAvail}
-                        onClick={() => setAvailUser(r)}
-                        className={cn(
-                          "flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-bold text-xs transition-all duration-200 active:scale-95",
-                          canAvail 
-                            ? "bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600 hover:text-white border border-emerald-500/30" 
-                            : "bg-zinc-900 text-zinc-600 border border-zinc-800 cursor-not-allowed"
-                        )}
-                      >
-                        <CheckCircle2 className="w-3.5 h-3.5" />
-                        Avail Reward
-                      </button>
-                      <button className="p-2 rounded-lg text-zinc-500 hover:text-zinc-200 hover:bg-zinc-900 transition-all">
-                        {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                      </button>
+                    <div className="flex items-center justify-between sm:justify-end gap-4 sm:gap-8 w-full sm:w-auto border-t border-zinc-800/50 sm:border-0 pt-3 sm:pt-0">
+                      {/* Stats */}
+                      <div className="flex items-center gap-6 sm:gap-8 flex-shrink-0">
+                        <div className="text-center">
+                          <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block">Total</span>
+                          <span className="text-sm font-bold text-white">{r.totalReferrals}</span>
+                        </div>
+                        <div className="text-center">
+                          <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block">Claimed</span>
+                          <span className="text-sm font-bold text-zinc-500">{r.referralRewardsClaimed}</span>
+                        </div>
+                        <div className="text-center">
+                          <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block">Unclaimed</span>
+                          <span className={cn(
+                            "text-sm font-bold", 
+                            canAvail ? "text-emerald-400" : "text-violet-400"
+                          )}>
+                            {r.unclaimedReferrals}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Actions */}
+                      <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0" onClick={e => e.stopPropagation()}>
+                        <button
+                          disabled={!canAvail}
+                          onClick={() => setAvailUser(r)}
+                          className={cn(
+                            "flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-bold text-xs transition-all duration-200 active:scale-95",
+                            canAvail 
+                              ? "bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600 hover:text-white border border-emerald-500/30" 
+                              : "bg-zinc-900 text-zinc-600 border border-zinc-800 cursor-not-allowed"
+                          )}
+                        >
+                          <CheckCircle2 className="w-3.5 h-3.5" />
+                          <span className="hidden sm:inline">Avail Reward</span>
+                          <span className="sm:hidden">Avail</span>
+                        </button>
+                        <button className="p-2 rounded-lg text-zinc-500 hover:text-zinc-200 hover:bg-zinc-900 transition-all">
+                          {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                        </button>
+                      </div>
                     </div>
                   </div>
 

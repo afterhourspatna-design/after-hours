@@ -105,7 +105,7 @@ export async function GET(req: NextRequest) {
       include: {
         game: { select: { name: true, tag: true } },
         resourceUnit: { select: { unitName: true } },
-        user: { select: { name: true, phone: true } },
+        user: { select: { name: true, phone: true, createdAt: true, _count: { select: { bookings: { where: { paymentStatus: { in: ["PAID", "PARTIAL"] } } }, snackOrders: { where: { paymentStatus: { in: ["PAID", "PARTIAL"] } } } } } } },
         allocations: true,
       },
       orderBy: { startDateTime: "asc" },
@@ -121,7 +121,7 @@ export async function GET(req: NextRequest) {
       include: {
         game: { select: { name: true, tag: true } },
         resourceUnit: { select: { unitName: true } },
-        user: { select: { name: true, phone: true } },
+        user: { select: { name: true, phone: true, createdAt: true, _count: { select: { bookings: { where: { paymentStatus: { in: ["PAID", "PARTIAL"] } } }, snackOrders: { where: { paymentStatus: { in: ["PAID", "PARTIAL"] } } } } } } },
         allocations: true,
       },
       orderBy: { startDateTime: "desc" },
@@ -133,7 +133,7 @@ export async function GET(req: NextRequest) {
     (includeSnacks && !status ? prisma.snackOrder.findMany({
       where: paymentStatus === "UNPAID" ? { paymentStatus: { in: ["UNPAID", "PARTIAL"] } } : (paymentStatus ? { paymentStatus } : {}),
       include: {
-        user: { select: { name: true, phone: true } },
+        user: { select: { name: true, phone: true, createdAt: true, _count: { select: { bookings: { where: { paymentStatus: { in: ["PAID", "PARTIAL"] } } }, snackOrders: { where: { paymentStatus: { in: ["PAID", "PARTIAL"] } } } } } } },
         allocations: true,
       },
       orderBy: { createdAt: "desc" }
@@ -146,6 +146,7 @@ export async function GET(req: NextRequest) {
     userId: snack.userId,
     guestName: snack.guestName,
     guestPhone: snack.guestPhone,
+    isNewUser: false,
     startDateTime: snack.createdAt.toISOString(),
     endDateTime: snack.createdAt.toISOString(),
     durationMinutes: 0,
@@ -166,14 +167,25 @@ export async function GET(req: NextRequest) {
     allocations: snack.allocations ?? [],
   })) : [];
 
+  const todayDate = new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Kolkata", year: "numeric", month: "numeric", day: "numeric" }).format(new Date());
+
   // Map bookings to calculate balance due and clean up big decimals
-  const mappedBookings = bookings.map((b: any) => ({
-    ...b,
-    finalAmount: Number(b.finalAmount),
-    negotiatedAmount: b.negotiatedAmount !== null ? Number(b.negotiatedAmount) : null,
-    discountAmount: Number(b.discountAmount),
-    couponDiscount: Number(b.couponDiscount),
-  }));
+  const mappedBookings = bookings.map((b: any) => {
+    let isNewUser = false;
+    if (b.user) {
+      const userDate = new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Kolkata", year: "numeric", month: "numeric", day: "numeric" }).format(new Date(b.user.createdAt));
+      isNewUser = (userDate === todayDate) && (b.user._count?.bookings === 0) && (b.user._count?.snackOrders === 0);
+    }
+    
+    return {
+      ...b,
+      isNewUser,
+      finalAmount: Number(b.finalAmount),
+      negotiatedAmount: b.negotiatedAmount !== null ? Number(b.negotiatedAmount) : null,
+      discountAmount: Number(b.discountAmount),
+      couponDiscount: Number(b.couponDiscount),
+    };
+  });
 
   const combinedBookings = [...mappedBookings, ...mappedSnacks].sort((a: any, b: any) => 
     new Date(b.startDateTime).getTime() - new Date(a.startDateTime).getTime()

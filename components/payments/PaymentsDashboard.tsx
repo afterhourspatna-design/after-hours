@@ -34,6 +34,7 @@ interface Booking {
   snacksAmount: number | null;
   couponId: string | null;
   allocations?: any[];
+  isNewUser?: boolean;
 }
 
 interface Coupon {
@@ -425,7 +426,7 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
   const totalPages = Math.ceil(total / LIMIT);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-28">
       {/* Header section */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -580,7 +581,14 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
                         </td>
                         <td>
                           <div>
-                            <p className="font-medium text-white text-sm">{customerName}</p>
+                            <p className="font-medium text-white text-sm flex items-center gap-2">
+                              {customerName}
+                              {b.isNewUser && (
+                                <span className="bg-emerald-500/20 text-emerald-400 text-[10px] px-1.5 py-0.5 rounded font-bold uppercase tracking-wider border border-emerald-500/30">
+                                  New
+                                </span>
+                              )}
+                            </p>
                             {customerPhone && <p className="text-xs text-zinc-600">{customerPhone}</p>}
                           </div>
                         </td>
