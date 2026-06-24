@@ -35,6 +35,7 @@ interface Booking {
   couponId: string | null;
   allocations?: any[];
   isNewUser?: boolean;
+  allocatedAmount?: number;
 }
 
 interface Coupon {
@@ -152,37 +153,38 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
           const mappedGroups: PaymentGroup[] = (data.payments ?? []).map((p: any) => {
             const bookings: any[] = [];
             const snackBookings: any[] = [];
-            
+
             for (const alloc of p.allocations || []) {
-               if (alloc.booking) {
-                  bookings.push(alloc.booking);
-               }
-               if (alloc.snackOrder) {
-                  const snack = alloc.snackOrder;
-                  snackBookings.push({
-                    id: `SNACK_${snack.id}`,
-                    guestName: snack.guestName,
-                    guestPhone: snack.guestPhone,
-                    startDateTime: p.createdAt,
-                    endDateTime: p.createdAt,
-                    durationMinutes: 0,
-                    bookingStatus: "COMPLETED",
-                    paymentStatus: "PAID",
-                    finalAmount: snack.amount,
-                    negotiatedAmount: snack.amount,
-                    paymentMethod: p.paymentMethod,
-                    cashAmount: 0,
-                    onlineAmount: 0,
-                    source: "WALK_IN",
-                    game: { name: "Snacks", tag: "SNACK" },
-                    resourceUnit: null,
-                    user: snack.user,
-                    updatedAt: p.createdAt,
-                    paymentId: p.id,
-                    snacksAmount: snack.amount,
-                    couponId: null,
-                  });
-               }
+              if (alloc.booking) {
+                bookings.push({ ...alloc.booking, allocatedAmount: Number(alloc.amount) });
+              }
+              if (alloc.snackOrder) {
+                const snack = alloc.snackOrder;
+                snackBookings.push({
+                  id: `SNACK_${snack.id}`,
+                  guestName: snack.guestName,
+                  guestPhone: snack.guestPhone,
+                  startDateTime: p.createdAt,
+                  endDateTime: p.createdAt,
+                  durationMinutes: 0,
+                  bookingStatus: "COMPLETED",
+                  paymentStatus: "PAID",
+                  finalAmount: snack.amount,
+                  negotiatedAmount: snack.amount,
+                  paymentMethod: p.paymentMethod,
+                  cashAmount: 0,
+                  onlineAmount: 0,
+                  source: "WALK_IN",
+                  game: { name: "Snacks", tag: "SNACK" },
+                  resourceUnit: null,
+                  user: snack.user,
+                  updatedAt: p.createdAt,
+                  paymentId: p.id,
+                  snacksAmount: snack.amount,
+                  allocatedAmount: Number(alloc.amount),
+                  couponId: null,
+                });
+              }
             }
 
             const allBookings = [...bookings, ...snackBookings];
@@ -242,7 +244,7 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
   };
 
   // Math totals for checkout
-  const selectedBookings = editPaymentId 
+  const selectedBookings = editPaymentId
     ? paymentHistory.find(p => p.paymentId === editPaymentId)?.bookings || []
     : bookings.filter((b) => selectedIds.has(b.id));
 
@@ -275,7 +277,7 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
   // Dynamic Coupon Discount Calculation
   const eligibleBookings = selectedBookings.filter((b) => !b.couponId && !b.id.startsWith("SNACK_"));
   const eligibleBaseAmount = eligibleBookings.reduce((sum, b) => sum + Number(b.finalAmount), 0);
-  
+
   let dynamicCouponDiscount = 0;
   if (!editPaymentId && selectedCouponCode && eligibleBaseAmount > 0) {
     const coupon = coupons.find(c => c.code === selectedCouponCode);
@@ -306,7 +308,7 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
     }
     const newGamesAmount = Math.max(0, totalActualGamesAmount - discount);
     setNegotiatedInput(String(newGamesAmount));
-    
+
     // Auto-update Amount Paying Now to reflect the new discount while accounting for prior payments
     const currentSnacks = Number(snacksInput) || 0;
     const newTotalToPay = newGamesAmount + currentSnacks - (editPaymentId ? 0 : previouslyPaidTotal);
@@ -384,24 +386,24 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
     try {
       const payload = editPaymentId
         ? {
-            paymentId: editPaymentId,
-            negotiatedAmount: totalNegotiatedVal,
-            snacksAmount: snacksVal,
-            amountPayingNow: amountPayingNowVal,
-            paymentMethod,
-            cashAmount: paymentMethod === "MIXED" ? cashVal : paymentMethod === "CASH" ? amountPayingNowVal : 0,
-            onlineAmount: paymentMethod === "MIXED" ? onlineVal : paymentMethod === "ONLINE" ? amountPayingNowVal : 0,
-          }
+          paymentId: editPaymentId,
+          negotiatedAmount: totalNegotiatedVal,
+          snacksAmount: snacksVal,
+          amountPayingNow: amountPayingNowVal,
+          paymentMethod,
+          cashAmount: paymentMethod === "MIXED" ? cashVal : paymentMethod === "CASH" ? amountPayingNowVal : 0,
+          onlineAmount: paymentMethod === "MIXED" ? onlineVal : paymentMethod === "ONLINE" ? amountPayingNowVal : 0,
+        }
         : {
-            bookingIds: Array.from(selectedIds),
-            negotiatedAmount: totalNegotiatedVal,
-            snacksAmount: snacksVal,
-            amountPayingNow: amountPayingNowVal,
-            paymentMethod,
-            cashAmount: paymentMethod === "MIXED" ? cashVal : paymentMethod === "CASH" ? amountPayingNowVal : 0,
-            onlineAmount: paymentMethod === "MIXED" ? onlineVal : paymentMethod === "ONLINE" ? amountPayingNowVal : 0,
-            couponCode: selectedCouponCode || null,
-          };
+          bookingIds: Array.from(selectedIds),
+          negotiatedAmount: totalNegotiatedVal,
+          snacksAmount: snacksVal,
+          amountPayingNow: amountPayingNowVal,
+          paymentMethod,
+          cashAmount: paymentMethod === "MIXED" ? cashVal : paymentMethod === "CASH" ? amountPayingNowVal : 0,
+          onlineAmount: paymentMethod === "MIXED" ? onlineVal : paymentMethod === "ONLINE" ? amountPayingNowVal : 0,
+          couponCode: selectedCouponCode || null,
+        };
 
       const method = editPaymentId ? "PUT" : "POST";
       const res = await fetch("/api/bookings/batch-pay", {
@@ -616,7 +618,7 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
                         <td>
                           <span className={cn(
                             "inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold uppercase border",
-                            b.paymentStatus === "PARTIAL" 
+                            b.paymentStatus === "PARTIAL"
                               ? "bg-amber-600/10 text-amber-400 border-amber-600/20"
                               : "bg-red-600/10 text-red-400 border-red-600/20"
                           )}>
@@ -643,69 +645,76 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
                   </tr>
                 </thead>
                 <tbody>
-                  {paymentHistory.map((p) => (
-                    <tr
-                      key={p.paymentId}
-                      onClick={() => setSelectedPaymentDetail(p)}
-                      className="cursor-pointer hover:bg-zinc-800/30 transition-colors"
-                    >
-                      <td>
-                        <p className="font-bold text-violet-400 font-mono" title={p.paymentId}>
-                          {p.paymentId.startsWith("LEGACY-") 
-                            ? "#LEGACY" 
-                            : `#${p.paymentId.substring(0, 8).toUpperCase()}`}
-                        </p>
-                      </td>
-                      <td>
-                        <p className="font-medium text-white text-sm">{p.customerNames}</p>
-                      </td>
-                      <td>
-                        <p className="text-sm text-zinc-300">
-                          {p.bookings.length} {p.bookings.length === 1 ? "booking" : "bookings"}
-                        </p>
-                      </td>
-                      <td className="text-sm text-zinc-400 whitespace-nowrap">
-                        {formatCurrency(p.totalActual)}
-                      </td>
-                      <td className="text-xs text-zinc-300 whitespace-nowrap">
-                        <p className="text-sm font-semibold text-emerald-400">{formatCurrency(p.totalNegotiated + p.totalSnacks)}</p>
-                        {p.totalSnacks > 0 && (
-                          <p className="text-[10px] text-zinc-500">Games: {formatCurrency(p.totalNegotiated)} | Snacks: {formatCurrency(p.totalSnacks)}</p>
-                        )}
-                      </td>
-                      <td>
-                        <div className="text-xs">
-                          <span className="px-2 py-0.5 rounded bg-zinc-800 text-zinc-300 font-semibold border border-zinc-700 uppercase">
-                            {p.paymentMethod}
-                          </span>
-                          {p.paymentMethod === "MIXED" && (
-                            <p className="text-[10px] text-zinc-500 mt-1 whitespace-nowrap">
-                              C: {formatCurrency(p.totalCash)} | O: {formatCurrency(p.totalOnline)}
-                            </p>
+                  {paymentHistory.map((p) => {
+                    const amountPaid = p.totalCash + p.totalOnline;
+                    const batchTotal = p.totalNegotiated + p.totalSnacks;
+                    return (
+                      <tr
+                        key={p.paymentId}
+                        onClick={() => setSelectedPaymentDetail(p)}
+                        className="cursor-pointer hover:bg-zinc-800/30 transition-colors"
+                      >
+                        <td>
+                          <p className="font-bold text-violet-400 font-mono" title={p.paymentId}>
+                            {p.paymentId.startsWith("LEGACY-")
+                              ? "#LEGACY"
+                              : `#${p.paymentId.substring(0, 8).toUpperCase()}`}
+                          </p>
+                        </td>
+                        <td>
+                          <p className="font-medium text-white text-sm">{p.customerNames}</p>
+                        </td>
+                        <td>
+                          <p className="text-sm text-zinc-300">
+                            {p.bookings.length} {p.bookings.length === 1 ? "booking" : "bookings"}
+                          </p>
+                        </td>
+                        <td className="text-sm text-zinc-400 whitespace-nowrap">
+                          {formatCurrency(p.totalActual)}
+                        </td>
+                        <td className="text-xs text-zinc-300 whitespace-nowrap">
+                          <p className="text-sm font-semibold text-emerald-400">{formatCurrency(amountPaid)}</p>
+                          {Math.abs(amountPaid - batchTotal) > 0.01 && (
+                            <p className="text-[10px] text-amber-500 font-medium">Invoice: {formatCurrency(batchTotal)}</p>
                           )}
-                        </div>
-                      </td>
-                      <td className="text-xs text-zinc-500 whitespace-nowrap">
-                        {formatDate(p.updatedAt)}
-                      </td>
-                      <td className="text-right" onClick={(e) => e.stopPropagation()}>
-                        <div className="flex gap-2 justify-end">
-                          <button
-                            onClick={() => setSelectedPaymentDetail(p)}
-                            className="px-3 py-1 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-zinc-300 text-xs font-semibold rounded-lg transition-colors"
-                          >
-                            View Details
-                          </button>
-                          <button
-                            onClick={() => handleOpenEditModal(p)}
-                            className="px-3 py-1 bg-violet-600 hover:bg-violet-500 text-white text-xs font-semibold rounded-lg transition-colors"
-                          >
-                            Edit
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
+                          {p.totalSnacks > 0 && (
+                            <p className="text-[10px] text-zinc-500">Games: {formatCurrency(p.totalNegotiated)} | Snacks: {formatCurrency(p.totalSnacks)}</p>
+                          )}
+                        </td>
+                        <td>
+                          <div className="text-xs">
+                            <span className="px-2 py-0.5 rounded bg-zinc-800 text-zinc-300 font-semibold border border-zinc-700 uppercase">
+                              {p.paymentMethod}
+                            </span>
+                            {p.paymentMethod === "MIXED" && (
+                              <p className="text-[10px] text-zinc-500 mt-1 whitespace-nowrap">
+                                C: {formatCurrency(p.totalCash)} | O: {formatCurrency(p.totalOnline)}
+                              </p>
+                            )}
+                          </div>
+                        </td>
+                        <td className="text-xs text-zinc-500 whitespace-nowrap">
+                          {formatDate(p.updatedAt)}
+                        </td>
+                        <td className="text-right" onClick={(e) => e.stopPropagation()}>
+                          <div className="flex gap-2 justify-end">
+                            <button
+                              onClick={() => setSelectedPaymentDetail(p)}
+                              className="px-3 py-1 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-zinc-300 text-xs font-semibold rounded-lg transition-colors"
+                            >
+                              View Details
+                            </button>
+                            <button
+                              onClick={() => handleOpenEditModal(p)}
+                              className="px-3 py-1 bg-violet-600 hover:bg-violet-500 text-white text-xs font-semibold rounded-lg transition-colors"
+                            >
+                              Edit
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             )}
@@ -1030,19 +1039,19 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
                   <span className="font-semibold">-{formatCurrency(previouslyPaidTotal)}</span>
                 </div>
               )}
-              
+
               <div className="flex items-center justify-between text-xs text-zinc-400 border-t border-zinc-800/40 pt-1.5 mt-0.5">
                 <span>Balance Due:</span>
                 <span className="font-semibold text-white">
                   {formatCurrency(Math.max(0, totalWithSnacks - (editPaymentId ? 0 : previouslyPaidTotal)))}
                 </span>
               </div>
-              
+
               <div className="flex items-center justify-between text-xs font-bold text-zinc-300">
                 <span>Amount Paying Today:</span>
                 <span className="text-sm text-emerald-400 font-extrabold">{formatCurrency(amountPayingNowVal)}</span>
               </div>
-              
+
               {amountPayingNowVal > Math.max(0, totalWithSnacks - (editPaymentId ? 0 : previouslyPaidTotal)) && (
                 <div className="flex items-center justify-between text-[11px] text-amber-400 border-t border-amber-500/20 pt-1.5 mt-0.5 bg-amber-500/5 -mx-3 -mb-3 px-3 pb-3 rounded-b-xl">
                   <span>Excess / Tip (Unallocated Revenue):</span>
@@ -1161,13 +1170,13 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
                     </p>
                   </div>
                   <div>
-                    <p className="text-[10px] text-violet-400 font-bold uppercase tracking-wider">Games Settled</p>
+                    <p className="text-[10px] text-violet-400 font-bold uppercase tracking-wider">Games Invoice</p>
                     <p className="text-xs font-bold text-zinc-200 mt-1">
                       {formatCurrency(selectedPaymentDetail.totalNegotiated)}
                     </p>
                   </div>
                   <div>
-                    <p className="text-[10px] text-violet-400 font-bold uppercase tracking-wider">Snacks Paid</p>
+                    <p className="text-[10px] text-violet-400 font-bold uppercase tracking-wider">Snacks Invoice</p>
                     <p className="text-xs font-bold text-zinc-200 mt-1">
                       {formatCurrency(selectedPaymentDetail.totalSnacks)}
                     </p>
@@ -1175,10 +1184,18 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
                 </div>
 
                 {/* Overall settled total */}
-                <div className="flex items-center justify-between text-xs bg-emerald-500/5 p-3 border border-emerald-500/10 rounded-xl">
-                  <p className="text-emerald-400 font-bold">Overall Transaction Settled Total (Games + Snacks):</p>
-                  <p className="text-sm font-extrabold text-emerald-400">
+                <div className="flex items-center justify-between text-xs bg-amber-500/5 p-3 border border-amber-500/10 rounded-xl">
+                  <p className="text-amber-400 font-bold">Overall Transaction Invoice (Games + Snacks):</p>
+                  <p className="text-sm font-extrabold text-amber-400">
                     {formatCurrency(selectedPaymentDetail.totalNegotiated + selectedPaymentDetail.totalSnacks)}
+                  </p>
+                </div>
+
+                {/* Amount Paid */}
+                <div className="flex items-center justify-between text-xs bg-emerald-500/10 p-3 border border-emerald-500/20 rounded-xl">
+                  <p className="text-emerald-400 font-bold">Amount Paid in this Transaction:</p>
+                  <p className="text-sm font-extrabold text-emerald-400">
+                    {formatCurrency(selectedPaymentDetail.totalCash + selectedPaymentDetail.totalOnline)}
                   </p>
                 </div>
 
@@ -1206,7 +1223,8 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
                             <th className="p-3">Customer</th>
                             <th className="p-3">Game / Slot</th>
                             <th className="p-3 text-right">Actual Price</th>
-                            <th className="p-3 text-right">Settled Price</th>
+                            <th className="p-3 text-right">Invoice Price</th>
+                            <th className="p-3 text-right">Paid Now</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-zinc-800/40">
@@ -1227,8 +1245,11 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
                               <td className="p-3 text-right text-zinc-400 font-medium">
                                 {formatCurrency(Number(bk.finalAmount))}
                               </td>
-                              <td className="p-3 text-right text-emerald-400 font-semibold">
+                              <td className="p-3 text-right text-amber-500 font-medium">
                                 {formatCurrency(Number(bk.negotiatedAmount ?? bk.finalAmount))}
+                              </td>
+                              <td className="p-3 text-right text-emerald-400 font-semibold">
+                                {formatCurrency(Number(bk.allocatedAmount ?? 0))}
                               </td>
                             </tr>
                           ))}
@@ -1248,7 +1269,8 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
                           <tr>
                             <th className="p-3">Customer</th>
                             <th className="p-3">Item</th>
-                            <th className="p-3 text-right">Amount</th>
+                            <th className="p-3 text-right">Invoice Price</th>
+                            <th className="p-3 text-right">Paid Now</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-zinc-800/40">
@@ -1263,8 +1285,11 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
                               <td className="p-3">
                                 <p className="font-medium text-zinc-200">Snacks</p>
                               </td>
-                              <td className="p-3 text-right text-emerald-400 font-semibold">
+                              <td className="p-3 text-right text-amber-500 font-medium">
                                 {formatCurrency(Number(sn.finalAmount))}
+                              </td>
+                              <td className="p-3 text-right text-emerald-400 font-semibold">
+                                {formatCurrency(Number(sn.allocatedAmount ?? 0))}
                               </td>
                             </tr>
                           ))}
