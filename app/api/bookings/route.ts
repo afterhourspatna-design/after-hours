@@ -187,7 +187,7 @@ export async function GET(req: NextRequest) {
     };
   });
 
-  const combinedBookings = [...mappedBookings, ...mappedSnacks].sort((a: any, b: any) => 
+  const combinedBookings = [...mappedBookings, ...mappedSnacks].sort((a: any, b: any) =>
     new Date(b.startDateTime).getTime() - new Date(a.startDateTime).getTime()
   );
 
@@ -322,9 +322,9 @@ export async function POST(req: NextRequest) {
   let initialPaymentStatus = data.paymentStatus;
   if (data.advanceAmount && data.advanceAmount > 0) {
     if (data.advanceAmount >= finalAmount) {
-       initialPaymentStatus = PaymentStatus.PAID;
+      initialPaymentStatus = PaymentStatus.PAID;
     } else {
-       initialPaymentStatus = PaymentStatus.PARTIAL;
+      initialPaymentStatus = PaymentStatus.PARTIAL;
     }
   }
 
@@ -371,19 +371,19 @@ export async function POST(req: NextRequest) {
     const pmMethod = data.paymentMethod;
     const cashAmt = pmMethod === "MIXED" ? (data.cashAmount || 0) : pmMethod === "CASH" ? data.advanceAmount : 0;
     const onlineAmt = pmMethod === "MIXED" ? (data.onlineAmount || 0) : pmMethod === "ONLINE" ? data.advanceAmount : 0;
-    
+
     // Create actual payment receipt
     const payment = await prisma.payment.create({
       data: {
         paymentMethod: pmMethod,
-        negotiatedAmount: data.advanceAmount,
+        negotiatedAmount: finalAmount,
         cashAmount: cashAmt,
         onlineAmount: onlineAmt,
         userId: resolvedUserId,
-        customerNames: data.guestName ?? "Guest",
+        customerNames: booking.user?.name ?? data.guestName ?? "Guest",
       }
     });
-    
+
     // Allocate that payment exactly to this new booking
     await prisma.paymentAllocation.create({
       data: {
