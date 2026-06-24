@@ -105,7 +105,7 @@ export async function GET(req: NextRequest) {
       include: {
         game: { select: { name: true, tag: true } },
         resourceUnit: { select: { unitName: true } },
-        user: { select: { name: true, phone: true, createdAt: true, _count: { select: { bookings: { where: { paymentStatus: { in: ["PAID", "PARTIAL"] } } }, snackOrders: { where: { paymentStatus: { in: ["PAID", "PARTIAL"] } } } } } } },
+        user: { select: { name: true, phone: true, createdAt: true, _count: { select: { bookings: { where: { paymentStatus: "PAID" } } } } } },
         allocations: true,
       },
       orderBy: { startDateTime: "asc" },
@@ -121,7 +121,7 @@ export async function GET(req: NextRequest) {
       include: {
         game: { select: { name: true, tag: true } },
         resourceUnit: { select: { unitName: true } },
-        user: { select: { name: true, phone: true, createdAt: true, _count: { select: { bookings: { where: { paymentStatus: { in: ["PAID", "PARTIAL"] } } }, snackOrders: { where: { paymentStatus: { in: ["PAID", "PARTIAL"] } } } } } } },
+        user: { select: { name: true, phone: true, createdAt: true, _count: { select: { bookings: { where: { paymentStatus: "PAID" } } } } } },
         allocations: true,
       },
       orderBy: { startDateTime: "desc" },
@@ -133,7 +133,7 @@ export async function GET(req: NextRequest) {
     (includeSnacks && !status ? prisma.snackOrder.findMany({
       where: paymentStatus === "UNPAID" ? { paymentStatus: { in: ["UNPAID", "PARTIAL"] } } : (paymentStatus ? { paymentStatus } : {}),
       include: {
-        user: { select: { name: true, phone: true, createdAt: true, _count: { select: { bookings: { where: { paymentStatus: { in: ["PAID", "PARTIAL"] } } }, snackOrders: { where: { paymentStatus: { in: ["PAID", "PARTIAL"] } } } } } } },
+        user: { select: { name: true, phone: true, createdAt: true, _count: { select: { bookings: { where: { paymentStatus: "PAID" } } } } } },
         allocations: true,
       },
       orderBy: { createdAt: "desc" }
@@ -174,7 +174,7 @@ export async function GET(req: NextRequest) {
     let isNewUser = false;
     if (b.user) {
       const userDate = new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Kolkata", year: "numeric", month: "numeric", day: "numeric" }).format(new Date(b.user.createdAt));
-      isNewUser = (userDate === todayDate) && (b.user._count?.bookings === 0) && (b.user._count?.snackOrders === 0);
+      isNewUser = (userDate === todayDate) && (b.user._count?.bookings === 0);
     }
     
     return {
