@@ -36,6 +36,16 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
         data: {
           amount: { decrement: item.amount }
         }
+      }),
+      prisma.auditLog.create({
+        data: {
+          actorId: (session.user as any).id,
+          actorName: session?.user?.name ?? undefined,
+          action: "DELETE_SNACK_ITEM",
+          entityType: "SnackOrder",
+          entityId: id,
+          meta: { deletedItem: item },
+        }
       })
     ]);
 

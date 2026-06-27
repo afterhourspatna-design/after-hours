@@ -38,6 +38,17 @@ export async function POST(req: NextRequest) {
     },
   });
 
+  await prisma.auditLog.create({
+    data: {
+      actorId: userIdFromSession,
+      actorName: session?.user?.name ?? undefined,
+      action: "CREATE_SNACK_ORDER",
+      entityType: "SnackOrder",
+      entityId: snackOrder.id,
+      meta: { changes: { amount, notes, paymentStatus } },
+    }
+  });
+
   return NextResponse.json(snackOrder, { status: 201 });
 }
 

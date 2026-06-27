@@ -36,6 +36,17 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
       },
     });
 
+    await prisma.auditLog.create({
+      data: {
+        actorId: (session.user as any).id,
+        actorName: session?.user?.name ?? undefined,
+        action: "UPDATE_SNACK_ORDER",
+        entityType: "SnackOrder",
+        entityId: id,
+        meta: { changes: body },
+      }
+    });
+
     return NextResponse.json(updated);
   } catch (error) {
     console.error("Error updating snack:", error);
@@ -63,6 +74,17 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     }
 
     await prisma.snackOrder.delete({ where: { id } });
+
+    await prisma.auditLog.create({
+      data: {
+        actorId: (session.user as any).id,
+        actorName: session?.user?.name ?? undefined,
+        action: "DELETE_SNACK_ORDER",
+        entityType: "SnackOrder",
+        entityId: id,
+        meta: { orderDetails: existing },
+      }
+    });
 
     return NextResponse.json({ success: true });
   } catch (error) {
