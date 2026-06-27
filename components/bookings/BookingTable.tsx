@@ -227,7 +227,7 @@ function BookingTableInner({ role = "ADMIN" }: BookingTableProps) {
 
                   return (
                     <tr key={b.id} className={cn(isHold && "bg-amber-500/5")}>
-                      <td className="p-4 align-top">
+                      <td className="p-4 align-top whitespace-nowrap">
                         <div className="font-medium text-zinc-100 flex items-center gap-2">
                           {customerName}
                         </div>
@@ -242,7 +242,7 @@ function BookingTableInner({ role = "ADMIN" }: BookingTableProps) {
                           <span className="text-[10px] text-zinc-600">Guest</span>
                         )}
                       </td>
-                      <td>
+                      <td className="whitespace-nowrap">
                         <p className="text-sm text-zinc-200">{b.game.name}</p>
                         {b.resourceUnit && <p className="text-xs text-zinc-600">{b.resourceUnit.unitName}</p>}
                       </td>
@@ -263,7 +263,7 @@ function BookingTableInner({ role = "ADMIN" }: BookingTableProps) {
                       </td>
                       <td><BookingStatusBadge status={b.bookingStatus as any} /></td>
                       <td><PaymentStatusBadge status={b.paymentStatus as any} /></td>
-                      <td className="text-xs text-zinc-500">
+                      <td className="text-xs text-zinc-500 whitespace-nowrap">
                         <div>{SOURCE_LABELS[b.source as keyof typeof SOURCE_LABELS] ?? b.source}</div>
                         {b.source === "REFERRAL" && b.user?.referredByPhone && (
                           <div className="text-[10px] text-zinc-400 mt-1">Ref: {b.user.referredByPhone}</div>
