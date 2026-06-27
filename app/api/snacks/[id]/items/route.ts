@@ -51,6 +51,17 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       }
     });
 
+    await prisma.auditLog.create({
+      data: {
+        actorId: userIdFromSession,
+        actorName: session?.user?.name ?? undefined,
+        action: "ADD_SNACK_ITEM",
+        entityType: "SnackOrder",
+        entityId: id,
+        meta: { addedAmount: amount, notes },
+      }
+    });
+
     return NextResponse.json(updated, { status: 201 });
   } catch (error) {
     console.error("Error adding snack item:", error);

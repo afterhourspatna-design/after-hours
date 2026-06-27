@@ -69,6 +69,7 @@ model AppUser {
   feedback     Feedback[]
   snackOrders  SnackOrder[]
   addedSnackItems SnackOrderItem[]
+  createdBookings Booking[] @relation("CreatedBookings")
 
   // Referral System Fields
   referredById           String?
@@ -153,6 +154,7 @@ model Booking {
   updatedAt      DateTime      @updatedAt
 
   user           AppUser?      @relation(fields: [userId], references: [id], onDelete: SetNull)
+  createdBy      AppUser?      @relation("CreatedBookings", fields: [createdById], references: [id], onDelete: SetNull)
   game           Game          @relation(fields: [gameId], references: [id])
   resourceUnit   ResourceUnit? @relation(fields: [resourceUnitId], references: [id], onDelete: SetNull)
   coupon         Coupon?       @relation(fields: [couponId], references: [id], onDelete: SetNull)

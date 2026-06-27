@@ -32,9 +32,10 @@ interface Booking {
   holdExpiresAt: string | null;
   game: { name: string; tag: string };
   resourceUnit: { unitName: string } | null;
-  user: { name: string; phone: string } | null;
+  user: { name: string; phone: string; referredByPhone?: string | null } | null;
   negotiatedAmount: number | null;
   allocations?: { amount: number }[];
+  createdByName?: string | null;
 }
 
 interface BookingTableProps {
@@ -226,14 +227,20 @@ function BookingTableInner({ role = "ADMIN" }: BookingTableProps) {
 
                   return (
                     <tr key={b.id} className={cn(isHold && "bg-amber-500/5")}>
-                      <td>
-                        <div>
-                          <p className="font-medium text-white text-sm">{customerName}</p>
-                          {customerPhone && <p className="text-xs text-zinc-600">{customerPhone}</p>}
-                          {!b.user && b.guestName && (
-                            <span className="text-[10px] text-zinc-600">Guest</span>
-                          )}
+                      <td className="p-4 align-top">
+                        <div className="font-medium text-zinc-100 flex items-center gap-2">
+                          {customerName}
                         </div>
+                        <div className="text-xs text-zinc-400 font-mono mt-1">{customerPhone}</div>
+                        {b.createdByName && (
+                          <div className="text-[10px] text-zinc-500 mt-2 flex items-center gap-1">
+                            <span className="opacity-75">Created by:</span>
+                            <span className="font-medium">{b.createdByName}</span>
+                          </div>
+                        )}
+                        {!b.user && b.guestName && (
+                          <span className="text-[10px] text-zinc-600">Guest</span>
+                        )}
                       </td>
                       <td>
                         <p className="text-sm text-zinc-200">{b.game.name}</p>
@@ -256,7 +263,12 @@ function BookingTableInner({ role = "ADMIN" }: BookingTableProps) {
                       </td>
                       <td><BookingStatusBadge status={b.bookingStatus as any} /></td>
                       <td><PaymentStatusBadge status={b.paymentStatus as any} /></td>
-                      <td className="text-xs text-zinc-500">{SOURCE_LABELS[b.source as keyof typeof SOURCE_LABELS] ?? b.source}</td>
+                      <td className="text-xs text-zinc-500">
+                        <div>{SOURCE_LABELS[b.source as keyof typeof SOURCE_LABELS] ?? b.source}</div>
+                        {b.source === "REFERRAL" && b.user?.referredByPhone && (
+                          <div className="text-[10px] text-zinc-400 mt-1">Ref: {b.user.referredByPhone}</div>
+                        )}
+                      </td>
                       <td>
                         <div className="flex items-center gap-1 justify-end flex-nowrap">
                           {customerPhone && (

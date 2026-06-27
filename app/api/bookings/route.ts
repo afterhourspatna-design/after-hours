@@ -105,7 +105,8 @@ export async function GET(req: NextRequest) {
       include: {
         game: { select: { name: true, tag: true } },
         resourceUnit: { select: { unitName: true } },
-        user: { select: { name: true, phone: true, createdAt: true, _count: { select: { bookings: { where: { paymentStatus: "PAID" } } } } } },
+        user: { select: { name: true, phone: true, createdAt: true, referredByPhone: true, _count: { select: { bookings: { where: { paymentStatus: "PAID" } } } } } },
+        createdBy: { select: { name: true } },
         allocations: true,
       },
       orderBy: { startDateTime: "asc" },
@@ -121,7 +122,8 @@ export async function GET(req: NextRequest) {
       include: {
         game: { select: { name: true, tag: true } },
         resourceUnit: { select: { unitName: true } },
-        user: { select: { name: true, phone: true, createdAt: true, _count: { select: { bookings: { where: { paymentStatus: "PAID" } } } } } },
+        user: { select: { name: true, phone: true, createdAt: true, referredByPhone: true, _count: { select: { bookings: { where: { paymentStatus: "PAID" } } } } } },
+        createdBy: { select: { name: true } },
         allocations: true,
       },
       orderBy: { startDateTime: "desc" },
@@ -132,7 +134,7 @@ export async function GET(req: NextRequest) {
     (includeSnacks && !status ? prisma.snackOrder.findMany({
       where: paymentStatus === "UNPAID" ? { paymentStatus: { in: ["UNPAID", "PARTIAL"] } } : (paymentStatus ? { paymentStatus } : {}),
       include: {
-        user: { select: { name: true, phone: true, createdAt: true, _count: { select: { bookings: { where: { paymentStatus: "PAID" } } } } } },
+        user: { select: { name: true, phone: true, createdAt: true, referredByPhone: true, _count: { select: { bookings: { where: { paymentStatus: "PAID" } } } } } },
         allocations: true,
       },
       orderBy: { createdAt: "desc" }
@@ -159,7 +161,7 @@ export async function GET(req: NextRequest) {
     source: "WALK_IN",
     game: { name: "Snack Sale", tag: "snack" },
     resourceUnit: null,
-    user: snack.user ? { name: snack.user.name, phone: snack.user.phone } : null,
+    user: snack.user ? { name: snack.user.name, phone: snack.user.phone, referredByPhone: snack.user.referredByPhone } : null,
     updatedAt: snack.updatedAt.toISOString(),
     paymentId: snack.paymentId,
     snacksAmount: Number(snack.amount),
@@ -183,6 +185,7 @@ export async function GET(req: NextRequest) {
       negotiatedAmount: b.negotiatedAmount !== null ? Number(b.negotiatedAmount) : null,
       discountAmount: Number(b.discountAmount),
       couponDiscount: Number(b.couponDiscount),
+      createdByName: b.createdBy?.name || null,
     };
   });
 

@@ -3,12 +3,13 @@
 import { Suspense } from "react";
 import { useState, useEffect } from "react";
 import { signIn } from "next-auth/react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Gamepad2, Eye, EyeOff, Loader2, Zap } from "lucide-react";
 
 function LoginForm() {
   const searchParams = useSearchParams();
+  const router = useRouter();
   const callbackUrl = searchParams.get("callbackUrl") || "/";
 
   const [email, setEmail] = useState("");
@@ -37,9 +38,10 @@ function LoginForm() {
         redirect: false,
       });
 
-      if (result?.ok) {
+      if (result?.ok && !result?.error) {
         toast.success("Welcome back!");
-        window.location.href = callbackUrl;
+        router.push(callbackUrl);
+        router.refresh();
       } else {
         const errorMsg = result?.error === "CredentialsSignin" 
           ? "Invalid email or password." 
