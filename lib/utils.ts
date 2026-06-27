@@ -143,6 +143,9 @@ export const GAME_COLOR_MAP: Record<string, string> = {
   basketball:  "#ea580c",
   foosball:    "#db2777",
   event:       "#7c3aed",
+  carrom:      "#ef4444",
+  jenga:       "#f59e0b",
+  cards:       "#10b981",
 };
 
 export const SOURCE_LABELS: Record<string, string> = {

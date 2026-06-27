@@ -22,6 +22,7 @@ interface Game {
 const GAME_ICONS: Record<string, string> = {
   ps5: "🎮", metaquest: "🥽", soccer: "⚽", tabletennis: "🏓",
   pool: "🎱", basketball: "🏀", foosball: "⚽", event: "🎉",
+  carrom: "🎯", jenga: "🧱", cards: "🃏",
 };
 
 function GameRow({ game, onUpdate, onDelete }: { game: Game; onUpdate: () => void; onDelete: (id: string) => void }) {

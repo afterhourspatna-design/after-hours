@@ -128,6 +128,7 @@ export default function BookingForm({ mode = "create", initialData, prefillDate,
     switch (selectedGame.tag) {
       case "basketball":
       case "dart":
+      case "jenga":
         return [5];
       case "metaquest":
         return [20, 30, 40, 60];
@@ -136,6 +137,8 @@ export default function BookingForm({ mode = "create", initialData, prefillDate,
       case "ps5":
       case "tabletennis":
       case "pool":
+      case "carrom":
+      case "cards":
         return [30, 60];
       case "event":
         return [120, 180, 240];
@@ -165,6 +168,16 @@ export default function BookingForm({ mode = "create", initialData, prefillDate,
     initialData?.accessoriesCount ?? 
     (initialData?.gameId ? 0 : 0)
   );
+
+  // Reset American Pool to 2 sticks if it was 4
+  useEffect(() => {
+    if (selectedGame?.tag === "pool") {
+      const isAmerican = selectedGame.resourceUnits.find(u => u.id === selectedUnit)?.unitName?.includes("American");
+      if (isAmerican && accessoriesCount === 4) {
+        setAccessoriesCount(2);
+      }
+    }
+  }, [selectedUnit, selectedGame, accessoriesCount]);
 
   // Advance Payment
   const [advanceAmount, setAdvanceAmount] = useState<number | "">("");
@@ -337,6 +350,8 @@ export default function BookingForm({ mode = "create", initialData, prefillDate,
       }
     }
     if (!isGuest && !selectedUser) { toast.error("Please select a user or switch to Guest mode"); return; }
+    if (selectedGame.tag === "pool" && !selectedUnit) { toast.error("Please select a specific Pool Table (Indian or American)"); return; }
+    if (selectedGame.tag === "cards" && !selectedUnit) { toast.error("Please select a specific Card Game (Uno, Monopoly, or Card)"); return; }
     if (unitAvailability === false) { toast.error("This unit is not available at the selected time"); return; }
     
     if (mode === "create" && advanceAmount !== "" && advanceAmount > 0) {
@@ -564,7 +579,7 @@ export default function BookingForm({ mode = "create", initialData, prefillDate,
                 <label className="text-xs text-zinc-400 mb-1 block">Unit (optional — auto-assigned)</label>
                 <select value={selectedUnit} onChange={e => setSelectedUnit(e.target.value)} className="input-field"
                   disabled={!selectedGame}>
-                  <option value="">Auto-assign</option>
+                  {(selectedGame?.tag !== "pool" && selectedGame?.tag !== "cards") && <option value="">Auto-assign</option>}
                   {selectedGame?.resourceUnits.map(u => (
                     <option key={u.id} value={u.id}>{u.unitName}</option>
                   ))}
@@ -646,7 +661,10 @@ export default function BookingForm({ mode = "create", initialData, prefillDate,
                   {selectedGame.tag === "pool" && [
                     { count: 2, label: "2 Sticks", price30: 80, price60: 150 },
                     { count: 4, label: "4 Sticks", price30: 100, price60: 180 },
-                  ].map((opt) => {
+                  ].filter(opt => {
+                    const isAmerican = selectedGame?.resourceUnits.find(u => u.id === selectedUnit)?.unitName?.includes("American");
+                    return !(isAmerican && opt.count === 4);
+                  }).map((opt) => {
                     const active = accessoriesCount === opt.count;
                     const price = durationMinutes <= 30 ? opt.price30 : opt.price60;
                     return (
@@ -684,7 +702,7 @@ export default function BookingForm({ mode = "create", initialData, prefillDate,
               <div>
                 <label className="text-xs text-zinc-400 mb-1 block">Date *</label>
                 <input type="date" value={bookingDate} onChange={e => setBookingDate(e.target.value)}
-                  className="input-field" min={format(new Date(), "yyyy-MM-dd")} />
+                  className="input-field" min={mode === "create" && role !== "ADMIN" ? format(new Date(), "yyyy-MM-dd") : undefined} />
               </div>
               <div>
                 <label className="text-xs text-zinc-400 mb-1 block">Start Time *</label>

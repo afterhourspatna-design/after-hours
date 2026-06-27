@@ -101,8 +101,8 @@ function calculateBlockBaseAmount(params: {
     return 150;
   }
 
-  if (tag === "soccer") {
-    // Under Soccer: 30m = ₹50, 1h = ₹100
+  if (tag === "soccer" || tag === "carrom" || tag === "cards") {
+    // Soccer / Carrom / Cards: 30m = ₹50, 1h = ₹100
     if (blockMinutes <= 30) return 50;
     return 100;
   }
@@ -139,8 +139,8 @@ function calculateBlockBaseAmount(params: {
     return rHour;
   }
 
-  if (tag === "basketball" || tag === "dart") {
-    // Basketball & Dart: ₹20 flat
+  if (tag === "basketball" || tag === "dart" || tag === "jenga") {
+    // Basketball / Dart / Jenga: ₹20 flat
     return blockNumber === 1 ? 20 : 0;
   }
 
