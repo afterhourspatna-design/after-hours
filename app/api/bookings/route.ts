@@ -125,10 +125,9 @@ export async function GET(req: NextRequest) {
         allocations: true,
       },
       orderBy: { startDateTime: "desc" },
-      skip: (page - 1) * limit,
-      take: limit,
+      ...(includeSnacks ? {} : { skip: (page - 1) * limit, take: limit }),
     }),
-    prisma.booking.count({ where }),
+    includeSnacks ? Promise.resolve(0) : prisma.booking.count({ where }),
     // Fetch snack orders only if requested and matching the same payment status criteria
     (includeSnacks && !status ? prisma.snackOrder.findMany({
       where: paymentStatus === "UNPAID" ? { paymentStatus: { in: ["UNPAID", "PARTIAL"] } } : (paymentStatus ? { paymentStatus } : {}),
@@ -191,7 +190,13 @@ export async function GET(req: NextRequest) {
     new Date(b.startDateTime).getTime() - new Date(a.startDateTime).getTime()
   );
 
-  return NextResponse.json({ bookings: combinedBookings, total: total + mappedSnacks.length, page, limit });
+  const finalBookings = includeSnacks 
+    ? combinedBookings.slice((page - 1) * limit, page * limit) 
+    : combinedBookings;
+
+  const finalTotal = includeSnacks ? combinedBookings.length : total;
+
+  return NextResponse.json({ bookings: finalBookings, total: finalTotal, page, limit });
 }
 
 export async function POST(req: NextRequest) {

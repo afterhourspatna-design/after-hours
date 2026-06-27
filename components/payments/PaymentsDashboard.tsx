@@ -113,6 +113,7 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
   useEffect(() => {
     setStartDate("");
     setEndDate("");
+    setPage(1);
   }, [activeTab]);
 
 
@@ -125,8 +126,8 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
     try {
       if (activeTab === "UNPAID") {
         const params = new URLSearchParams({
-          page: String(page),
-          limit: String(LIMIT),
+          page: "1",
+          limit: "1000", // Unpaid tabs shouldn't be paginated so we can batch settle everything at once
           includeSnacks: "1",
           ...(search ? { q: search } : {}),
           paymentStatus: "UNPAID",
@@ -136,7 +137,7 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
           const data = await res.json();
           const list: Booking[] = (data.bookings ?? []).filter((b: Booking) => !["CANCELLED", "EXPIRED"].includes(b.bookingStatus));
           setBookings(list);
-          setTotal(data.total ?? 0);
+          setTotal(list.length);
         }
       } else {
         // PAID tab -> Fetch from /api/payments
@@ -425,7 +426,8 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
     }
   };
 
-  const totalPages = Math.ceil(total / LIMIT);
+  const currentLimit = activeTab === "UNPAID" ? 1000 : LIMIT;
+  const totalPages = Math.ceil(total / currentLimit);
 
   return (
     <div className="space-y-6 pb-28">
