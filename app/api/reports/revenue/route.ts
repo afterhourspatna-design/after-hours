@@ -186,7 +186,12 @@ export async function GET(req: NextRequest) {
       SUM(b."couponDiscount") as "discountGiven"
     FROM "bookings" b
     JOIN "coupons" c ON b."couponId" = c.id
-    WHERE b."startDateTime" >= ${since} AND b."startDateTime" <= ${todayEndIST}
+    WHERE b.id IN (
+      SELECT DISTINCT pa."bookingId"
+      FROM "payment_allocations" pa
+      WHERE pa."bookingId" IS NOT NULL
+    )
+    AND b."startDateTime" >= ${since} AND b."startDateTime" <= ${todayEndIST}
     AND b."couponDiscount" > 0
     GROUP BY c.code
     ORDER BY "discountGiven" DESC
