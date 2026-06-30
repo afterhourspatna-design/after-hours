@@ -43,6 +43,7 @@ export async function GET(req: NextRequest) {
   const now = new Date();
   const todayStartIST = getISTStartOfDay(now);
   const since = subDays(todayStartIST, days - 1);
+  const todayEndIST = new Date(todayStartIST.getTime() + 24 * 60 * 60 * 1000 - 1);
 
   // 1. Daily Revenue (Cash vs Online Split)
   const rawDaily: any[] = await prisma.$queryRaw`
@@ -73,7 +74,7 @@ export async function GET(req: NextRequest) {
     LEFT JOIN "bookings" b ON pa."bookingId" = b.id
     LEFT JOIN "snack_orders" s ON pa."snackOrderId" = s.id
     WHERE COALESCE(b."startDateTime", s."createdAt") >= ${since} 
-      AND COALESCE(b."startDateTime", s."createdAt") <= ${now}
+      AND COALESCE(b."startDateTime", s."createdAt") <= ${todayEndIST}
     GROUP BY DATE_TRUNC('day', COALESCE(b."startDateTime", s."createdAt") AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata')
   `;
 
@@ -117,7 +118,7 @@ export async function GET(req: NextRequest) {
     FROM "games" g
     JOIN "bookings" b ON b."gameId" = g.id
     JOIN "payment_allocations" pa ON pa."bookingId" = b.id
-    WHERE b."startDateTime" >= ${since} AND b."startDateTime" <= ${now}
+    WHERE b."startDateTime" >= ${since} AND b."startDateTime" <= ${todayEndIST}
     GROUP BY g.id, g.name, g.tag
     ORDER BY revenue DESC
   `;
@@ -134,7 +135,7 @@ export async function GET(req: NextRequest) {
     FROM "payment_allocations" pa
     JOIN "bookings" b ON pa."bookingId" = b.id
     LEFT JOIN "app_users" u ON b."userId" = u.id
-    WHERE b."startDateTime" >= ${since} AND b."startDateTime" <= ${now}
+    WHERE b."startDateTime" >= ${since} AND b."startDateTime" <= ${todayEndIST}
     GROUP BY COALESCE(u.name, b."guestName", 'Guest'), COALESCE(u.phone, b."guestPhone", 'Unknown')
     ORDER BY spent DESC
     LIMIT 5
@@ -148,7 +149,7 @@ export async function GET(req: NextRequest) {
     SELECT b.source as source, COUNT(DISTINCT b.id) as count
     FROM "bookings" b
     JOIN "payment_allocations" pa ON pa."bookingId" = b.id
-    WHERE b."startDateTime" >= ${since} AND b."startDateTime" <= ${now}
+    WHERE b."startDateTime" >= ${since} AND b."startDateTime" <= ${todayEndIST}
     GROUP BY b.source
     ORDER BY count DESC
   `;
@@ -163,7 +164,7 @@ export async function GET(req: NextRequest) {
       COUNT(DISTINCT b.id) as count
     FROM "bookings" b
     JOIN "payment_allocations" pa ON pa."bookingId" = b.id
-    WHERE b."startDateTime" >= ${since} AND b."startDateTime" <= ${now}
+    WHERE b."startDateTime" >= ${since} AND b."startDateTime" <= ${todayEndIST}
     GROUP BY EXTRACT(HOUR FROM b."startDateTime" AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata')
   `;
   const peakHoursMap: Record<string, number> = {};
@@ -185,7 +186,7 @@ export async function GET(req: NextRequest) {
       SUM(b."couponDiscount") as "discountGiven"
     FROM "bookings" b
     JOIN "coupons" c ON b."couponId" = c.id
-    WHERE b."startDateTime" >= ${since} AND b."startDateTime" <= ${now}
+    WHERE b."startDateTime" >= ${since} AND b."startDateTime" <= ${todayEndIST}
     AND b."couponDiscount" > 0
     GROUP BY c.code
     ORDER BY "discountGiven" DESC
@@ -197,29 +198,78 @@ export async function GET(req: NextRequest) {
 
   // 7. General Aggregates (AOV, Duration, Gross, Discounts)
   const rawBookingAgg: any[] = await prisma.$queryRaw`
+    WITH booking_payables AS (
+      SELECT 
+        b.id,
+        b."durationMinutes",
+        b."discountAmount",
+        COALESCE(b."couponDiscount", 0) as "couponDiscount",
+        b."finalAmount",
+        b."negotiatedAmount",
+        COALESCE((
+          SELECT SUM(pa.amount) 
+          FROM "payment_allocations" pa 
+          WHERE pa."bookingId" = b.id
+        ), 0) as paid
+      FROM "bookings" b
+      WHERE b.id IN (
+        SELECT DISTINCT pa."bookingId"
+        FROM "payment_allocations" pa
+        WHERE pa."bookingId" IS NOT NULL
+      )
+      AND b."startDateTime" >= ${since} AND b."startDateTime" <= ${todayEndIST}
+    )
     SELECT 
-      COUNT(DISTINCT b.id) as count,
-      SUM(b."durationMinutes") as duration,
-      SUM(b."discountAmount" + COALESCE(b."couponDiscount", 0) + (b."finalAmount" - COALESCE(b."negotiatedAmount", b."finalAmount"))) as discounts,
-      SUM(b."finalAmount" + b."discountAmount" + COALESCE(b."couponDiscount", 0)) as gross
-    FROM "bookings" b
-    JOIN "payment_allocations" pa ON pa."bookingId" = b.id
-    WHERE b."startDateTime" >= ${since} AND b."startDateTime" <= ${now}
+      COUNT(id) as count,
+      SUM("durationMinutes") as duration,
+      SUM("discountAmount" + "couponDiscount") as discounts,
+      SUM(
+        CASE 
+          WHEN "negotiatedAmount" IS NOT NULL 
+          THEN "finalAmount" - GREATEST("negotiatedAmount", paid)
+          ELSE 0
+        END
+      ) as "negotiatedDown",
+      SUM("finalAmount" + "discountAmount" + "couponDiscount") as gross,
+      SUM(GREATEST(COALESCE("negotiatedAmount", "finalAmount"), paid) - paid) as "pendingDues"
+    FROM booking_payables
   `;
   
   const rawSnackAgg: any[] = await prisma.$queryRaw`
-    SELECT SUM(s.amount) as gross
-    FROM "snack_orders" s
-    JOIN "payment_allocations" pa ON pa."snackOrderId" = s.id
-    WHERE s."createdAt" >= ${since} AND s."createdAt" <= ${now}
+    WITH snack_payables AS (
+      SELECT 
+        s.amount,
+        COALESCE((
+          SELECT SUM(pa.amount) 
+          FROM "payment_allocations" pa 
+          WHERE pa."snackOrderId" = s.id
+        ), 0) as paid
+      FROM "snack_orders" s
+      WHERE s.id IN (
+        SELECT DISTINCT pa."snackOrderId"
+        FROM "payment_allocations" pa
+        WHERE pa."snackOrderId" IS NOT NULL
+      )
+      AND s."createdAt" >= ${since} AND s."createdAt" <= ${todayEndIST}
+    )
+    SELECT 
+      SUM(amount) as gross,
+      SUM(GREATEST(amount, paid) - paid) as "pendingDues"
+    FROM snack_payables
   `;
   
   const totalPaidBookingsCount = Number(rawBookingAgg[0]?.count || 0);
   const totalDurationMinutes = Number(rawBookingAgg[0]?.duration || 0);
   const totalDiscounts = Number(rawBookingAgg[0]?.discounts || 0);
+  const negotiatedDown = Number(rawBookingAgg[0]?.negotiatedDown || 0);
   const bookingGross = Number(rawBookingAgg[0]?.gross || 0);
+  const bookingPending = Number(rawBookingAgg[0]?.pendingDues || 0);
+
   const snackGross = Number(rawSnackAgg[0]?.gross || 0);
+  const snackPending = Number(rawSnackAgg[0]?.pendingDues || 0);
+
   const grossRevenue = bookingGross + snackGross;
+  const pendingDues = bookingPending + snackPending;
 
   const aov = totalPaidBookingsCount > 0 ? Math.round(totalNetRevenue / totalPaidBookingsCount) : 0;
   const avgDuration = totalPaidBookingsCount > 0 ? Math.round(totalDurationMinutes / totalPaidBookingsCount) : 0;
@@ -230,6 +280,8 @@ export async function GET(req: NextRequest) {
     revenueByGame,
     grossRevenue,
     totalDiscounts,
+    negotiatedDown,
+    pendingDues,
     netRevenue: totalNetRevenue,
     cashTotal,
     onlineTotal,

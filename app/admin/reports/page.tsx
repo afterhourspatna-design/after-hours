@@ -12,6 +12,8 @@ interface RevenueData {
   revenueByGame: { game: string; tag: string; revenue: number }[];
   grossRevenue: number;
   totalDiscounts: number;
+  negotiatedDown: number;
+  pendingDues: number;
   netRevenue: number;
   cashTotal: number;
   onlineTotal: number;
@@ -156,6 +158,14 @@ export default function ReportsPage() {
               <div className="flex justify-between items-center">
                 <span className="text-sm text-zinc-400">Total Discounts</span>
                 <span className="text-sm text-red-400">-{formatCurrency(data.totalDiscounts)}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-zinc-400">Negotiated Down</span>
+                <span className="text-sm text-amber-500">-{formatCurrency(data.negotiatedDown)}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-zinc-400">Pending Dues</span>
+                <span className="text-sm text-orange-400">-{formatCurrency(data.pendingDues)}</span>
               </div>
               <div className="h-px bg-zinc-800 w-full" />
               <div className="flex justify-between items-center">
