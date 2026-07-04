@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import { Zap, Loader2, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useRouter } from "next/navigation";
 
 interface Game {
   name: string;
@@ -42,7 +41,6 @@ export default function LiveActivityList({
   todayEndISO,
   role = "ADMIN",
 }: LiveActivityListProps) {
-  const router = useRouter();
   const [bookings, setBookings] = useState<Booking[]>(initialBookings);
   const [currentTime, setCurrentTime] = useState<Date>(new Date());
   const [loading, setLoading] = useState(false);
@@ -172,12 +170,8 @@ export default function LiveActivityList({
             return (
               <div
                 key={b.id}
-                onClick={() => {
-                  const basePath = role === "ADMIN" ? "admin" : "staff";
-                  router.push(`/${basePath}/bookings/${b.id}/edit`);
-                }}
                 className={cn(
-                  "flex items-center justify-between p-3 rounded-xl hover:bg-zinc-900/50 hover:bg-zinc-900/80 transition-colors group border border-transparent cursor-pointer",
+                  "flex items-center justify-between p-3 rounded-xl hover:bg-zinc-900/50 hover:bg-zinc-900/80 transition-colors group border border-transparent",
                   cardStyle
                 )}
               >
