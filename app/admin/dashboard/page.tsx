@@ -305,7 +305,7 @@ async function getDashboardData(period: string = "today", from?: string, to?: st
       id: h.id,
       guestName: h.guestName,
       guestPhone: h.guestPhone,
-      holdExpiresAt: h.holdExpiresAt.toISOString(),
+      holdExpiresAt: h.holdExpiresAt ? h.holdExpiresAt.toISOString() : null,
       finalAmount: Number(h.finalAmount),
       game: h.game,
       resourceUnit: h.resourceUnit,
