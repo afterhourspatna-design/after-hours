@@ -387,11 +387,14 @@ export async function POST(req: NextRequest) {
         newStatus = PaymentStatus.PARTIAL;
       }
 
+      const now = new Date();
+      const shouldComplete = !isOnlySnacks && new Date(b.endDateTime) <= now;
+
       return prisma.booking.update({
         where: { id: b.id },
         data: {
           paymentStatus: isOnlySnacks ? b.paymentStatus : newStatus,
-          bookingStatus: isOnlySnacks ? b.bookingStatus : BookingStatus.COMPLETED,
+          bookingStatus: shouldComplete ? BookingStatus.COMPLETED : BookingStatus.CONFIRMED,
           negotiatedAmount: bNegotiated,
           couponId: b.couponId,
           couponDiscount: b.couponDiscount,
@@ -570,11 +573,14 @@ export async function PUT(req: NextRequest) {
         newStatus = PaymentStatus.PARTIAL;
       }
 
+      const now = new Date();
+      const shouldComplete = !isOnlySnacks && new Date(b.endDateTime) <= now;
+
       return prisma.booking.update({
         where: { id: b.id },
         data: {
           paymentStatus: isOnlySnacks ? b.paymentStatus : newStatus,
-          bookingStatus: isOnlySnacks ? b.bookingStatus : BookingStatus.COMPLETED,
+          bookingStatus: shouldComplete ? BookingStatus.COMPLETED : BookingStatus.CONFIRMED,
           negotiatedAmount: bNegotiated,
         },
       });

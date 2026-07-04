@@ -6,6 +6,7 @@ import { formatCurrency, formatTimeRange, formatDate, cn } from "@/lib/utils";
 import { BookingStatusBadge, PaymentStatusBadge } from "@/components/ui/StatusBadge";
 import HoldAlert from "@/components/bookings/HoldAlert";
 import StatCard from "@/components/ui/StatCard";
+import LiveActivityList from "@/components/dashboard/LiveActivityList";
 import { BookOpen, Clock, Zap, Plus, Calendar, Search, Users } from "lucide-react";
 
 function getISTStartAndEnd(date: Date) {
@@ -48,9 +49,9 @@ export default async function StaffDashboard() {
       orderBy: { startDateTime: "asc" },
     }),
     prisma.booking.findMany({
-      where: { bookingStatus: { in: [BookingStatus.CONFIRMED, BookingStatus.HOLD] }, startDateTime: { lte: now }, endDateTime: { gte: now } },
+      where: { bookingStatus: { in: [BookingStatus.CONFIRMED, BookingStatus.HOLD] }, startDateTime: { gte: todayStart, lte: todayEnd } },
       include: { game: { select: { name: true, tag: true } }, resourceUnit: { select: { unitName: true } }, user: { select: { name: true } } },
-      orderBy: { endDateTime: "asc" },
+      orderBy: { startDateTime: "asc" },
     }),
     prisma.booking.findMany({
       where: { bookingStatus: BookingStatus.HOLD, holdExpiresAt: { gt: now } },
@@ -59,7 +60,34 @@ export default async function StaffDashboard() {
     }),
   ]);
 
-  const activeBookings = activeNow as any[];
+  const currentlyPlayingCount = activeNow.filter(b => {
+    const start = new Date(b.startDateTime).getTime();
+    const end = new Date(b.endDateTime).getTime();
+    const nowTime = now.getTime();
+    return b.bookingStatus === BookingStatus.CONFIRMED && start <= nowTime && end >= nowTime;
+  }).length;
+
+  const plainActiveNow = activeNow.map(b => ({
+    id: b.id,
+    guestName: b.guestName,
+    startDateTime: b.startDateTime.toISOString(),
+    endDateTime: b.endDateTime.toISOString(),
+    bookingStatus: b.bookingStatus,
+    game: b.game,
+    resourceUnit: b.resourceUnit,
+    user: b.user,
+  }));
+
+  const plainHolds = holds.map(h => ({
+    id: h.id,
+    guestName: h.guestName,
+    guestPhone: h.guestPhone,
+    holdExpiresAt: h.holdExpiresAt.toISOString(),
+    finalAmount: Number(h.finalAmount),
+    game: h.game,
+    resourceUnit: h.resourceUnit,
+    user: h.user,
+  }));
 
 
   return (
@@ -93,12 +121,12 @@ export default async function StaffDashboard() {
       {/* Stat Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <StatCard title="Today's Bookings" value={todayBookings.length} icon={BookOpen} iconColor="text-violet-400" subtitle="Scheduled for today" trend={{ value: 10, label: "up" }} />
-        <StatCard title="Active Sessions" value={activeBookings.length} icon={Zap} iconColor="text-emerald-400" subtitle="Playing right now" trend={{ value: 5, label: "up" }} />
-        <StatCard title="Pending Holds" value={holds.length} icon={Clock} iconColor="text-amber-400" subtitle="Expiring soon" trend={{ value: 0, label: "neutral" }} />
+        <StatCard title="Active Sessions" value={currentlyPlayingCount} icon={Zap} iconColor="text-emerald-400" subtitle="Playing right now" trend={{ value: 5, label: "up" }} />
+        <StatCard title="Pending Holds" value={plainHolds.length} icon={Clock} iconColor="text-amber-400" subtitle="Expiring soon" trend={{ value: 0, label: "neutral" }} />
       </div>
 
       {/* Hold alerts */}
-      {holds.length > 0 && <HoldAlert holds={holds as any} />}
+      {plainHolds.length > 0 && <HoldAlert holds={plainHolds as any} />}
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
         {/* Today's Schedule */}
@@ -138,40 +166,12 @@ export default async function StaffDashboard() {
         {/* Live Activity & Upcoming */}
         <div className="lg:col-span-4 space-y-6">
           {/* Live Activity Section */}
-          <div className="glass-card border-zinc-900/50 bg-zinc-950/30">
-            <div className="px-5 py-4 border-b border-zinc-900 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Zap className="w-4 h-4 text-violet-400" />
-                <h3 className="text-sm font-bold text-white">Live activity</h3>
-              </div>
-              <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">{activeBookings.length} active</span>
-            </div>
-            <div className="p-2 space-y-1">
-              {activeBookings.length > 0 ? activeBookings.map((b, i) => (
-                <div key={b.id} className="flex items-center justify-between p-3 rounded-xl hover:bg-zinc-900/50 transition-colors group">
-                  <div className="flex items-center gap-3">
-                    <div className={cn(
-                      "w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-bold border flex-shrink-0",
-                      i % 2 === 0 ? "bg-violet-500/10 border-violet-500/20 text-violet-400" : "bg-emerald-500/10 border-emerald-500/20 text-emerald-400"
-                    )}>
-                      {b.user?.name?.substring(0, 2).toUpperCase() || (b as any).guestName?.substring(0, 2).toUpperCase() || 'GU'}
-                    </div>
-                    <div>
-                      <p className="text-[13px] font-bold text-zinc-200 truncate max-w-[120px]">{b.user?.name || (b as any).guestName || 'Guest User'}</p>
-                      <p className="text-[10px] text-zinc-500 font-medium truncate max-w-[120px]">
-                        {b.game?.name} {b.resourceUnit ? `• ${b.resourceUnit.unitName}` : ''}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="text-[11px] font-mono font-bold text-emerald-400 bg-emerald-500/10 px-2 py-1 rounded border border-emerald-500/20 flex-shrink-0">
-                    {new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit' }).format(new Date(b.endDateTime))}
-                  </div>
-                </div>
-              )) : (
-                <p className="text-center py-8 text-zinc-600 text-xs font-medium italic">No active sessions</p>
-              )}
-            </div>
-          </div>
+          <LiveActivityList
+            initialBookings={plainActiveNow as any}
+            todayStartISO={todayStart.toISOString()}
+            todayEndISO={todayEnd.toISOString()}
+            role="STAFF"
+          />
 
           {/* Upcoming */}
           <div className="glass-card overflow-hidden border-zinc-900/50 bg-zinc-950/30">
