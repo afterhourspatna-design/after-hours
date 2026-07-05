@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Zap, Loader2, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
+import ConfirmDialog from "@/components/ui/ConfirmDialog";
 
 interface Game {
   name: string;
@@ -44,6 +45,32 @@ export default function LiveActivityList({
   const [bookings, setBookings] = useState<Booking[]>(initialBookings);
   const [currentTime, setCurrentTime] = useState<Date>(new Date());
   const [loading, setLoading] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [bookingToConfirm, setBookingToConfirm] = useState<Booking | null>(null);
+  const [confirmLoading, setConfirmLoading] = useState(false);
+
+  async function handleConfirmCheckout() {
+    if (!bookingToConfirm) return;
+    setConfirmLoading(true);
+    try {
+      const res = await fetch(`/api/bookings/${bookingToConfirm.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ bookingStatus: "COMPLETED" }),
+      });
+      if (res.ok) {
+        setBookings((prev) => prev.filter((item) => item.id !== bookingToConfirm.id));
+        setConfirmOpen(false);
+      } else {
+        alert("Failed to complete session");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Error completing session");
+    } finally {
+      setConfirmLoading(false);
+    }
+  }
 
   // Tick every 10 seconds to update remaining times
   useEffect(() => {
@@ -135,7 +162,7 @@ export default function LiveActivityList({
           </span>
         </div>
       </div>
-      <div className="p-2 space-y-1 max-h-[480px] overflow-y-auto scrollbar-thin scrollbar-thumb-zinc-800">
+      <div className="p-2 space-y-1 max-h-[480px] overflow-y-auto overflow-x-hidden scrollbar-thin scrollbar-thumb-zinc-800">
         {activeItems.length > 0 ? (
           activeItems.map(({ b, diffMins, startDiffMins, type }) => {
             const name = b.user?.name ?? b.guestName ?? "Guest";
@@ -175,7 +202,7 @@ export default function LiveActivityList({
                   cardStyle
                 )}
               >
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 min-w-0 flex-1">
                   <div
                     className={cn(
                       "w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-bold border flex-shrink-0",
@@ -188,9 +215,9 @@ export default function LiveActivityList({
                   >
                     {initials}
                   </div>
-                  <div className="min-w-0">
-                    <p className="text-[13px] font-bold text-zinc-200 truncate max-w-[120px]">{name}</p>
-                    <p className="text-[10px] text-zinc-500 font-medium truncate max-w-[120px]">
+                  <div className="min-w-0 flex-1 pr-2">
+                    <p className="text-[13px] font-bold text-zinc-200 truncate">{name}</p>
+                    <p className="text-[10px] text-zinc-500 font-medium truncate">
                       {b.game?.name} {b.resourceUnit ? `• ${b.resourceUnit.unitName}` : ""}
                     </p>
                   </div>
@@ -198,24 +225,10 @@ export default function LiveActivityList({
                 <div className="flex items-center gap-2 flex-shrink-0">
                   {type !== "upcoming" && (
                     <button
-                      onClick={async (e) => {
+                      onClick={(e) => {
                         e.stopPropagation();
-                        if (!confirm(`Mark ${name}'s session as completed?`)) return;
-                        try {
-                          const res = await fetch(`/api/bookings/${b.id}`, {
-                            method: "PUT",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({ bookingStatus: "COMPLETED" }),
-                          });
-                          if (res.ok) {
-                            setBookings((prev) => prev.filter((item) => item.id !== b.id));
-                          } else {
-                            alert("Failed to complete session");
-                          }
-                        } catch (err) {
-                          console.error(err);
-                          alert("Error completing session");
-                        }
+                        setBookingToConfirm(b);
+                        setConfirmOpen(true);
                       }}
                       className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded-lg bg-emerald-600/20 text-emerald-400 border border-emerald-600/30 hover:bg-emerald-600/30 hover:text-white flex-shrink-0"
                       title="Mark Session Completed"
@@ -234,6 +247,15 @@ export default function LiveActivityList({
           <p className="text-center py-8 text-zinc-600 text-xs font-medium italic">No active sessions</p>
         )}
       </div>
+      <ConfirmDialog
+        open={confirmOpen}
+        title="Complete Session"
+        description={`Are you sure you want to mark ${bookingToConfirm?.user?.name ?? bookingToConfirm?.guestName ?? "Guest"}'s session as completed?`}
+        confirmLabel="Complete"
+        onConfirm={handleConfirmCheckout}
+        onCancel={() => setConfirmOpen(false)}
+        loading={confirmLoading}
+      />
     </div>
   );
 }
