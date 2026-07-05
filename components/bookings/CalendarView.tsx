@@ -34,7 +34,7 @@ interface CalendarViewProps {
 
 export default function CalendarView({
   role = "ADMIN",
-  initialView = "timeGridWeek",
+  initialView = "timeGridDay",
   newBookingPath = "/admin/bookings/new",
 }: CalendarViewProps) {
   const router = useRouter();

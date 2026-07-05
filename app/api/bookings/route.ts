@@ -168,14 +168,11 @@ export async function GET(req: NextRequest) {
     allocations: snack.allocations ?? [],
   })) : [];
 
-  const todayDate = new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Kolkata", year: "numeric", month: "numeric", day: "numeric" }).format(new Date());
-
   // Map bookings to calculate balance due and clean up big decimals
   const mappedBookings = bookings.map((b: any) => {
     let isNewUser = false;
     if (b.user) {
-      const userDate = new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Kolkata", year: "numeric", month: "numeric", day: "numeric" }).format(new Date(b.user.createdAt));
-      isNewUser = (userDate === todayDate) && (b.user._count?.bookings === 0);
+      isNewUser = b.user._count?.bookings === 0;
     }
     
     return {
