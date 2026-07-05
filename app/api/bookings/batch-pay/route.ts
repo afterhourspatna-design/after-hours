@@ -387,11 +387,23 @@ export async function POST(req: NextRequest) {
         newStatus = PaymentStatus.PARTIAL;
       }
 
+      const now = new Date();
+      const shouldComplete = !isOnlySnacks && new Date(b.endDateTime) <= now;
+
+      let finalBookingStatus = b.bookingStatus;
+      if (!isOnlySnacks) {
+        if (shouldComplete) {
+          finalBookingStatus = BookingStatus.COMPLETED;
+        } else if (b.bookingStatus === "HOLD") {
+          finalBookingStatus = BookingStatus.CONFIRMED;
+        }
+      }
+
       return prisma.booking.update({
         where: { id: b.id },
         data: {
           paymentStatus: isOnlySnacks ? b.paymentStatus : newStatus,
-          bookingStatus: isOnlySnacks ? b.bookingStatus : BookingStatus.COMPLETED,
+          bookingStatus: finalBookingStatus,
           negotiatedAmount: bNegotiated,
           couponId: b.couponId,
           couponDiscount: b.couponDiscount,
@@ -570,11 +582,23 @@ export async function PUT(req: NextRequest) {
         newStatus = PaymentStatus.PARTIAL;
       }
 
+      const now = new Date();
+      const shouldComplete = !isOnlySnacks && new Date(b.endDateTime) <= now;
+
+      let finalBookingStatus = b.bookingStatus;
+      if (!isOnlySnacks) {
+        if (shouldComplete) {
+          finalBookingStatus = BookingStatus.COMPLETED;
+        } else if (b.bookingStatus === "HOLD") {
+          finalBookingStatus = BookingStatus.CONFIRMED;
+        }
+      }
+
       return prisma.booking.update({
         where: { id: b.id },
         data: {
           paymentStatus: isOnlySnacks ? b.paymentStatus : newStatus,
-          bookingStatus: isOnlySnacks ? b.bookingStatus : BookingStatus.COMPLETED,
+          bookingStatus: finalBookingStatus,
           negotiatedAmount: bNegotiated,
         },
       });

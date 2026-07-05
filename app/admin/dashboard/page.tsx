@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import StatCard from "@/components/ui/StatCard";
 import HoldAlert from "@/components/bookings/HoldAlert";
+import LiveActivityList from "@/components/dashboard/LiveActivityList";
 import {
   startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, subDays,
 } from "date-fns";
@@ -145,14 +146,14 @@ async function getDashboardData(period: string = "today", from?: string, to?: st
     prisma.booking.findMany({
       where: {
         bookingStatus: { in: [BookingStatus.CONFIRMED, BookingStatus.HOLD] },
-        startDateTime: { lte: now }, endDateTime: { gte: now },
+        startDateTime: { gte: boundsToday.start, lte: boundsToday.end },
       },
       include: {
         game: { select: { name: true, tag: true } },
         resourceUnit: { select: { unitName: true } },
         user: { select: { name: true } },
       },
-      orderBy: { endDateTime: "asc" },
+      orderBy: { startDateTime: "asc" },
     }),
     prisma.booking.findMany({
       where: {
@@ -284,12 +285,32 @@ async function getDashboardData(period: string = "today", from?: string, to?: st
     weekCount,
     monthCount,
     activeNow: activeNow.length,
-    activeBookings: activeNow,
+    activeBookings: activeNow.map(b => ({
+      id: b.id,
+      guestName: b.guestName,
+      startDateTime: b.startDateTime.toISOString(),
+      endDateTime: b.endDateTime.toISOString(),
+      bookingStatus: b.bookingStatus,
+      game: b.game,
+      resourceUnit: b.resourceUnit,
+      user: b.user,
+    })),
+    todayStartISO: boundsToday.start.toISOString(),
+    todayEndISO: boundsToday.end.toISOString(),
     periodRevenue,
     periodGameRevenue,
     periodSnacksRevenue,
     gameUtilization,
-    holds,
+    holds: holds.map(h => ({
+      id: h.id,
+      guestName: h.guestName,
+      guestPhone: h.guestPhone,
+      holdExpiresAt: h.holdExpiresAt ? h.holdExpiresAt.toISOString() : null,
+      finalAmount: Number(h.finalAmount),
+      game: h.game,
+      resourceUnit: h.resourceUnit,
+      user: h.user,
+    })),
     recentBookings,
     last7DaysRevenue,
   };
@@ -305,6 +326,13 @@ export default async function AdminDashboard({
 
   const { period = "today", from, to } = await searchParams;
   const data = await getDashboardData(period, from, to);
+  const now = new Date();
+  const currentlyPlayingCount = data.activeBookings.filter(b => {
+    const start = new Date(b.startDateTime).getTime();
+    const end = new Date(b.endDateTime).getTime();
+    const nowTime = now.getTime();
+    return b.bookingStatus === BookingStatus.CONFIRMED && start <= nowTime && end >= nowTime;
+  }).length;
 
   const stats = [
     {
@@ -316,7 +344,7 @@ export default async function AdminDashboard({
     },
     {
       title: "Active Sessions",
-      value: `${data.activeNow} / 8 units`,
+      value: `${currentlyPlayingCount} / 8 units`,
       icon: Zap,
       iconColor: "text-emerald-400",
       subtitle: "Current parlor load",
@@ -604,40 +632,11 @@ export default async function AdminDashboard({
           </div>
 
           {/* Live Activity Section */}
-          <div className="glass-card border-zinc-900/50 bg-zinc-950/30">
-            <div className="px-5 py-4 border-b border-zinc-900 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Zap className="w-4 h-4 text-violet-400" />
-                <h3 className="text-sm font-bold text-white">Live activity</h3>
-              </div>
-              <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">{data.activeNow} active</span>
-            </div>
-            <div className="p-2 space-y-1">
-              {data.activeBookings.length > 0 ? data.activeBookings.map((b, i) => (
-                <div key={b.id} className="flex items-center justify-between p-3 rounded-xl hover:bg-zinc-900/50 transition-colors group">
-                  <div className="flex items-center gap-3">
-                    <div className={cn(
-                      "w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-bold border flex-shrink-0",
-                      i % 2 === 0 ? "bg-violet-500/10 border-violet-500/20 text-violet-400" : "bg-emerald-500/10 border-emerald-500/20 text-emerald-400"
-                    )}>
-                      {b.user?.name?.substring(0, 2).toUpperCase() || b.guestName?.substring(0, 2).toUpperCase() || 'GU'}
-                    </div>
-                    <div>
-                      <p className="text-[13px] font-bold text-zinc-200 truncate max-w-[120px]">{b.user?.name || b.guestName || 'Guest User'}</p>
-                      <p className="text-[10px] text-zinc-500 font-medium truncate max-w-[120px]">
-                        {b.game?.name} {b.resourceUnit ? `• ${b.resourceUnit.unitName}` : ''}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="text-[11px] font-mono font-bold text-emerald-400 bg-emerald-500/10 px-2 py-1 rounded border border-emerald-500/20 flex-shrink-0">
-                    {new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit' }).format(new Date(b.endDateTime))}
-                  </div>
-                </div>
-              )) : (
-                <p className="text-center py-8 text-zinc-600 text-xs font-medium italic">No active sessions</p>
-              )}
-            </div>
-          </div>
+          <LiveActivityList
+            initialBookings={data.activeBookings as any}
+            todayStartISO={data.todayStartISO}
+            todayEndISO={data.todayEndISO}
+          />
         </div>
       </div>
     </div>
