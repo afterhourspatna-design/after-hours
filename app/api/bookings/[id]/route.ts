@@ -210,9 +210,9 @@ export async function PUT(
 
   // Role limits check
   if (role === "STAFF" && !data.action) {
-    const allowedStaffStatuses: BookingStatus[] = [BookingStatus.CONFIRMED, BookingStatus.CANCELLED];
+    const allowedStaffStatuses: BookingStatus[] = [BookingStatus.CONFIRMED, BookingStatus.CANCELLED, BookingStatus.COMPLETED];
     if (data.bookingStatus && !allowedStaffStatuses.includes(data.bookingStatus as BookingStatus)) {
-      return NextResponse.json({ error: "Staff can only confirm or cancel bookings" }, { status: 403 });
+      return NextResponse.json({ error: "Staff can only confirm, complete, or cancel bookings" }, { status: 403 });
     }
   }
 

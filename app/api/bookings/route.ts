@@ -105,7 +105,8 @@ export async function GET(req: NextRequest) {
       include: {
         game: { select: { name: true, tag: true } },
         resourceUnit: { select: { unitName: true } },
-        user: { select: { name: true, phone: true, createdAt: true, _count: { select: { bookings: { where: { paymentStatus: { in: ["PAID", "PARTIAL"] } } }, snackOrders: { where: { paymentStatus: { in: ["PAID", "PARTIAL"] } } } } } } },
+        user: { select: { name: true, phone: true, createdAt: true, referredByPhone: true, _count: { select: { bookings: { where: { paymentStatus: "PAID" } } } } } },
+        createdBy: { select: { name: true } },
         allocations: true,
       },
       orderBy: { startDateTime: "asc" },
@@ -121,19 +122,19 @@ export async function GET(req: NextRequest) {
       include: {
         game: { select: { name: true, tag: true } },
         resourceUnit: { select: { unitName: true } },
-        user: { select: { name: true, phone: true, createdAt: true, _count: { select: { bookings: { where: { paymentStatus: { in: ["PAID", "PARTIAL"] } } }, snackOrders: { where: { paymentStatus: { in: ["PAID", "PARTIAL"] } } } } } } },
+        user: { select: { name: true, phone: true, createdAt: true, referredByPhone: true, _count: { select: { bookings: { where: { paymentStatus: "PAID" } } } } } },
+        createdBy: { select: { name: true } },
         allocations: true,
       },
       orderBy: { startDateTime: "desc" },
-      skip: (page - 1) * limit,
-      take: limit,
+      ...(includeSnacks ? {} : { skip: (page - 1) * limit, take: limit }),
     }),
-    prisma.booking.count({ where }),
+    includeSnacks ? Promise.resolve(0) : prisma.booking.count({ where }),
     // Fetch snack orders only if requested and matching the same payment status criteria
     (includeSnacks && !status ? prisma.snackOrder.findMany({
       where: paymentStatus === "UNPAID" ? { paymentStatus: { in: ["UNPAID", "PARTIAL"] } } : (paymentStatus ? { paymentStatus } : {}),
       include: {
-        user: { select: { name: true, phone: true, createdAt: true, _count: { select: { bookings: { where: { paymentStatus: { in: ["PAID", "PARTIAL"] } } }, snackOrders: { where: { paymentStatus: { in: ["PAID", "PARTIAL"] } } } } } } },
+        user: { select: { name: true, phone: true, createdAt: true, referredByPhone: true, _count: { select: { bookings: { where: { paymentStatus: "PAID" } } } } } },
         allocations: true,
       },
       orderBy: { createdAt: "desc" }
@@ -160,21 +161,18 @@ export async function GET(req: NextRequest) {
     source: "WALK_IN",
     game: { name: "Snack Sale", tag: "snack" },
     resourceUnit: null,
-    user: snack.user ? { name: snack.user.name, phone: snack.user.phone } : null,
+    user: snack.user ? { name: snack.user.name, phone: snack.user.phone, referredByPhone: snack.user.referredByPhone } : null,
     updatedAt: snack.updatedAt.toISOString(),
     paymentId: snack.paymentId,
     snacksAmount: Number(snack.amount),
     allocations: snack.allocations ?? [],
   })) : [];
 
-  const todayDate = new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Kolkata", year: "numeric", month: "numeric", day: "numeric" }).format(new Date());
-
   // Map bookings to calculate balance due and clean up big decimals
   const mappedBookings = bookings.map((b: any) => {
     let isNewUser = false;
     if (b.user) {
-      const userDate = new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Kolkata", year: "numeric", month: "numeric", day: "numeric" }).format(new Date(b.user.createdAt));
-      isNewUser = (userDate === todayDate) && (b.user._count?.bookings === 0) && (b.user._count?.snackOrders === 0);
+      isNewUser = b.user._count?.bookings === 0;
     }
     
     return {
@@ -184,14 +182,21 @@ export async function GET(req: NextRequest) {
       negotiatedAmount: b.negotiatedAmount !== null ? Number(b.negotiatedAmount) : null,
       discountAmount: Number(b.discountAmount),
       couponDiscount: Number(b.couponDiscount),
+      createdByName: b.createdBy?.name || null,
     };
   });
 
-  const combinedBookings = [...mappedBookings, ...mappedSnacks].sort((a: any, b: any) => 
+  const combinedBookings = [...mappedBookings, ...mappedSnacks].sort((a: any, b: any) =>
     new Date(b.startDateTime).getTime() - new Date(a.startDateTime).getTime()
   );
 
-  return NextResponse.json({ bookings: combinedBookings, total: total + mappedSnacks.length, page, limit });
+  const finalBookings = includeSnacks 
+    ? combinedBookings.slice((page - 1) * limit, page * limit) 
+    : combinedBookings;
+
+  const finalTotal = includeSnacks ? combinedBookings.length : total;
+
+  return NextResponse.json({ bookings: finalBookings, total: finalTotal, page, limit });
 }
 
 export async function POST(req: NextRequest) {
@@ -322,9 +327,9 @@ export async function POST(req: NextRequest) {
   let initialPaymentStatus = data.paymentStatus;
   if (data.advanceAmount && data.advanceAmount > 0) {
     if (data.advanceAmount >= finalAmount) {
-       initialPaymentStatus = PaymentStatus.PAID;
+      initialPaymentStatus = PaymentStatus.PAID;
     } else {
-       initialPaymentStatus = PaymentStatus.PARTIAL;
+      initialPaymentStatus = PaymentStatus.PARTIAL;
     }
   }
 
@@ -371,19 +376,19 @@ export async function POST(req: NextRequest) {
     const pmMethod = data.paymentMethod;
     const cashAmt = pmMethod === "MIXED" ? (data.cashAmount || 0) : pmMethod === "CASH" ? data.advanceAmount : 0;
     const onlineAmt = pmMethod === "MIXED" ? (data.onlineAmount || 0) : pmMethod === "ONLINE" ? data.advanceAmount : 0;
-    
+
     // Create actual payment receipt
     const payment = await prisma.payment.create({
       data: {
         paymentMethod: pmMethod,
-        negotiatedAmount: data.advanceAmount,
+        negotiatedAmount: finalAmount,
         cashAmount: cashAmt,
         onlineAmount: onlineAmt,
         userId: resolvedUserId,
-        customerNames: data.guestName ?? "Guest",
+        customerNames: booking.user?.name ?? data.guestName ?? "Guest",
       }
     });
-    
+
     // Allocate that payment exactly to this new booking
     await prisma.paymentAllocation.create({
       data: {

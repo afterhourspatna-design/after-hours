@@ -37,7 +37,7 @@ export default function AdminCalendarPage() {
       </div>
 
       <div className="glass-card overflow-hidden p-4">
-        <CalendarClient role="ADMIN" initialView="timeGridWeek" />
+        <CalendarClient role="ADMIN" initialView="timeGridDay" />
       </div>
     </div>
   );

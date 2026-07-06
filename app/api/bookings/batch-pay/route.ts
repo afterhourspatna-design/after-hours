@@ -310,10 +310,8 @@ export async function POST(req: NextRequest) {
          const amountNeeded = Number(s.amount) - previouslyPaid;
          const allocation = Math.min(amountNeeded > 0 ? amountNeeded : 0, remainingPaidToday);
          
-         if (allocation > 0) {
-            allocationsToCreate.push({ amount: allocation, paymentId, snackOrderId: s.id });
-            remainingPaidToday = Number((remainingPaidToday - allocation).toFixed(2));
-         }
+         allocationsToCreate.push({ amount: allocation, paymentId, snackOrderId: s.id });
+         remainingPaidToday = Number((remainingPaidToday - allocation).toFixed(2));
 
          const totalPaidSoFar = previouslyPaid + allocation;
          let newStatus: PaymentStatus = PaymentStatus.UNPAID;
@@ -354,42 +352,58 @@ export async function POST(req: NextRequest) {
         }
       });
 
-      if (allocation > 0) {
-         allocationsToCreate.push({ amount: allocation, paymentId, snackOrderId: newSnack.id });
-         remainingPaidToday = Number((remainingPaidToday - allocation).toFixed(2));
-      }
+      allocationsToCreate.push({ amount: allocation, paymentId, snackOrderId: newSnack.id });
+      remainingPaidToday = Number((remainingPaidToday - allocation).toFixed(2));
     }
 
     // 3. Process Bookings
-    const updatePromises = bookings.map(b => {
-      let ratio = 1 / (bookings.length || 1);
-      if (totalFinalAmount > 0) {
-        ratio = Number(b.finalAmount) / totalFinalAmount;
+    let sumOfBNegotiated = 0;
+    const updatePromises = bookings.map((b, index) => {
+      let bNegotiated = 0;
+      if (index === bookings.length - 1) {
+        bNegotiated = Number((negotiatedAmount - sumOfBNegotiated).toFixed(2));
+      } else {
+        let ratio = 1 / (bookings.length || 1);
+        if (totalFinalAmount > 0) {
+          ratio = Number(b.finalAmount) / totalFinalAmount;
+        }
+        bNegotiated = Math.round(negotiatedAmount * ratio * 100) / 100;
+        sumOfBNegotiated += bNegotiated;
       }
-      const bNegotiated = Math.round(negotiatedAmount * ratio * 100) / 100;
       
       const previouslyPaid = b.allocations.reduce((s: number, a: any) => s + Number(a.amount), 0);
       const amountNeeded = bNegotiated - previouslyPaid;
       const allocation = Math.min(amountNeeded > 0 ? amountNeeded : 0, remainingPaidToday);
       
-      if (allocation > 0) {
-        allocationsToCreate.push({ amount: allocation, paymentId, bookingId: b.id });
-        remainingPaidToday = Number((remainingPaidToday - allocation).toFixed(2));
-      }
+      allocationsToCreate.push({ amount: allocation, paymentId, bookingId: b.id });
+      remainingPaidToday = Number((remainingPaidToday - allocation).toFixed(2));
 
       const totalPaidSoFar = previouslyPaid + allocation;
       let newStatus: PaymentStatus = PaymentStatus.UNPAID;
-      if (Math.abs(totalPaidSoFar - bNegotiated) < 0.01 || totalPaidSoFar >= bNegotiated) {
+      // Use < 0.011 to safely cover float inaccuracies around 0.01
+      if (Math.abs(totalPaidSoFar - bNegotiated) < 0.011 || totalPaidSoFar >= bNegotiated) {
         newStatus = PaymentStatus.PAID;
       } else if (totalPaidSoFar > 0) {
         newStatus = PaymentStatus.PARTIAL;
+      }
+
+      const now = new Date();
+      const shouldComplete = !isOnlySnacks && new Date(b.endDateTime) <= now;
+
+      let finalBookingStatus = b.bookingStatus;
+      if (!isOnlySnacks) {
+        if (shouldComplete) {
+          finalBookingStatus = BookingStatus.COMPLETED;
+        } else if (b.bookingStatus === "HOLD") {
+          finalBookingStatus = BookingStatus.CONFIRMED;
+        }
       }
 
       return prisma.booking.update({
         where: { id: b.id },
         data: {
           paymentStatus: isOnlySnacks ? b.paymentStatus : newStatus,
-          bookingStatus: isOnlySnacks ? b.bookingStatus : BookingStatus.COMPLETED,
+          bookingStatus: finalBookingStatus,
           negotiatedAmount: bNegotiated,
           couponId: b.couponId,
           couponDiscount: b.couponDiscount,
@@ -521,10 +535,8 @@ export async function PUT(req: NextRequest) {
          const amountNeeded = Number(s.amount) - previouslyPaid;
          const allocation = Math.min(amountNeeded > 0 ? amountNeeded : 0, remainingPaidToday);
 
-         if (allocation > 0) {
-            allocationsToCreate.push({ amount: allocation, paymentId, snackOrderId: s.id });
-            remainingPaidToday = Number((remainingPaidToday - allocation).toFixed(2));
-         }
+         allocationsToCreate.push({ amount: allocation, paymentId, snackOrderId: s.id });
+         remainingPaidToday = Number((remainingPaidToday - allocation).toFixed(2));
 
          const totalPaidSoFar = previouslyPaid + allocation;
          let newStatus: PaymentStatus = PaymentStatus.UNPAID;
@@ -543,34 +555,50 @@ export async function PUT(req: NextRequest) {
     }
 
     // 4. Process Bookings
-    const updatePromises = activeBookings.map((b) => {
-      let ratio = 1 / (activeBookings.length || 1);
-      if (totalFinalAmount > 0) ratio = Number(b.finalAmount) / totalFinalAmount;
-
-      const bNegotiated = Math.round(negotiatedAmount * ratio * 100) / 100;
+    let sumOfBNegotiated = 0;
+    const updatePromises = activeBookings.map((b, index) => {
+      let bNegotiated = 0;
+      if (index === activeBookings.length - 1) {
+        bNegotiated = Number((negotiatedAmount - sumOfBNegotiated).toFixed(2));
+      } else {
+        let ratio = 1 / (activeBookings.length || 1);
+        if (totalFinalAmount > 0) ratio = Number(b.finalAmount) / totalFinalAmount;
+        bNegotiated = Math.round(negotiatedAmount * ratio * 100) / 100;
+        sumOfBNegotiated += bNegotiated;
+      }
       
       const previouslyPaid = b.allocations.reduce((s: number, a: any) => s + Number(a.amount), 0);
       const amountNeeded = bNegotiated - previouslyPaid;
       const allocation = Math.min(amountNeeded > 0 ? amountNeeded : 0, remainingPaidToday);
 
-      if (allocation > 0) {
-        allocationsToCreate.push({ amount: allocation, paymentId, bookingId: b.id });
-        remainingPaidToday = Number((remainingPaidToday - allocation).toFixed(2));
-      }
+      allocationsToCreate.push({ amount: allocation, paymentId, bookingId: b.id });
+      remainingPaidToday = Number((remainingPaidToday - allocation).toFixed(2));
 
       const totalPaidSoFar = previouslyPaid + allocation;
       let newStatus: PaymentStatus = PaymentStatus.UNPAID;
-      if (Math.abs(totalPaidSoFar - bNegotiated) < 0.01 || totalPaidSoFar >= bNegotiated) {
+      if (Math.abs(totalPaidSoFar - bNegotiated) < 0.011 || totalPaidSoFar >= bNegotiated) {
         newStatus = PaymentStatus.PAID;
       } else if (totalPaidSoFar > 0) {
         newStatus = PaymentStatus.PARTIAL;
+      }
+
+      const now = new Date();
+      const shouldComplete = !isOnlySnacks && new Date(b.endDateTime) <= now;
+
+      let finalBookingStatus = b.bookingStatus;
+      if (!isOnlySnacks) {
+        if (shouldComplete) {
+          finalBookingStatus = BookingStatus.COMPLETED;
+        } else if (b.bookingStatus === "HOLD") {
+          finalBookingStatus = BookingStatus.CONFIRMED;
+        }
       }
 
       return prisma.booking.update({
         where: { id: b.id },
         data: {
           paymentStatus: isOnlySnacks ? b.paymentStatus : newStatus,
-          bookingStatus: isOnlySnacks ? b.bookingStatus : BookingStatus.COMPLETED,
+          bookingStatus: finalBookingStatus,
           negotiatedAmount: bNegotiated,
         },
       });

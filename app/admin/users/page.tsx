@@ -11,6 +11,7 @@ import ConfirmDialog from "@/components/ui/ConfirmDialog";
 interface AppUser {
   id: string; name: string; phone: string; email?: string | null;
   notes?: string | null; isActive: boolean; createdAt: string; role: string;
+  referredByPhone?: string | null; referredBy?: { name: string } | null;
 }
 
 interface UserModalProps {
@@ -386,23 +387,46 @@ export default function UsersPage() {
         ) : (
           <div className="divide-y divide-zinc-900">
             {users.map(u => (
-              <div key={u.id} className="flex items-center gap-4 px-6 py-4 hover:bg-zinc-900/40 transition-colors group">
-                <div className="w-10 h-10 rounded-xl bg-violet-600/10 border border-violet-500/10 flex items-center justify-center flex-shrink-0 group-hover:bg-violet-600/20 group-hover:border-violet-500/30 transition-all duration-300">
-                  <span className="text-sm font-bold text-violet-400">{getInitials(u.name)}</span>
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-bold text-white group-hover:text-violet-400 transition-colors duration-300">{u.name}</p>
-                  <div className="flex items-center gap-4 mt-1">
-                    <span className="flex items-center gap-1.5 text-xs text-zinc-400 font-medium"><Phone className="w-3 h-3 text-zinc-600" /> +91 {u.phone}</span>
-                    {u.email && <span className="flex items-center gap-1.5 text-xs text-zinc-500 font-medium"><Mail className="w-3 h-3 text-zinc-600" /> {u.email}</span>}
+              <div key={u.id} className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 px-4 sm:px-6 py-4 hover:bg-zinc-900/40 transition-colors group">
+                {/* Mobile Top Row: Avatar, Name, Actions */}
+                <div className="flex items-center gap-3 w-full sm:w-auto">
+                  <div className="w-10 h-10 rounded-xl bg-violet-600/10 border border-violet-500/10 flex items-center justify-center flex-shrink-0 group-hover:bg-violet-600/20 group-hover:border-violet-500/30 transition-all duration-300">
+                    <span className="text-sm font-bold text-violet-400">{getInitials(u.name)}</span>
+                  </div>
+                  <div className="flex-1 sm:hidden">
+                    <p className="text-sm font-bold text-white group-hover:text-violet-400 transition-colors duration-300">{u.name}</p>
+                  </div>
+                  <div className="flex gap-1 sm:hidden">
+                    <button onClick={() => setModalUser(u)} className="p-2 rounded-lg text-zinc-500 hover:text-zinc-200 hover:bg-zinc-900 transition-all"><Edit2 className="w-4 h-4" /></button>
+                    <button onClick={() => setDeleteId(u.id)} className="p-2 rounded-lg text-zinc-500 hover:text-red-400 hover:bg-red-500/10 transition-all"><Trash2 className="w-4 h-4" /></button>
                   </div>
                 </div>
-                <div className="text-right flex-shrink-0 mr-4">
-                  <p className="text-[10px] font-bold text-zinc-600 uppercase tracking-widest">{formatRelative(u.createdAt)}</p>
+
+                {/* Main Content */}
+                <div className="flex-1 min-w-0 pl-14 sm:pl-0">
+                  <p className="hidden sm:block text-sm font-bold text-white group-hover:text-violet-400 transition-colors duration-300">{u.name}</p>
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 mt-1">
+                    <div className="flex items-center gap-4">
+                      <span className="flex items-center gap-1.5 text-xs text-zinc-400 font-medium"><Phone className="w-3 h-3 text-zinc-600" /> +91 {u.phone}</span>
+                      {u.email && <span className="flex items-center gap-1.5 text-xs text-zinc-500 font-medium"><Mail className="w-3 h-3 text-zinc-600" /> {u.email}</span>}
+                    </div>
+                    {u.referredByPhone && (
+                      <span className="inline-flex w-fit items-center gap-1.5 text-[11px] text-emerald-500/80 font-medium bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/10">
+                        Referred by: {u.referredBy?.name ? `${u.referredBy.name} (${u.referredByPhone})` : u.referredByPhone}
+                      </span>
+                    )}
+                  </div>
                 </div>
-                <div className="flex gap-1 opacity-40 group-hover:opacity-100 transition-opacity">
-                  <button onClick={() => setModalUser(u)} className="p-2 rounded-lg text-zinc-500 hover:text-zinc-200 hover:bg-zinc-900 transition-all"><Edit2 className="w-3.5 h-3.5" /></button>
-                  <button onClick={() => setDeleteId(u.id)} className="p-2 rounded-lg text-zinc-500 hover:text-red-400 hover:bg-red-500/10 transition-all"><Trash2 className="w-3.5 h-3.5" /></button>
+
+                {/* Desktop Date & Actions */}
+                <div className="flex items-center justify-between sm:justify-end gap-4 pl-14 sm:pl-0 mt-1 sm:mt-0">
+                  <div className="text-left sm:text-right flex-shrink-0">
+                    <p className="text-[10px] font-bold text-zinc-500 sm:text-zinc-600 uppercase tracking-widest">{formatRelative(u.createdAt)}</p>
+                  </div>
+                  <div className="hidden sm:flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button onClick={() => setModalUser(u)} className="p-2 rounded-lg text-zinc-500 hover:text-zinc-200 hover:bg-zinc-900 transition-all"><Edit2 className="w-3.5 h-3.5" /></button>
+                    <button onClick={() => setDeleteId(u.id)} className="p-2 rounded-lg text-zinc-500 hover:text-red-400 hover:bg-red-500/10 transition-all"><Trash2 className="w-3.5 h-3.5" /></button>
+                  </div>
                 </div>
               </div>
             ))}
