@@ -11,6 +11,7 @@ const createSchema = z.object({
   password: z.string().min(6).optional().nullable(),
   notes: z.string().optional().nullable(),
   role: z.enum(["CUSTOMER", "STAFF", "ADMIN"]).default("CUSTOMER"),
+  isPhoneVerified: z.boolean().optional().default(false),
 });
 
 export async function GET(req: NextRequest) {
@@ -81,6 +82,7 @@ export async function POST(req: NextRequest) {
       notes: parsed.data.notes ?? null,
       passwordHash,
       role: actorRole === "ADMIN" ? parsed.data.role : "CUSTOMER",
+      isPhoneVerified: parsed.data.isPhoneVerified,
     },
   });
 
