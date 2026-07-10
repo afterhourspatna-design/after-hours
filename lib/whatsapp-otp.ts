@@ -1,94 +1,168 @@
-export function generateOtp(): string {
-  return Math.floor(100000 + Math.random() * 900000).toString();
+/**
+ * MSG91 WhatsApp OTP Integration
+ *
+ * MSG91 manages OTP generation, delivery via WhatsApp, and verification
+ * entirely on their side. We do NOT store OTP codes in our database.
+ *
+ * Required ENV vars:
+ *   MSG91_AUTH_KEY      — Your MSG91 authentication key (from MSG91 dashboard)
+ *   MSG91_TEMPLATE_ID   — WhatsApp OTP template ID (from MSG91 > WhatsApp > Templates)
+ *
+ * Optional:
+ *   MSG91_OTP_EXPIRY    — OTP validity in minutes (default: 5)
+ *   MSG91_OTP_LENGTH    — Number of digits in OTP (default: 6)
+ */
+
+const MSG91_BASE = "https://control.msg91.com/api/v5";
+
+/** Formats phone to MSG91 standard: 91XXXXXXXXXX (no + prefix) */
+function formatPhone(phone: string): string {
+  const digits = phone.replace(/\D/g, "");
+  return digits.length === 10 ? `91${digits}` : digits;
 }
 
 /**
- * Sends a WhatsApp OTP to the specified phone number.
- * Standardizes the phone number with country code (defaults to +91 if 10 digits).
- * Falls back to printing to server console if API credentials are not set.
+ * Sends a WhatsApp OTP via MSG91.
+ * MSG91 generates and delivers the OTP code — we just trigger it.
+ * Returns { success: true } or { success: false, error: string }
  */
-export async function sendWhatsAppOtp(phone: string, otp: string): Promise<boolean> {
-  const token = process.env.WHATSAPP_API_TOKEN;
-  const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
-  const templateName = process.env.WHATSAPP_TEMPLATE_NAME;
+export async function sendMsg91Otp(
+  phone: string
+): Promise<{ success: boolean; error?: string }> {
+  const authKey = process.env.MSG91_AUTH_KEY;
+  const templateId = process.env.MSG91_TEMPLATE_ID;
+  const expiry = process.env.MSG91_OTP_EXPIRY ?? "5";
+  const otpLength = process.env.MSG91_OTP_LENGTH ?? "6";
 
-  // Clean the phone number to digits only
-  let formattedPhone = phone.replace(/\D/g, "");
-  // Assume India country code (+91) if it's a 10-digit number
-  if (formattedPhone.length === 10) {
-    formattedPhone = `91${formattedPhone}`;
+  const mobile = formatPhone(phone);
+
+  // ── Local dev fallback ──────────────────────────────────────────────────────
+  if (!authKey || !templateId) {
+    console.log("\n==================================================");
+    console.log("💬 [MSG91 OTP — DEV MODE / Credentials not set]");
+    console.log(`📱 Would send OTP to: +${mobile}`);
+    console.log("⚠️  Set MSG91_AUTH_KEY and MSG91_TEMPLATE_ID in .env to enable real delivery");
+    console.log("==================================================\n");
+    return { success: true };
   }
 
-  // Print OTP to terminal console for local debugging
-  console.log(`\n==================================================`);
-  console.log(`💬 [WHATSAPP OTP LOG]`);
-  console.log(`📱 Recipient Phone: +${formattedPhone}`);
-  console.log(`🔑 Verification OTP: ${otp}`);
-  console.log(`⏰ Generated At: ${new Date().toISOString()}`);
-  console.log(`==================================================\n`);
-
-  // Fallback if environment variables are not configured
-  if (!token || !phoneNumberId) {
-    console.log("⚠️ WHATSAPP_API_TOKEN or WHATSAPP_PHONE_NUMBER_ID not set in env. Simulating success.");
-    return true;
-  }
-
+  // ── Real MSG91 API call ────────────────────────────────────────────────────
   try {
-    const url = `https://graph.facebook.com/v18.0/${phoneNumberId}/messages`;
-    
-    // Choose between template or custom text layout based on templateName variable
-    const body = templateName
-      ? {
-          messaging_product: "whatsapp",
-          recipient_type: "individual",
-          to: formattedPhone,
-          type: "template",
-          template: {
-            name: templateName,
-            language: { code: "en_US" },
-            components: [
-              {
-                type: "body",
-                parameters: [{ type: "text", text: otp }]
-              },
-              {
-                type: "button",
-                sub_type: "url",
-                index: "0",
-                parameters: [{ type: "text", text: otp }]
-              }
-            ]
-          }
-        }
-      : {
-          messaging_product: "whatsapp",
-          recipient_type: "individual",
-          to: formattedPhone,
-          type: "text",
-          text: {
-            body: `Your After Hours verification code is: ${otp}. It is valid for 5 minutes.`
-          }
-        };
+    const url = new URL(`${MSG91_BASE}/otp`);
+    url.searchParams.set("template_id", templateId);
+    url.searchParams.set("mobile", mobile);
+    url.searchParams.set("authkey", authKey);
+    url.searchParams.set("otp_length", otpLength);
+    url.searchParams.set("otp_expiry", expiry);
 
-    const res = await fetch(url, {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${token}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify(body)
+    const res = await fetch(url.toString(), {
+      method: "GET",
+      headers: { "accept": "application/json" },
     });
 
     const data = await res.json();
-    if (!res.ok) {
-      console.error("❌ WhatsApp Cloud API Error Response:", data);
-      return false;
+
+    if (data?.type === "success") {
+      console.log(`✅ [MSG91] OTP dispatched to +${mobile}`);
+      return { success: true };
     }
 
-    console.log("✅ WhatsApp OTP message sent successfully.");
-    return true;
-  } catch (error) {
-    console.error("❌ Error sending WhatsApp OTP via HTTP API:", error);
-    return false;
+    console.error("❌ [MSG91] Send OTP failed:", data);
+    return {
+      success: false,
+      error: data?.message ?? "Failed to send OTP via MSG91",
+    };
+  } catch (err) {
+    console.error("❌ [MSG91] Network error while sending OTP:", err);
+    return { success: false, error: "Network error — could not reach MSG91" };
+  }
+}
+
+/**
+ * Verifies the OTP code entered by the user against MSG91.
+ * MSG91 tracks the code on their side — no DB lookup needed.
+ * Returns { verified: true } or { verified: false, error: string }
+ */
+export async function verifyMsg91Otp(
+  phone: string,
+  otp: string
+): Promise<{ verified: boolean; error?: string }> {
+  const authKey = process.env.MSG91_AUTH_KEY;
+  const mobile = formatPhone(phone);
+
+  // ── Local dev fallback ──────────────────────────────────────────────────────
+  if (!authKey) {
+    console.log(`🔓 [MSG91 VERIFY — DEV MODE] Accepting any OTP for +${mobile}`);
+    return { verified: true };
+  }
+
+  // ── Real MSG91 verification ────────────────────────────────────────────────
+  try {
+    const url = new URL(`${MSG91_BASE}/otp/verify`);
+    url.searchParams.set("authkey", authKey);
+    url.searchParams.set("mobile", mobile);
+    url.searchParams.set("otp", otp);
+
+    const res = await fetch(url.toString(), {
+      method: "GET",
+      headers: { "accept": "application/json" },
+    });
+
+    const data = await res.json();
+
+    if (data?.type === "success") {
+      console.log(`✅ [MSG91] OTP verified for +${mobile}`);
+      return { verified: true };
+    }
+
+    console.warn(`⚠️ [MSG91] OTP verification failed for +${mobile}:`, data);
+    return {
+      verified: false,
+      error: data?.message ?? "Incorrect or expired OTP",
+    };
+  } catch (err) {
+    console.error("❌ [MSG91] Network error during OTP verification:", err);
+    return { verified: false, error: "Network error — could not reach MSG91" };
+  }
+}
+
+/**
+ * Retries / resends the OTP to the same number via MSG91.
+ * Useful for the "Resend Code" button — MSG91 reuses the same OTP session.
+ */
+export async function resendMsg91Otp(
+  phone: string
+): Promise<{ success: boolean; error?: string }> {
+  const authKey = process.env.MSG91_AUTH_KEY;
+  const mobile = formatPhone(phone);
+
+  if (!authKey) {
+    console.log(`🔁 [MSG91 RESEND — DEV MODE] Would resend OTP to +${mobile}`);
+    return { success: true };
+  }
+
+  try {
+    const url = new URL(`${MSG91_BASE}/otp/retry`);
+    url.searchParams.set("authkey", authKey);
+    url.searchParams.set("mobile", mobile);
+    url.searchParams.set("retrytype", "text"); // "text" = WhatsApp text; use "voice" for voice call
+
+    const res = await fetch(url.toString(), {
+      method: "GET",
+      headers: { "accept": "application/json" },
+    });
+
+    const data = await res.json();
+
+    if (data?.type === "success") {
+      console.log(`🔁 [MSG91] OTP resent to +${mobile}`);
+      return { success: true };
+    }
+
+    console.error("❌ [MSG91] Resend OTP failed:", data);
+    return { success: false, error: data?.message ?? "Failed to resend OTP" };
+  } catch (err) {
+    console.error("❌ [MSG91] Network error during OTP resend:", err);
+    return { success: false, error: "Network error — could not reach MSG91" };
   }
 }

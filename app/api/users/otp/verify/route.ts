@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
-import { prisma } from "@/lib/prisma";
+import { verifyMsg91Otp } from "@/lib/whatsapp-otp";
 import { z } from "zod";
 
 const verifySchema = z.object({
@@ -9,7 +9,6 @@ const verifySchema = z.object({
 });
 
 export async function POST(req: NextRequest) {
-  // Authenticate session
   const session = await auth();
   if (!session?.user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -23,35 +22,26 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const parsed = verifySchema.safeParse(body);
     if (!parsed.success) {
-      return NextResponse.json({ error: "Validation failed", details: parsed.error.flatten() }, { status: 400 });
+      return NextResponse.json(
+        { error: "Validation failed", details: parsed.error.flatten() },
+        { status: 400 }
+      );
     }
 
     const { phone, code } = parsed.data;
 
-    const record = await prisma.otpVerification.findUnique({
-      where: { phone }
-    });
-
-    if (!record) {
-      return NextResponse.json({ verified: false, error: "No verification code exists for this number" }, { status: 400 });
+    // MSG91 verifies the OTP on their side — no DB lookup needed
+    const result = await verifyMsg91Otp(phone, code);
+    if (!result.verified) {
+      return NextResponse.json(
+        { verified: false, error: result.error ?? "Incorrect or expired OTP" },
+        { status: 400 }
+      );
     }
-
-    if (record.code !== code) {
-      return NextResponse.json({ verified: false, error: "Incorrect OTP code. Please check and try again" }, { status: 400 });
-    }
-
-    if (new Date() > record.expiresAt) {
-      return NextResponse.json({ verified: false, error: "Verification code has expired. Please request a new one" }, { status: 400 });
-    }
-
-    // Delete verification record on successful verification to prevent reuse
-    await prisma.otpVerification.delete({
-      where: { phone }
-    });
 
     return NextResponse.json({ verified: true });
   } catch (error: any) {
-    console.error("Error verifying OTP:", error);
+    console.error("Error in /api/users/otp/verify:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

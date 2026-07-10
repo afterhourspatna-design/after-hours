@@ -171,6 +171,29 @@ export default function BookingForm({ mode = "create", initialData, prefillDate,
     }
   }
 
+  // Step 2: resend OTP via MSG91 retry endpoint (more efficient than re-calling send)
+  async function handleResendOtp() {
+    setOtpError("");
+    setOtpLoading(true);
+    try {
+      const res = await fetch("/api/users/otp/resend", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone: guestPhone.replace(/\D/g, "") }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setOtpError(data.error ?? "Failed to resend OTP");
+        return;
+      }
+      toast.success("Verification code resent via WhatsApp!");
+    } catch {
+      setOtpError("Connection error. Please try again.");
+    } finally {
+      setOtpLoading(false);
+    }
+  }
+
   // Step 2 → 3: verify OTP, register user, advance
   async function handleVerifyOtp() {
     if (otpCode.length < 4) { setOtpError("Please enter the 6-digit verification code"); return; }
@@ -770,7 +793,7 @@ export default function BookingForm({ mode = "create", initialData, prefillDate,
                   <div className="flex justify-between text-xs">
                     <button type="button" onClick={() => { setGuestStep(1); setOtpCode(""); setOtpError(""); }}
                       className="text-zinc-500 hover:text-zinc-300 font-medium">← Edit Details</button>
-                    <button type="button" onClick={handleSendOtp} disabled={otpLoading}
+                    <button type="button" onClick={handleResendOtp} disabled={otpLoading}
                       className="text-violet-400 hover:text-violet-300 font-medium flex items-center gap-1">
                       {otpLoading && <Loader2 className="w-3 h-3 animate-spin" />} Resend Code
                     </button>
