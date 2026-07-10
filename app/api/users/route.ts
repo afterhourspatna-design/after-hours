@@ -38,7 +38,7 @@ export async function GET(req: NextRequest) {
   const [users, total] = await Promise.all([
     prisma.appUser.findMany({
       where,
-      select: { id: true, name: true, phone: true, email: true, notes: true, isActive: true, createdAt: true, role: true, referredByPhone: true, referredBy: { select: { name: true } } },
+      select: { id: true, name: true, phone: true, email: true, notes: true, isActive: true, createdAt: true, role: true, referredByPhone: true, prepaidHours: true, referredBy: { select: { name: true } } },
       orderBy: { createdAt: "desc" },
       skip: (page - 1) * limit,
       take: limit,

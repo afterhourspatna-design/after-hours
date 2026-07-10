@@ -39,6 +39,7 @@ const NAV_SECTIONS: NavSection[] = [
       { label: "Snacks",     href: "/staff/snacks",       icon: Coffee,          roles: ["STAFF"] },
       { label: "Payments",   href: "/admin/payments",     icon: CreditCard,      roles: ["ADMIN"] },
       { label: "Payments",   href: "/staff/payments",     icon: CreditCard,      roles: ["STAFF"] },
+      { label: "Prepaid",    href: "/admin/prepaid-balances", icon: Zap,         roles: ["ADMIN"] },
       { label: "Customers",  href: "/admin/users",        icon: Users,           roles: ["ADMIN"] },
       { label: "Staff",      href: "/admin/staff",        icon: Shield,          roles: ["ADMIN"] },
       { label: "Users",      href: "/staff/users",        icon: Users,           roles: ["STAFF"] },

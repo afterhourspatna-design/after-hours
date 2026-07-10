@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { format, addMinutes } from "date-fns";
-import { Loader2, User, Users, Gamepad2, Clock, IndianRupee, ChevronDown, Search, X, AlertCircle, Phone, CheckCircle2, ArrowRight } from "lucide-react";
+import { Loader2, User, Users, Gamepad2, Clock, IndianRupee, ChevronDown, Search, X, AlertCircle, Phone, CheckCircle2, ArrowRight, Zap } from "lucide-react";
 import { cn, formatCurrency, SOURCE_LABELS } from "@/lib/utils";
 import { generateBookingConfirmationMessage } from "@/lib/whatsapp";
 
@@ -28,6 +28,7 @@ interface AppUser {
   name: string;
   phone: string;
   email?: string | null;
+  prepaidHours?: string | number;
 }
 
 interface PriceBreakdown {
@@ -310,6 +311,8 @@ export default function BookingForm({ mode = "create", initialData, prefillDate,
   const [paymentMethod, setPaymentMethod] = useState<string>("CASH");
   const [cashAmount, setCashAmount] = useState<number | "">("");
   const [onlineAmount, setOnlineAmount] = useState<number | "">("");
+  
+  const [usePrepaidHours, setUsePrepaidHours] = useState(false);
 
   // Coupon states
   const [couponCode, setCouponCode] = useState(initialData?.coupon?.code ?? "");
@@ -514,6 +517,7 @@ export default function BookingForm({ mode = "create", initialData, prefillDate,
       referredByPhone: (isEditGuest && source === "REFERRAL") ? referredByPhone.replace(/\D/g, "") : null,
       notes: notes || null,
       couponCode: appliedCoupon || null,
+      usePrepaidHours,
       ...(mode === "create" && advanceAmount !== "" && advanceAmount > 0 ? {
         advanceAmount: Number(advanceAmount),
         paymentMethod,
@@ -1239,6 +1243,24 @@ export default function BookingForm({ mode = "create", initialData, prefillDate,
                 rows={3} placeholder="Any notes for this booking…"
                 className="input-field resize-none" />
             </div>
+
+            {selectedUser && selectedUser.prepaidHours && Number(selectedUser.prepaidHours) > 0 && (
+              <div className="pt-4 border-t border-zinc-800/60 space-y-4">
+                <div className="flex items-center justify-between bg-zinc-900/50 border border-zinc-800 p-4 rounded-xl">
+                  <div>
+                    <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                      <Zap className="w-4 h-4 text-violet-400" />
+                      Prepaid Hours Balance
+                    </h4>
+                    <p className="text-xs text-zinc-400 mt-1">Available: {Number(selectedUser.prepaidHours).toFixed(1)} hrs</p>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input type="checkbox" className="sr-only peer" checked={usePrepaidHours} onChange={(e) => setUsePrepaidHours(e.target.checked)} />
+                    <div className="w-11 h-6 bg-zinc-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-zinc-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-violet-600"></div>
+                  </label>
+                </div>
+              </div>
+            )}
 
             {mode === "create" && (
               <div className="pt-4 border-t border-zinc-800/60 space-y-4">

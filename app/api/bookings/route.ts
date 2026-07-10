@@ -27,6 +27,7 @@ const createBookingSchema = z.object({
   paymentMethod: z.enum(["CASH", "ONLINE", "MIXED"]).optional(),
   cashAmount: z.number().nonnegative().optional(),
   onlineAmount: z.number().nonnegative().optional(),
+  usePrepaidHours: z.boolean().optional().default(false),
 });
 
 export async function GET(req: NextRequest) {
@@ -320,12 +321,26 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  const finalAmount = data.priceOverride != null && role === "ADMIN"
+  let finalAmount = data.priceOverride != null && role === "ADMIN"
     ? data.priceOverride
     : pricing.finalAmount;
 
+  let usedPrepaidHours = 0;
+  if (data.usePrepaidHours && resolvedUserId) {
+    const user = await prisma.appUser.findUnique({ where: { id: resolvedUserId } });
+    const hoursNeeded = data.durationMinutes / 60;
+    if (user && Number(user.prepaidHours) >= hoursNeeded) {
+      usedPrepaidHours = hoursNeeded;
+      finalAmount = 0;
+    } else {
+      return NextResponse.json({ error: "Insufficient prepaid hours balance" }, { status: 400 });
+    }
+  }
+
   let initialPaymentStatus = data.paymentStatus;
-  if (data.advanceAmount && data.advanceAmount > 0) {
+  if (usedPrepaidHours > 0) {
+    initialPaymentStatus = PaymentStatus.PAID;
+  } else if (data.advanceAmount && data.advanceAmount > 0) {
     if (data.advanceAmount >= finalAmount) {
       initialPaymentStatus = PaymentStatus.PAID;
     } else {
@@ -351,6 +366,7 @@ export async function POST(req: NextRequest) {
       couponId: dbCouponId,
       couponDiscount: pricing.couponDiscount ?? 0,
       finalAmount,
+      usedPrepaidHours,
       paymentStatus: initialPaymentStatus,
       bookingStatus: BookingStatus.CONFIRMED,
       source: data.source,
@@ -369,6 +385,21 @@ export async function POST(req: NextRequest) {
     await prisma.coupon.update({
       where: { id: dbCouponId },
       data: { usedCount: { increment: 1 } }
+    });
+  }
+
+  if (usedPrepaidHours > 0 && resolvedUserId) {
+    await prisma.appUser.update({
+      where: { id: resolvedUserId },
+      data: { prepaidHours: { decrement: usedPrepaidHours } }
+    });
+    await prisma.prepaidTransaction.create({
+      data: {
+        userId: resolvedUserId,
+        amount: -usedPrepaidHours,
+        description: `Booking #${booking.id.slice(-6).toUpperCase()}`,
+        bookingId: booking.id
+      }
     });
   }
 
