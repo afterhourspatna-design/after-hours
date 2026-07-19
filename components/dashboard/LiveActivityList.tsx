@@ -27,6 +27,7 @@ interface Booking {
   game: Game | null;
   resourceUnit: ResourceUnit | null;
   user: User | null;
+  usedCreditAmount?: string | number | null;
 }
 
 interface LiveActivityListProps {
@@ -217,9 +218,16 @@ export default function LiveActivityList({
                   </div>
                   <div className="min-w-0 flex-1 pr-2">
                     <p className="text-[13px] font-bold text-zinc-200 truncate">{name}</p>
-                    <p className="text-[10px] text-zinc-500 font-medium truncate">
-                      {b.game?.name} {b.resourceUnit ? `• ${b.resourceUnit.unitName}` : ""}
-                    </p>
+                    <div className="flex items-center gap-1.5 overflow-hidden">
+                      <p className="text-[10px] text-zinc-500 font-medium truncate">
+                        {b.game?.name} {b.resourceUnit ? `• ${b.resourceUnit.unitName}` : ""}
+                      </p>
+                      {b.usedCreditAmount && Number(b.usedCreditAmount) > 0 && (
+                        <span className="px-1.5 py-0.5 rounded flex-shrink-0 bg-violet-500/20 text-violet-400 border border-violet-500/30 text-[8px] uppercase tracking-wider font-bold" title={`Paid ₹${Number(b.usedCreditAmount)} via credits`}>
+                          Paid via Credits
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
                 <div className="flex items-center gap-2 flex-shrink-0">

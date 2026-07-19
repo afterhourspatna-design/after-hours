@@ -137,6 +137,8 @@ async function getDashboardData(period: string = "today", from?: string, to?: st
     last7DaysBookings,
     periodStandaloneSnacks,
     last7DaysStandaloneSnacks,
+    periodPrepaidCredits,
+    last7DaysPrepaidCredits,
   ] = await Promise.all([
     prisma.booking.count(),
     prisma.booking.count({ where: whereRange }),
@@ -206,6 +208,16 @@ async function getDashboardData(period: string = "today", from?: string, to?: st
       },
       select: { createdAt: true, amount: true }
     }),
+    prisma.prepaidTransaction.findMany({
+      where: paymentWhereRange,
+      select: { createdAt: true, moneyGiven: true, amount: true }
+    }),
+    prisma.prepaidTransaction.findMany({
+      where: {
+        createdAt: { gte: bounds7Days.start, lte: bounds7Days.end }
+      },
+      select: { createdAt: true, moneyGiven: true, amount: true }
+    }),
   ]);
 
   let periodGameRevenue = 0;
@@ -232,7 +244,17 @@ async function getDashboardData(period: string = "today", from?: string, to?: st
     periodSnacksRevenue += Number(s.amount);
   }
   
-  const periodRevenue = periodGameRevenue + periodSnacksRevenue;
+  let periodCreditRevenue = 0;
+  for (const t of periodPrepaidCredits) {
+    if (Number(t.moneyGiven) > 0) {
+      periodCreditRevenue += Number(t.moneyGiven);
+    } else if (Number(t.amount) > 0) {
+      // Fallback for older transactions
+      periodCreditRevenue += Number(t.amount);
+    }
+  }
+  
+  const periodRevenue = periodGameRevenue + periodSnacksRevenue + periodCreditRevenue;
 
   const gameUtilization = Object.entries(gameMap)
     .map(([name, stats]) => ({
@@ -242,10 +264,10 @@ async function getDashboardData(period: string = "today", from?: string, to?: st
     }))
     .sort((a, b) => b.revenue - a.revenue);
 
-  const dailyMap: Record<string, { game: number; snacks: number }> = {};
+  const dailyMap: Record<string, { game: number; snacks: number; credits: number }> = {};
   for (let i = 6; i >= 0; i--) {
     const day = subDays(now, i);
-    dailyMap[formatInIST(day)] = { game: 0, snacks: 0 };
+    dailyMap[formatInIST(day)] = { game: 0, snacks: 0, credits: 0 };
   }
 
   for (const b of last7DaysBookings) {
@@ -260,9 +282,15 @@ async function getDashboardData(period: string = "today", from?: string, to?: st
   }
 
   for (const s of last7DaysStandaloneSnacks) {
-    const key = formatInIST(s.createdAt);
-    if (key in dailyMap) {
-      dailyMap[key].snacks += Number(s.amount);
+    const dateStr = formatInIST(s.createdAt);
+    if (dailyMap[dateStr]) dailyMap[dateStr].snacks += Number(s.amount);
+  }
+
+  for (const t of last7DaysPrepaidCredits) {
+    const dateStr = formatInIST(t.createdAt);
+    if (dailyMap[dateStr]) {
+      if (Number(t.moneyGiven) > 0) dailyMap[dateStr].credits += Number(t.moneyGiven);
+      else if (Number(t.amount) > 0) dailyMap[dateStr].credits += Number(t.amount);
     }
   }
 
@@ -274,7 +302,8 @@ async function getDashboardData(period: string = "today", from?: string, to?: st
       dayName,
       gameAmount: data.game,
       snacksAmount: data.snacks,
-      amount: data.game + data.snacks,
+      creditsAmount: data.credits,
+      amount: data.game + data.snacks + data.credits,
     };
   });
 
@@ -300,6 +329,7 @@ async function getDashboardData(period: string = "today", from?: string, to?: st
     periodRevenue,
     periodGameRevenue,
     periodSnacksRevenue,
+    periodCreditRevenue,
     gameUtilization,
     holds: holds.map(h => ({
       id: h.id,
@@ -362,6 +392,13 @@ export default async function AdminDashboard({
       icon: Coffee,
       iconColor: "text-amber-400",
       subtitle: "From snack sales",
+    },
+    {
+      title: "Prepaid Credits",
+      value: formatCurrency(data.periodCreditRevenue),
+      icon: Zap,
+      iconColor: "text-blue-400",
+      subtitle: "From wallet top-ups",
     },
     {
       title: "Total Revenue",

@@ -11,6 +11,7 @@ const createSchema = z.object({
   password: z.string().min(6).optional().nullable(),
   notes: z.string().optional().nullable(),
   role: z.enum(["CUSTOMER", "STAFF", "ADMIN"]).default("CUSTOMER"),
+  isPhoneVerified: z.boolean().optional().default(false),
 });
 
 export async function GET(req: NextRequest) {
@@ -37,7 +38,7 @@ export async function GET(req: NextRequest) {
   const [users, total] = await Promise.all([
     prisma.appUser.findMany({
       where,
-      select: { id: true, name: true, phone: true, email: true, notes: true, isActive: true, createdAt: true, role: true, referredByPhone: true, referredBy: { select: { name: true } } },
+      select: { id: true, name: true, phone: true, email: true, notes: true, isActive: true, createdAt: true, role: true, referredByPhone: true, creditBalances: { include: { applicableGames: { select: { id: true, name: true, tag: true } } } }, referredBy: { select: { name: true } } },
       orderBy: { createdAt: "desc" },
       skip: (page - 1) * limit,
       take: limit,
@@ -81,6 +82,7 @@ export async function POST(req: NextRequest) {
       notes: parsed.data.notes ?? null,
       passwordHash,
       role: actorRole === "ADMIN" ? parsed.data.role : "CUSTOMER",
+      isPhoneVerified: parsed.data.isPhoneVerified,
     },
   });
 

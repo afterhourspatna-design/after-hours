@@ -154,6 +154,7 @@ export const SOURCE_LABELS: Record<string, string> = {
   INSTAGRAM:"Instagram",
   REFERRAL: "Referral",
   ONLINE:   "Online",
+  CREDITS:  "Credits",
 };
 
 export function getInitials(name: string): string {
