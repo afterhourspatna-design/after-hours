@@ -31,6 +31,19 @@ export async function GET(req: Request) {
         phone: true,
         creditBalances: {
           include: { applicableGames: { select: { id: true, name: true, tag: true } } }
+        },
+        prepaidTransactions: {
+          orderBy: { createdAt: 'desc' },
+          select: {
+            id: true,
+            amount: true,
+            description: true,
+            createdAt: true,
+            moneyGiven: true,
+            creditsReceived: true,
+            paymentId: true,
+            bookingId: true,
+          }
         }
       },
       orderBy: { name: 'asc' }
@@ -50,7 +63,7 @@ export async function POST(req: Request) {
     const role = (session.user as any).role;
     if (role !== "ADMIN" && role !== "STAFF") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
-    const { userId, moneyGiven, creditsReceived, description, isAllGames, gameIds } = await req.json();
+    const { userId, moneyGiven, creditsReceived, description, isAllGames, gameIds, paymentMethod, cashAmount, onlineAmount } = await req.json();
 
     if (!userId || typeof creditsReceived !== "number" || typeof moneyGiven !== "number") {
       return NextResponse.json({ error: "Invalid parameters" }, { status: 400 });
@@ -111,6 +124,20 @@ export async function POST(req: Request) {
         }
       });
 
+      // Create payment record if money was given
+      let paymentId: string | null = null;
+      if (moneyGiven > 0 && paymentMethod) {
+        const payment = await tx.payment.create({
+          data: {
+            paymentMethod,
+            negotiatedAmount: moneyGiven,
+            cashAmount: cashAmount ?? 0,
+            onlineAmount: onlineAmount ?? 0,
+          }
+        });
+        paymentId = payment.id;
+      }
+
       // Create transaction record
       await tx.prepaidTransaction.create({
         data: {
@@ -119,7 +146,8 @@ export async function POST(req: Request) {
           moneyGiven,
           creditsReceived,
           amount: creditsReceived, // for backwards compat / general tracking
-          description: description || "Credits Added manually"
+          description: description || "Credits Added manually",
+          paymentId
         }
       });
 

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { toast } from "sonner";
-import { Zap, Search, RefreshCw, Loader2, Plus, Minus, User, Edit2, AlertCircle } from "lucide-react";
+import { Zap, Search, RefreshCw, Loader2, Plus, Trash2, User, Edit2, AlertCircle } from "lucide-react";
 import { cn, getInitials } from "@/lib/utils";
 import EmptyState from "@/components/ui/EmptyState";
 import { TableSkeleton } from "@/components/ui/LoadingSkeleton";
@@ -20,11 +20,23 @@ interface CreditBalance {
   applicableGames: Game[];
 }
 
+interface PrepaidTransaction {
+  id: string;
+  amount: number | string;
+  description: string | null;
+  createdAt: string;
+  moneyGiven: number | string;
+  creditsReceived: number | string;
+  paymentId: string | null;
+  bookingId: string | null;
+}
+
 interface PrepaidUser {
   id: string;
   name: string;
   phone: string;
   creditBalances: CreditBalance[];
+  prepaidTransactions: PrepaidTransaction[];
 }
 
 interface BalanceModalProps {
@@ -40,6 +52,9 @@ function BalanceModal({ user, games, onClose, onSaved }: BalanceModalProps) {
   const [description, setDescription] = useState("");
   const [isAllGames, setIsAllGames] = useState(true);
   const [selectedGames, setSelectedGames] = useState<string[]>([]);
+  const [paymentMethod, setPaymentMethod] = useState("CASH");
+  const [cashAmount, setCashAmount] = useState<number | "">("");
+  const [onlineAmount, setOnlineAmount] = useState<number | "">("");
   const [loading, setLoading] = useState(false);
 
   const toggleGame = (id: string) => {
@@ -62,6 +77,14 @@ function BalanceModal({ user, games, onClose, onSaved }: BalanceModalProps) {
       toast.error("Please select at least one game");
       return;
     }
+    if (paymentMethod === "MIXED") {
+      const c = Number(cashAmount) || 0;
+      const o = Number(onlineAmount) || 0;
+      if (c + o !== Number(moneyGiven)) {
+        toast.error(`Cash + Online must equal Money Given (₹${moneyGiven})`);
+        return;
+      }
+    }
 
     setLoading(true);
     try {
@@ -74,7 +97,10 @@ function BalanceModal({ user, games, onClose, onSaved }: BalanceModalProps) {
           creditsReceived: Number(creditsReceived),
           description,
           isAllGames,
-          gameIds: isAllGames ? [] : selectedGames
+          gameIds: isAllGames ? [] : selectedGames,
+          paymentMethod,
+          cashAmount: paymentMethod === "MIXED" ? Number(cashAmount) : paymentMethod === "CASH" ? Number(moneyGiven) : 0,
+          onlineAmount: paymentMethod === "MIXED" ? Number(onlineAmount) : paymentMethod !== "CASH" ? Number(moneyGiven) : 0,
         }),
       });
 
@@ -131,6 +157,55 @@ function BalanceModal({ user, games, onClose, onSaved }: BalanceModalProps) {
               />
             </div>
           </div>
+
+          <div>
+            <label className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider mb-1.5 block">Payment Method</label>
+            <select
+              value={paymentMethod}
+              onChange={e => {
+                setPaymentMethod(e.target.value);
+                if (e.target.value !== "MIXED") {
+                  setCashAmount("");
+                  setOnlineAmount("");
+                }
+              }}
+              className="input-field"
+            >
+              <option value="CASH">Cash</option>
+              <option value="UPI">UPI</option>
+              <option value="CARD">Card</option>
+              <option value="MIXED">Split (Cash + Online)</option>
+            </select>
+          </div>
+
+          {paymentMethod === "MIXED" && (
+            <div className="flex gap-3">
+              <div className="flex-1">
+                <label className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider mb-1.5 block">Cash Amount</label>
+                <input
+                  type="number"
+                  min="0"
+                  value={cashAmount}
+                  onChange={e => setCashAmount(e.target.value === "" ? "" : Number(e.target.value))}
+                  placeholder="₹0"
+                  className="input-field"
+                  required
+                />
+              </div>
+              <div className="flex-1">
+                <label className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider mb-1.5 block">Online Amount</label>
+                <input
+                  type="number"
+                  min="0"
+                  value={onlineAmount}
+                  onChange={e => setOnlineAmount(e.target.value === "" ? "" : Number(e.target.value))}
+                  placeholder="₹0"
+                  className="input-field"
+                  required
+                />
+              </div>
+            </div>
+          )}
 
           <div>
             <label className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider mb-1.5 block">Applicable Games</label>
@@ -195,6 +270,28 @@ export default function PrepaidBalancesPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [modalUser, setModalUser] = useState<PrepaidUser | null>(null);
+  const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
+  const [deletingTxId, setDeletingTxId] = useState<string | null>(null);
+
+  const handleDeleteTransaction = async (txId: string) => {
+    if (!confirm("Are you sure you want to delete this top-up? This will reverse the balance and delete the payment record.")) return;
+    
+    setDeletingTxId(txId);
+    try {
+      const res = await fetch(`/api/prepaid-balances/${txId}`, { method: "DELETE" });
+      if (res.ok) {
+        toast.success("Transaction deleted successfully");
+        fetchData();
+      } else {
+        const d = await res.json();
+        toast.error(d.error || "Failed to delete transaction");
+      }
+    } catch {
+      toast.error("Network error");
+    } finally {
+      setDeletingTxId(null);
+    }
+  };
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -247,43 +344,88 @@ export default function PrepaidBalancesPage() {
         ) : (
           <div className="divide-y divide-zinc-900">
             {users.map(u => (
-              <div key={u.id} className="flex flex-col sm:flex-row sm:items-start gap-3 sm:gap-4 px-4 sm:px-6 py-4 hover:bg-zinc-900/40 transition-colors group">
-                <div className="flex items-center gap-3 w-full sm:w-auto">
-                  <div className="w-10 h-10 rounded-xl bg-violet-600/10 border border-violet-500/10 flex items-center justify-center flex-shrink-0 group-hover:bg-violet-600/20 group-hover:border-violet-500/30 transition-all duration-300">
-                    <span className="text-sm font-bold text-violet-400">{getInitials(u.name)}</span>
+              <div key={u.id} className="flex flex-col group border-b border-zinc-900 last:border-0">
+                <div className="flex flex-col sm:flex-row sm:items-start gap-3 sm:gap-4 px-4 sm:px-6 py-4 hover:bg-zinc-900/40 transition-colors">
+                  <div className="flex items-center gap-3 w-full sm:w-auto">
+                    <div className="w-10 h-10 rounded-xl bg-violet-600/10 border border-violet-500/10 flex items-center justify-center flex-shrink-0 group-hover:bg-violet-600/20 group-hover:border-violet-500/30 transition-all duration-300">
+                      <span className="text-sm font-bold text-violet-400">{getInitials(u.name)}</span>
+                    </div>
+                    <div className="flex-1 sm:hidden">
+                      <p className="text-sm font-bold text-white group-hover:text-violet-400 transition-colors duration-300">{u.name}</p>
+                      <p className="text-xs text-zinc-500">+91 {u.phone}</p>
+                    </div>
+                    <div className="flex gap-1 sm:hidden">
+                      <button onClick={() => setModalUser(u)} className="p-2 rounded-lg text-zinc-500 hover:text-zinc-200 hover:bg-zinc-900 transition-all flex items-center gap-2">
+                         <Plus className="w-4 h-4" /> Add
+                      </button>
+                    </div>
                   </div>
-                  <div className="flex-1 sm:hidden">
-                    <p className="text-sm font-bold text-white group-hover:text-violet-400 transition-colors duration-300">{u.name}</p>
-                    <p className="text-xs text-zinc-500">+91 {u.phone}</p>
+  
+                  <div className="flex-1 min-w-0 pl-14 sm:pl-0">
+                    <p className="hidden sm:block text-sm font-bold text-white group-hover:text-violet-400 transition-colors duration-300">{u.name}</p>
+                    <p className="hidden sm:block text-xs text-zinc-500 mt-0.5">+91 {u.phone}</p>
+                    
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {u.creditBalances.filter(cb => Number(cb.balance) > 0).map(cb => (
+                        <div key={cb.id} className="px-2.5 py-1 rounded-md bg-zinc-900/80 border border-zinc-800 text-xs">
+                          <span className="font-bold text-violet-400">₹{Number(cb.balance)}</span>
+                          <span className="text-zinc-500 ml-1.5">
+                            {cb.isAllGames ? "All Games" : cb.applicableGames.map(g => g.name).join(", ")}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                  <div className="flex gap-1 sm:hidden">
-                    <button onClick={() => setModalUser(u)} className="p-2 rounded-lg text-zinc-500 hover:text-zinc-200 hover:bg-zinc-900 transition-all flex items-center gap-2">
-                       <Plus className="w-4 h-4" /> Add
+  
+                  <div className="hidden sm:flex items-center justify-end gap-3 mt-2 sm:mt-0">
+                    <button onClick={() => setExpandedUserId(expandedUserId === u.id ? null : u.id)} className="px-4 py-2 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-300 hover:text-white hover:bg-zinc-800 transition-all text-sm font-bold flex items-center gap-2">
+                      {expandedUserId === u.id ? "Hide History" : "View History"}
+                    </button>
+                    <button onClick={() => setModalUser(u)} className="px-4 py-2 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-300 hover:text-white hover:bg-zinc-800 transition-all text-sm font-bold flex items-center gap-2">
+                       <Plus className="w-4 h-4" /> Add Credits
                     </button>
                   </div>
                 </div>
-
-                <div className="flex-1 min-w-0 pl-14 sm:pl-0">
-                  <p className="hidden sm:block text-sm font-bold text-white group-hover:text-violet-400 transition-colors duration-300">{u.name}</p>
-                  <p className="hidden sm:block text-xs text-zinc-500 mt-0.5">+91 {u.phone}</p>
-                  
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {u.creditBalances.filter(cb => Number(cb.balance) > 0).map(cb => (
-                      <div key={cb.id} className="px-2.5 py-1 rounded-md bg-zinc-900/80 border border-zinc-800 text-xs">
-                        <span className="font-bold text-violet-400">₹{Number(cb.balance)}</span>
-                        <span className="text-zinc-500 ml-1.5">
-                          {cb.isAllGames ? "All Games" : cb.applicableGames.map(g => g.name).join(", ")}
-                        </span>
+                
+                {expandedUserId === u.id && (
+                  <div className="px-4 sm:px-6 pb-4 pt-2 bg-zinc-950 border-t border-zinc-900">
+                    <h4 className="text-xs font-bold text-zinc-500 uppercase tracking-wider mb-3">Transaction History</h4>
+                    {u.prepaidTransactions.filter(tx => Number(tx.amount) > 0 || tx.bookingId).length === 0 ? (
+                      <p className="text-sm text-zinc-600">No transactions yet.</p>
+                    ) : (
+                      <div className="space-y-2">
+                        {u.prepaidTransactions
+                          .filter(tx => Number(tx.amount) > 0 || tx.bookingId)
+                          .map(tx => (
+                          <div key={tx.id} className="flex items-center justify-between p-3 rounded-lg bg-zinc-900/50 border border-zinc-800/50 text-sm">
+                            <div>
+                              <p className="font-bold text-zinc-200">
+                                {Number(tx.amount) > 0 ? "+" : ""}₹{Number(tx.amount)}
+                              </p>
+                              <p className="text-xs text-zinc-500">
+                                {new Date(tx.createdAt).toLocaleString("en-IN", { 
+                                  day: 'numeric', month: 'short', year: 'numeric',
+                                  hour: 'numeric', minute: '2-digit', hour12: true
+                                })}
+                              </p>
+                              {tx.description && <p className="text-xs text-zinc-400 mt-0.5">{tx.description}</p>}
+                            </div>
+                            {Number(tx.amount) > 0 && tx.paymentId && (
+                              <button 
+                                onClick={() => handleDeleteTransaction(tx.id)}
+                                disabled={deletingTxId === tx.id}
+                                className="p-2 text-red-500 hover:bg-red-500/10 rounded-lg transition-colors disabled:opacity-50"
+                                title="Delete Top-up"
+                              >
+                                {deletingTxId === tx.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                              </button>
+                            )}
+                          </div>
+                        ))}
                       </div>
-                    ))}
+                    )}
                   </div>
-                </div>
-
-                <div className="hidden sm:flex items-center justify-end gap-6 mt-2 sm:mt-0">
-                  <button onClick={() => setModalUser(u)} className="px-4 py-2 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-300 hover:text-white hover:bg-zinc-800 transition-all text-sm font-bold flex items-center gap-2">
-                     <Plus className="w-4 h-4" /> Add Credits
-                  </button>
-                </div>
+                )}
               </div>
             ))}
           </div>
