@@ -46,7 +46,6 @@ enum BookingSource {
   INSTAGRAM
   REFERRAL
   ONLINE
-  CREDITS
 }
 
 // ─────────────────────────────────────────
@@ -62,7 +61,6 @@ model AppUser {
   role         Role      @default(CUSTOMER)
   notes        String?
   isActive     Boolean   @default(true)
-  isPhoneVerified Boolean @default(false)
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
@@ -79,10 +77,6 @@ model AppUser {
   referredBy             AppUser?   @relation("UserReferrals", fields: [referredById], references: [id], onDelete: SetNull)
   refereeUsers           AppUser[]  @relation("UserReferrals")
   referralRewardsClaimed Int        @default(0)
-
-  // Prepaid Balance
-  creditBalances         UserCreditBalance[]
-  prepaidTransactions    PrepaidTransaction[]
 
   @@index([phone])
   @@index([role])
@@ -109,7 +103,6 @@ model Game {
 
   resourceUnits   ResourceUnit[]
   bookings        Booking[]
-  creditBalances  UserCreditBalance[] @relation("GameCreditBalances")
 
   @@index([tag])
   @@index([isActive])
@@ -157,7 +150,6 @@ model Booking {
   createdById    String?
   negotiatedAmount Decimal?    @db.Decimal(10, 2)
   snacksAmount     Decimal?    @default(0) @db.Decimal(10, 2)
-  usedCreditAmount Decimal     @default(0) @db.Decimal(10, 2)
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
 
@@ -167,7 +159,6 @@ model Booking {
   resourceUnit   ResourceUnit? @relation(fields: [resourceUnitId], references: [id], onDelete: SetNull)
   coupon         Coupon?       @relation(fields: [couponId], references: [id], onDelete: SetNull)
   allocations    PaymentAllocation[]
-  prepaidTransactions PrepaidTransaction[]
 
   @@index([startDateTime])
   @@index([gameId])
@@ -191,7 +182,6 @@ model Payment {
   updatedAt        DateTime      @updatedAt
 
   allocations      PaymentAllocation[]
-  prepaidTransactions PrepaidTransaction[]
   user             AppUser?      @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   @@index([createdAt])
@@ -328,57 +318,4 @@ model Coupon {
   @@index([code])
   @@index([isActive])
   @@map("coupons")
-}
-
-model OtpVerification {
-  id        String   @id @default(cuid())
-  phone     String   @unique
-  code      String
-  expiresAt DateTime
-  createdAt DateTime @default(now())
-
-  @@map("otp_verifications")
-}
-
-// ─────────────────────────────────────────
-// PREPAID BALANCES & CREDITS
-// ─────────────────────────────────────────
-
-model UserCreditBalance {
-  id              String   @id @default(cuid())
-  userId          String
-  balance         Decimal  @db.Decimal(10, 2)
-  isAllGames      Boolean  @default(true)
-  applicableGames Game[]   @relation("GameCreditBalances")
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-
-  user            AppUser  @relation(fields: [userId], references: [id], onDelete: Cascade)
-  transactions    PrepaidTransaction[]
-
-  @@index([userId])
-  @@map("user_credit_balances")
-}
-
-model PrepaidTransaction {
-  id              String   @id @default(cuid())
-  userId          String
-  creditBalanceId String?
-  moneyGiven      Decimal  @default(0.00) @db.Decimal(10, 2)
-  creditsReceived Decimal  @default(0.00) @db.Decimal(10, 2)
-  amount          Decimal  @db.Decimal(10, 2) // positive for adding, negative for deduction
-  description     String?
-  bookingId       String?
-  paymentId       String?
-  createdAt       DateTime @default(now())
-
-  user            AppUser            @relation(fields: [userId], references: [id], onDelete: Cascade)
-  creditBalance   UserCreditBalance? @relation(fields: [creditBalanceId], references: [id], onDelete: SetNull)
-  booking         Booking?           @relation(fields: [bookingId], references: [id], onDelete: SetNull)
-  payment         Payment?           @relation(fields: [paymentId], references: [id], onDelete: SetNull)
-
-  @@index([userId])
-  @@index([creditBalanceId])
-  @@index([createdAt])
-  @@map("prepaid_transactions")
 }

@@ -27,7 +27,6 @@ const createBookingSchema = z.object({
   paymentMethod: z.enum(["CASH", "ONLINE", "MIXED"]).optional(),
   cashAmount: z.number().nonnegative().optional(),
   onlineAmount: z.number().nonnegative().optional(),
-  usePrepaidCredits: z.boolean().optional().default(false),
 });
 
 export async function GET(req: NextRequest) {
@@ -321,55 +320,17 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  let finalAmount = data.priceOverride != null && role === "ADMIN"
+  const finalAmount = data.priceOverride != null && role === "ADMIN"
     ? data.priceOverride
     : pricing.finalAmount;
 
-  let usedCreditAmount = 0;
-  let creditBalanceIdToDeduct: string | null = null;
-  
-  if (data.usePrepaidCredits && resolvedUserId) {
-    const balances = await prisma.userCreditBalance.findMany({
-      where: { userId: resolvedUserId, balance: { gt: 0 } },
-      include: { applicableGames: true }
-    });
-    
-    // Prioritize specific game balances, fallback to general "all games" balances
-    let applicableBalance = balances.find(b => !b.isAllGames && b.applicableGames.some(g => g.id === data.gameId));
-    if (!applicableBalance) {
-      applicableBalance = balances.find(b => b.isAllGames);
-    }
-
-    if (applicableBalance) {
-      const balanceValue = Number(applicableBalance.balance);
-      if (balanceValue >= finalAmount) {
-        usedCreditAmount = finalAmount;
-        creditBalanceIdToDeduct = applicableBalance.id;
-        finalAmount = 0;
-      } else {
-        usedCreditAmount = balanceValue;
-        creditBalanceIdToDeduct = applicableBalance.id;
-        finalAmount -= usedCreditAmount;
-      }
-    } else {
-      return NextResponse.json({ error: "Insufficient prepaid credit balance for this game" }, { status: 400 });
-    }
-  }
-
   let initialPaymentStatus = data.paymentStatus;
-  if (finalAmount === 0 && usedCreditAmount > 0) {
-    initialPaymentStatus = PaymentStatus.PAID;
-  } else if (data.advanceAmount && data.advanceAmount > 0) {
+  if (data.advanceAmount && data.advanceAmount > 0) {
     if (data.advanceAmount >= finalAmount) {
       initialPaymentStatus = PaymentStatus.PAID;
     } else {
       initialPaymentStatus = PaymentStatus.PARTIAL;
     }
-  }
-
-  let finalSource = data.source;
-  if (finalAmount === 0 && usedCreditAmount > 0) {
-    finalSource = "CREDITS" as any; // Cast as any because zod schema uses nativeEnum which may not immediately reflect prisma enum change
   }
 
   const booking = await prisma.booking.create({
@@ -390,10 +351,9 @@ export async function POST(req: NextRequest) {
       couponId: dbCouponId,
       couponDiscount: pricing.couponDiscount ?? 0,
       finalAmount,
-      usedCreditAmount,
       paymentStatus: initialPaymentStatus,
       bookingStatus: BookingStatus.CONFIRMED,
-      source: finalSource,
+      source: data.source,
       notes: data.notes ?? null,
       holdExpiresAt: null,
       createdById: actorId,
@@ -409,22 +369,6 @@ export async function POST(req: NextRequest) {
     await prisma.coupon.update({
       where: { id: dbCouponId },
       data: { usedCount: { increment: 1 } }
-    });
-  }
-
-  if (usedCreditAmount > 0 && resolvedUserId && creditBalanceIdToDeduct) {
-    await prisma.userCreditBalance.update({
-      where: { id: creditBalanceIdToDeduct },
-      data: { balance: { decrement: usedCreditAmount } }
-    });
-    await prisma.prepaidTransaction.create({
-      data: {
-        userId: resolvedUserId,
-        creditBalanceId: creditBalanceIdToDeduct,
-        amount: -usedCreditAmount,
-        description: `Booking #${booking.id.slice(-6).toUpperCase()}`,
-        bookingId: booking.id
-      }
     });
   }
 
