@@ -208,6 +208,9 @@ export default function BookingForm({ mode = "create", initialData, prefillDate,
           setSelectedGame(g);
           if (mode === "create") {
             setAccessoriesCount(g.tag === "ps5" ? 1 : g.tag === "tabletennis" ? 2 : g.tag === "pool" ? 2 : 0);
+            if ((g.tag === "pool" || g.tag === "cards") && !selectedUnit) {
+              setSelectedUnit(g.resourceUnits[0]?.id ?? "");
+            }
           } else if (mode === "edit" && (!initialData?.accessoriesCount || initialData.accessoriesCount === 0)) {
             setAccessoriesCount(g.tag === "ps5" ? 1 : g.tag === "tabletennis" ? 2 : g.tag === "pool" ? 2 : 0);
           }
@@ -559,10 +562,15 @@ export default function BookingForm({ mode = "create", initialData, prefillDate,
                   onChange={e => {
                     const g = games.find(g => g.id === e.target.value) ?? null;
                     setSelectedGame(g);
-                    setSelectedUnit("");
                     if (g) {
                       setAccessoriesCount(g.tag === "ps5" ? 1 : g.tag === "tabletennis" ? 2 : g.tag === "pool" ? 2 : 0);
+                      if (g.tag === "pool" || g.tag === "cards") {
+                        setSelectedUnit(g.resourceUnits[0]?.id ?? "");
+                      } else {
+                        setSelectedUnit("");
+                      }
                     } else {
+                      setSelectedUnit("");
                       setAccessoriesCount(0);
                     }
                   }}
