@@ -210,7 +210,12 @@ export default function CalendarView({
                 {unitName && (
                   <p className="text-[10px] opacity-80 truncate">{unitName}</p>
                 )}
-                <p className="text-[10px] opacity-70">{statusLabel}</p>
+                <p className="text-[10px] opacity-70 truncate">{statusLabel}</p>
+                {booking.usedCreditAmount && Number(booking.usedCreditAmount) > 0 && (
+                  <p className="text-[8px] uppercase tracking-wider font-bold text-violet-200 mt-0.5 truncate bg-violet-500/30 px-1 py-0.5 rounded w-max">
+                    Paid via Credits
+                  </p>
+                )}
               </div>
             );
           }}

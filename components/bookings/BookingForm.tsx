@@ -28,7 +28,7 @@ interface AppUser {
   name: string;
   phone: string;
   email?: string | null;
-  prepaidHours?: string | number;
+  creditBalances?: { id: string; balance: string | number; isAllGames: boolean; applicableGames: { id: string }[] }[];
 }
 
 interface PriceBreakdown {
@@ -335,7 +335,8 @@ export default function BookingForm({ mode = "create", initialData, prefillDate,
   const [cashAmount, setCashAmount] = useState<number | "">("");
   const [onlineAmount, setOnlineAmount] = useState<number | "">("");
   
-  const [usePrepaidHours, setUsePrepaidHours] = useState(false);
+  const [usePrepaidCredits, setUsePrepaidCredits] = useState(false);
+  const [sendToCustomer, setSendToCustomer] = useState(false);
 
   // Coupon states
   const [couponCode, setCouponCode] = useState(initialData?.coupon?.code ?? "");
@@ -540,7 +541,7 @@ export default function BookingForm({ mode = "create", initialData, prefillDate,
       referredByPhone: (isEditGuest && source === "REFERRAL") ? referredByPhone.replace(/\D/g, "") : null,
       notes: notes || null,
       couponCode: appliedCoupon || null,
-      usePrepaidHours,
+      usePrepaidCredits,
       ...(mode === "create" && advanceAmount !== "" && advanceAmount > 0 ? {
         advanceAmount: Number(advanceAmount),
         paymentMethod,
@@ -563,6 +564,21 @@ export default function BookingForm({ mode = "create", initialData, prefillDate,
       if (!res.ok) {
         toast.error(data.error ?? "Failed to save booking");
         return;
+      }
+
+      // Send WhatsApp notification if staff opted in
+      if (mode === "create" && sendToCustomer && data?.id) {
+        try {
+          const notifyRes = await fetch(`/api/bookings/${data.id}/notify`, { method: "POST" });
+          if (notifyRes.ok) {
+            toast.success("Invoice sent to customer WhatsApp! 📲");
+          } else {
+            const err = await notifyRes.json();
+            toast.error(`WhatsApp: ${err.error ?? "Failed to send"}`);
+          }
+        } catch {
+          toast.error("Could not send WhatsApp notification");
+        }
       }
 
       toast.success(mode === "edit" ? "Booking updated!" : "Booking created successfully!", {
@@ -1267,23 +1283,44 @@ export default function BookingForm({ mode = "create", initialData, prefillDate,
                 className="input-field resize-none" />
             </div>
 
-            {selectedUser && selectedUser.prepaidHours && Number(selectedUser.prepaidHours) > 0 && (
-              <div className="pt-4 border-t border-zinc-800/60 space-y-4">
-                <div className="flex items-center justify-between bg-zinc-900/50 border border-zinc-800 p-4 rounded-xl">
-                  <div>
-                    <h4 className="text-sm font-bold text-white flex items-center gap-2">
-                      <Zap className="w-4 h-4 text-violet-400" />
-                      Prepaid Hours Balance
-                    </h4>
-                    <p className="text-xs text-zinc-400 mt-1">Available: {Number(selectedUser.prepaidHours).toFixed(1)} hrs</p>
+            {(() => {
+              if (!selectedUser || !selectedUser.creditBalances) return null;
+              
+              // Prioritize specific game balances, fallback to general "all games" balances
+              let applicableBalance = selectedUser.creditBalances.find(b => 
+                Number(b.balance) > 0 && !b.isAllGames && b.applicableGames.some(g => g.id === selectedGame?.id)
+              );
+              if (!applicableBalance) {
+                applicableBalance = selectedUser.creditBalances.find(b => 
+                  Number(b.balance) > 0 && b.isAllGames
+                );
+              }
+              
+              if (!applicableBalance) return null;
+              
+              return (
+                <div className="pt-4 border-t border-zinc-800/60 space-y-4">
+                  <div className="flex items-center justify-between bg-zinc-900/50 border border-zinc-800 p-4 rounded-xl">
+                    <div>
+                      <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                        <Zap className="w-4 h-4 text-violet-400" />
+                        Prepaid Credits Available
+                      </h4>
+                      <p className="text-xs text-zinc-400 mt-1">
+                        Available Balance: ₹{Number(applicableBalance.balance)}
+                        <span className="ml-1 opacity-70">
+                          ({applicableBalance.isAllGames ? "All Games Wallet" : "Specific Game Wallet"})
+                        </span>
+                      </p>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input type="checkbox" className="sr-only peer" checked={usePrepaidCredits} onChange={(e) => setUsePrepaidCredits(e.target.checked)} />
+                      <div className="w-11 h-6 bg-zinc-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-zinc-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-violet-600"></div>
+                    </label>
                   </div>
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input type="checkbox" className="sr-only peer" checked={usePrepaidHours} onChange={(e) => setUsePrepaidHours(e.target.checked)} />
-                    <div className="w-11 h-6 bg-zinc-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-zinc-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-violet-600"></div>
-                  </label>
                 </div>
-              </div>
-            )}
+              );
+            })()}
 
             {mode === "create" && (
               <div className="pt-4 border-t border-zinc-800/60 space-y-4">
@@ -1398,6 +1435,25 @@ export default function BookingForm({ mode = "create", initialData, prefillDate,
               </div>
             ) : (
               <p className="text-xs text-zinc-600">Select a game and time to see pricing</p>
+            )}
+
+            {/* Send to Customer WhatsApp toggle */}
+            {mode === "create" && (
+              <div className="flex items-center justify-between p-3 bg-zinc-900/60 rounded-xl border border-zinc-800">
+                <div>
+                  <p className="text-xs font-semibold text-zinc-200">Send invoice to customer WhatsApp</p>
+                  <p className="text-[10px] text-zinc-500 mt-0.5">Sends booking details after creation</p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    className="sr-only peer"
+                    checked={sendToCustomer}
+                    onChange={e => setSendToCustomer(e.target.checked)}
+                  />
+                  <div className="w-9 h-5 bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-600" />
+                </label>
+              </div>
             )}
 
             {/* Submit */}

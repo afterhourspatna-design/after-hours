@@ -1,12 +1,14 @@
 /**
- * MSG91 WhatsApp OTP Integration
- *
- * MSG91 manages OTP generation, delivery via WhatsApp, and verification
- * entirely on their side. We do NOT store OTP codes in our database.
+ * MSG91 WhatsApp OTP + Booking Notification Integration
  *
  * Required ENV vars:
- *   MSG91_AUTH_KEY      — Your MSG91 authentication key (from MSG91 dashboard)
- *   MSG91_TEMPLATE_ID   — WhatsApp OTP template ID (from MSG91 > WhatsApp > Templates)
+ *   MSG91_AUTH_KEY                — Your MSG91 authentication key
+ *   MSG91_TEMPLATE_ID             — WhatsApp OTP template ID
+ *   MSG91_BOOKING_TEMPLATE_ID     — WhatsApp booking confirmation template ID
+ *
+ * Booking template must have these variables in order:
+ *   {{1}} = customer name, {{2}} = game name, {{3}} = date,
+ *   {{4}} = time range, {{5}} = payment status + amount
  *
  * Optional:
  *   MSG91_OTP_EXPIRY    — OTP validity in minutes (default: 5)
@@ -163,6 +165,74 @@ export async function resendMsg91Otp(
     return { success: false, error: data?.message ?? "Failed to resend OTP" };
   } catch (err) {
     console.error("❌ [MSG91] Network error during OTP resend:", err);
+    return { success: false, error: "Network error — could not reach MSG91" };
+  }
+}
+
+/**
+ * Sends a booking confirmation WhatsApp message via MSG91 template API.
+ * Requires MSG91_BOOKING_TEMPLATE_ID to be set (create the template in MSG91 dashboard).
+ * Template variables: {{1}} name, {{2}} game, {{3}} date, {{4}} time, {{5}} payment
+ */
+export async function sendBookingNotification(data: {
+  phone: string;
+  name: string;
+  gameName: string;
+  date: string;
+  timeRange: string;
+  paymentLine: string;
+}): Promise<{ success: boolean; error?: string }> {
+  const authKey = process.env.MSG91_AUTH_KEY;
+  const templateId = process.env.MSG91_BOOKING_TEMPLATE_ID;
+  const mobile = formatPhone(data.phone);
+
+  // ── Dev fallback ───────────────────────────────────────────────────────────
+  if (!authKey || !templateId) {
+    console.log("\n==================================================");
+    console.log("💬 [MSG91 BOOKING — DEV MODE / Credentials not set]");
+    console.log(`📱 Would send booking confirmation to: +${mobile}`);
+    console.log(`📋 Name: ${data.name} | Game: ${data.gameName}`);
+    console.log(`📅 ${data.date} ⏰ ${data.timeRange}`);
+    console.log(`💳 ${data.paymentLine}`);
+    console.log("⚠️  Set MSG91_AUTH_KEY and MSG91_BOOKING_TEMPLATE_ID in .env");
+    console.log("==================================================\n");
+    return { success: true };
+  }
+
+  // ── MSG91 WhatsApp Integrated Messaging (template send) ────────────────────
+  try {
+    const res = await fetch("https://control.msg91.com/api/v5/flow/", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        authkey: authKey,
+      },
+      body: JSON.stringify({
+        template_id: templateId,
+        short_url: "0",
+        recipients: [
+          {
+            mobiles: mobile,
+            VAR1: data.name,
+            VAR2: data.gameName,
+            VAR3: data.date,
+            VAR4: data.timeRange,
+            VAR5: data.paymentLine,
+          },
+        ],
+      }),
+    });
+
+    const json = await res.json();
+    if (json?.type === "success") {
+      console.log(`✅ [MSG91] Booking notification sent to +${mobile}`);
+      return { success: true };
+    }
+
+    console.error("❌ [MSG91] Booking notification failed:", json);
+    return { success: false, error: json?.message ?? "Failed to send notification" };
+  } catch (err) {
+    console.error("❌ [MSG91] Network error sending booking notification:", err);
     return { success: false, error: "Network error — could not reach MSG91" };
   }
 }

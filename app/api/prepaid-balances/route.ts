@@ -20,7 +20,7 @@ export async function GET(req: Request) {
         { phone: { contains: q } }
       ];
     } else {
-      whereClause.prepaidHours = { gt: 0 };
+      whereClause.creditBalances = { some: { balance: { gt: 0 } } };
     }
 
     const users = await prisma.appUser.findMany({
@@ -29,7 +29,9 @@ export async function GET(req: Request) {
         id: true,
         name: true,
         phone: true,
-        prepaidHours: true
+        creditBalances: {
+          include: { applicableGames: { select: { id: true, name: true, tag: true } } }
+        }
       },
       orderBy: { name: 'asc' }
     });
@@ -48,9 +50,9 @@ export async function POST(req: Request) {
     const role = (session.user as any).role;
     if (role !== "ADMIN" && role !== "STAFF") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
-    const { userId, amount, description } = await req.json();
+    const { userId, moneyGiven, creditsReceived, description, isAllGames, gameIds } = await req.json();
 
-    if (!userId || typeof amount !== "number") {
+    if (!userId || typeof creditsReceived !== "number" || typeof moneyGiven !== "number") {
       return NextResponse.json({ error: "Invalid parameters" }, { status: 400 });
     }
 
@@ -58,23 +60,72 @@ export async function POST(req: Request) {
     if (!user) return NextResponse.json({ error: "User not found" }, { status: 404 });
 
     const updatedUser = await prisma.$transaction(async (tx) => {
+      // Find if a credit balance wallet already exists for this exact game configuration
+      // This is tricky because gameIds is an array. To keep it simple, we can either
+      // add a new UserCreditBalance record every time, or try to merge.
+      // Easiest is to add a new record if we can't find an exact match, or just always add a new record.
+      // Wait, let's just find an existing one that matches isAllGames and the exact same games.
+      
+      let creditBalance;
+      
+      if (isAllGames) {
+        creditBalance = await tx.userCreditBalance.findFirst({
+          where: { userId, isAllGames: true }
+        });
+      } else if (gameIds && gameIds.length > 0) {
+        // Just find one that has exactly these games? Let's just create a new one if it's complex,
+        // or find the first one that has ANY of these games and append?
+        // Actually, it's safer to just always create a new wallet for specific purchases unless we do exact matching.
+        // Let's create a new one to keep it simple and accurate.
+        creditBalance = await tx.userCreditBalance.create({
+          data: {
+            userId,
+            balance: 0,
+            isAllGames: false,
+            applicableGames: {
+              connect: gameIds.map((id: string) => ({ id }))
+            }
+          }
+        });
+      }
+
+      if (!creditBalance && isAllGames) {
+        creditBalance = await tx.userCreditBalance.create({
+          data: {
+            userId,
+            balance: 0,
+            isAllGames: true
+          }
+        });
+      }
+
+      if (!creditBalance) {
+        throw new Error("Could not determine credit balance configuration");
+      }
+
+      // Update the balance
+      const updatedBalance = await tx.userCreditBalance.update({
+        where: { id: creditBalance.id },
+        data: {
+          balance: { increment: creditsReceived }
+        }
+      });
+
       // Create transaction record
       await tx.prepaidTransaction.create({
         data: {
           userId,
-          amount,
-          description: description || (amount > 0 ? "Manual Add" : "Manual Deduct")
+          creditBalanceId: creditBalance.id,
+          moneyGiven,
+          creditsReceived,
+          amount: creditsReceived, // for backwards compat / general tracking
+          description: description || "Credits Added manually"
         }
       });
 
-      // Update user balance
-      return tx.appUser.update({
+      return tx.appUser.findUnique({
         where: { id: userId },
-        data: {
-          prepaidHours: {
-            increment: amount
-          }
-        }
+        include: { creditBalances: { include: { applicableGames: true } } }
       });
     });
 
