@@ -396,32 +396,42 @@ export default function PrepaidBalancesPage() {
                       <div className="space-y-2">
                         {u.prepaidTransactions
                           .filter(tx => Number(tx.amount) > 0 || tx.bookingId)
-                          .map(tx => (
-                          <div key={tx.id} className="flex items-center justify-between p-3 rounded-lg bg-zinc-900/50 border border-zinc-800/50 text-sm">
-                            <div>
-                              <p className="font-bold text-zinc-200">
-                                {Number(tx.amount) > 0 ? "+" : ""}₹{Number(tx.amount)}
-                              </p>
-                              <p className="text-xs text-zinc-500">
-                                {new Date(tx.createdAt).toLocaleString("en-IN", { 
-                                  day: 'numeric', month: 'short', year: 'numeric',
-                                  hour: 'numeric', minute: '2-digit', hour12: true
-                                })}
-                              </p>
-                              {tx.description && <p className="text-xs text-zinc-400 mt-0.5">{tx.description}</p>}
+                          .map(tx => {
+                            const isTopUp = Number(tx.amount) > 0 && !!tx.paymentId;
+                            const isDeduction = !!tx.bookingId && Number(tx.amount) <= 0;
+                            return (
+                            <div key={tx.id} className="flex items-center justify-between p-3 rounded-lg bg-zinc-900/50 border border-zinc-800/50 text-sm">
+                              <div>
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <p className={`font-bold ${Number(tx.amount) > 0 ? "text-emerald-400" : "text-red-400"}`}>
+                                    {Number(tx.amount) > 0 ? "+" : ""}₹{Math.abs(Number(tx.amount))} credits
+                                  </p>
+                                  {isTopUp && Number(tx.moneyGiven) > 0 && (
+                                    <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-zinc-800 border border-zinc-700 text-zinc-400">
+                                      Paid ₹{Number(tx.moneyGiven)}
+                                    </span>
+                                  )}
+                                </div>
+                                <p className="text-xs text-zinc-500 mt-0.5">
+                                  {new Date(tx.createdAt).toLocaleString("en-IN", { 
+                                    day: 'numeric', month: 'short', year: 'numeric',
+                                    hour: 'numeric', minute: '2-digit', hour12: true
+                                  })}
+                                </p>
+                                {tx.description && <p className="text-xs text-zinc-400 mt-0.5">{tx.description}</p>}
+                              </div>
+                              {isTopUp && (
+                                <button 
+                                  onClick={() => handleDeleteTransaction(tx.id)}
+                                  disabled={deletingTxId === tx.id}
+                                  className="p-2 text-red-500 hover:bg-red-500/10 rounded-lg transition-colors disabled:opacity-50"
+                                  title="Delete Top-up"
+                                >
+                                  {deletingTxId === tx.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                                </button>
+                              )}
                             </div>
-                            {Number(tx.amount) > 0 && tx.paymentId && (
-                              <button 
-                                onClick={() => handleDeleteTransaction(tx.id)}
-                                disabled={deletingTxId === tx.id}
-                                className="p-2 text-red-500 hover:bg-red-500/10 rounded-lg transition-colors disabled:opacity-50"
-                                title="Delete Top-up"
-                              >
-                                {deletingTxId === tx.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
-                              </button>
-                            )}
-                          </div>
-                        ))}
+                          )})}
                       </div>
                     )}
                   </div>
