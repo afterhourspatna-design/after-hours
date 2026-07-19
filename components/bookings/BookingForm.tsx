@@ -281,7 +281,7 @@ export default function BookingForm({ mode = "create", initialData, prefillDate,
       case "jenga":
         return [5];
       case "metaquest":
-        return [20, 30, 40, 60];
+        return [20, 30, 40, 60, 80, 90, 100, 120, 140, 150, 160, 180, 200, 210, 220, 240];
       case "foosball":
       case "soccer":
       case "ps5":
@@ -289,11 +289,11 @@ export default function BookingForm({ mode = "create", initialData, prefillDate,
       case "pool":
       case "carrom":
       case "cards":
-        return [30, 60];
+        return [30, 60, 90, 120, 150, 180, 210, 240];
       case "event":
         return [120, 180, 240];
       default:
-        return [60];
+        return [30, 60, 90, 120, 150, 180, 210, 240];
     }
   }, [selectedGame]);
 
@@ -1072,7 +1072,7 @@ export default function BookingForm({ mode = "create", initialData, prefillDate,
                         durationMinutes === d
                           ? "bg-violet-600 border-violet-600 text-white"
                           : "bg-zinc-800/60 border-zinc-700 text-zinc-400 hover:border-zinc-600")}>
-                      {d === 5 ? "5m" : d < 60 ? `${d}m` : `${d / 60}h`}
+                      {d === 5 ? "5m" : d < 60 ? `${d}m` : d % 60 === 0 ? `${d / 60}h` : `${Math.floor(d / 60)}h ${d % 60}m`}
                     </button>
                   ))}
                 </div>

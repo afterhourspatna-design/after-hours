@@ -209,14 +209,15 @@ async function getDashboardData(period: string = "today", from?: string, to?: st
       select: { createdAt: true, amount: true }
     }),
     prisma.prepaidTransaction.findMany({
-      where: paymentWhereRange,
-      select: { createdAt: true, moneyGiven: true, amount: true }
+      where: { ...paymentWhereRange, moneyGiven: { gt: 0 } },
+      select: { createdAt: true, moneyGiven: true }
     }),
     prisma.prepaidTransaction.findMany({
       where: {
-        createdAt: { gte: bounds7Days.start, lte: bounds7Days.end }
+        createdAt: { gte: bounds7Days.start, lte: bounds7Days.end },
+        moneyGiven: { gt: 0 }
       },
-      select: { createdAt: true, moneyGiven: true, amount: true }
+      select: { createdAt: true, moneyGiven: true }
     }),
   ]);
 
@@ -246,12 +247,7 @@ async function getDashboardData(period: string = "today", from?: string, to?: st
   
   let periodCreditRevenue = 0;
   for (const t of periodPrepaidCredits) {
-    if (Number(t.moneyGiven) > 0) {
-      periodCreditRevenue += Number(t.moneyGiven);
-    } else if (Number(t.amount) > 0) {
-      // Fallback for older transactions
-      periodCreditRevenue += Number(t.amount);
-    }
+    periodCreditRevenue += Number(t.moneyGiven);
   }
   
   const periodRevenue = periodGameRevenue + periodSnacksRevenue + periodCreditRevenue;
@@ -289,8 +285,7 @@ async function getDashboardData(period: string = "today", from?: string, to?: st
   for (const t of last7DaysPrepaidCredits) {
     const dateStr = formatInIST(t.createdAt);
     if (dailyMap[dateStr]) {
-      if (Number(t.moneyGiven) > 0) dailyMap[dateStr].credits += Number(t.moneyGiven);
-      else if (Number(t.amount) > 0) dailyMap[dateStr].credits += Number(t.amount);
+      dailyMap[dateStr].credits += Number(t.moneyGiven);
     }
   }
 

@@ -326,7 +326,32 @@ export async function DELETE(
   if (!booking) return NextResponse.json({ error: "Booking not found" }, { status: 404 });
 
   await prisma.$transaction(async (tx) => {
+    // Refund prepaid credits if any were used
+    if (Number(booking.usedCreditAmount) > 0 && booking.userId) {
+      const deductionTx = await tx.prepaidTransaction.findFirst({
+        where: { bookingId: id, amount: { lt: 0 } },
+      });
+
+      if (deductionTx && deductionTx.creditBalanceId) {
+        await tx.userCreditBalance.update({
+          where: { id: deductionTx.creditBalanceId },
+          data: { balance: { increment: Number(booking.usedCreditAmount) } },
+        });
+
+        await tx.prepaidTransaction.create({
+          data: {
+            userId: booking.userId,
+            creditBalanceId: deductionTx.creditBalanceId,
+            amount: Number(booking.usedCreditAmount),
+            creditsReceived: Number(booking.usedCreditAmount),
+            description: "Refund for deleted booking",
+          },
+        });
+      }
+    }
+
     await tx.booking.delete({ where: { id } });
+    
     if (booking.couponId) {
       await tx.coupon.updateMany({
         where: { id: booking.couponId, usedCount: { gt: 0 } },

@@ -45,6 +45,9 @@ export async function GET(req: NextRequest) {
               booking: { select: { id: true, finalAmount: true, guestName: true, guestPhone: true, startDateTime: true, endDateTime: true, negotiatedAmount: true, game: { select: { name: true } }, user: { select: { name: true, phone: true } }, couponId: true } },
               snackOrder: { select: { id: true, amount: true, guestName: true, guestPhone: true, user: { select: { name: true, phone: true } } } }
             }
+          },
+          prepaidTransactions: {
+            select: { id: true, amount: true, description: true }
           }
         },
         orderBy: { createdAt: "desc" },

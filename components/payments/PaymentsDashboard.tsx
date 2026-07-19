@@ -187,8 +187,35 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
                 });
               }
             }
+            const creditBookings: any[] = [];
+            for (const tx of p.prepaidTransactions || []) {
+              creditBookings.push({
+                id: `CREDIT_${tx.id}`,
+                guestName: p.customerNames || "Customer",
+                guestPhone: "",
+                startDateTime: p.createdAt,
+                endDateTime: p.createdAt,
+                durationMinutes: 0,
+                bookingStatus: "COMPLETED",
+                paymentStatus: "PAID",
+                finalAmount: tx.amount,
+                negotiatedAmount: tx.amount,
+                paymentMethod: p.paymentMethod,
+                cashAmount: 0,
+                onlineAmount: 0,
+                source: "WALK_IN",
+                game: { name: "Credits", tag: "CREDITS" },
+                resourceUnit: null,
+                user: null,
+                updatedAt: p.createdAt,
+                paymentId: p.id,
+                snacksAmount: 0,
+                allocatedAmount: Number(tx.amount),
+                couponId: null,
+              });
+            }
 
-            const allBookings = [...bookings, ...snackBookings];
+            const allBookings = [...bookings, ...snackBookings, ...creditBookings];
             const totalActual = allBookings.reduce((sum, b) => sum + Number(b.finalAmount), 0);
             const totalSnacks = (p.allocations || [])
               .filter((a: any) => a.snackOrder)
@@ -248,6 +275,8 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
   const selectedBookings = editPaymentId
     ? paymentHistory.find(p => p.paymentId === editPaymentId)?.bookings || []
     : bookings.filter((b) => selectedIds.has(b.id));
+
+  const isCreditsPayment = selectedBookings.some((b) => b.game?.tag === "CREDITS");
 
   const totalActualAmount = selectedBookings.reduce((sum, b) => sum + Number(b.finalAmount), 0);
   const totalActualGamesAmount = selectedBookings
@@ -679,8 +708,12 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
                           {Math.abs(amountPaid - batchTotal) > 0.01 && (
                             <p className="text-[10px] text-amber-500 font-medium">Invoice: {formatCurrency(batchTotal)}</p>
                           )}
-                          {p.totalSnacks > 0 && (
-                            <p className="text-[10px] text-zinc-500">Games: {formatCurrency(p.totalNegotiated)} | Snacks: {formatCurrency(p.totalSnacks)}</p>
+                          {p.totalSnacks > 0 ? (
+                            <p className="text-[10px] text-zinc-500">
+                              {p.bookings.some(b => b.game?.tag === "CREDITS") ? "Credits" : "Games"}: {formatCurrency(p.totalNegotiated)} | Snacks: {formatCurrency(p.totalSnacks)}
+                            </p>
+                          ) : p.bookings.some(b => b.game?.tag === "CREDITS") && (
+                            <p className="text-[10px] text-zinc-500">Credits: {formatCurrency(p.totalNegotiated)}</p>
                           )}
                         </td>
                         <td>
@@ -1026,7 +1059,7 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
             {/* Summary details */}
             <div className="flex flex-col gap-1.5 bg-zinc-950/20 p-3 border border-zinc-800/60 rounded-xl">
               <div className="flex items-center justify-between text-xs text-zinc-400">
-                <span>Games Invoice:</span>
+                <span>{isCreditsPayment ? "Credits" : "Games"} Invoice:</span>
                 <span className="font-semibold text-white">{formatCurrency(totalNegotiatedVal)}</span>
               </div>
               {snacksVal > 0 && (
@@ -1129,7 +1162,8 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
           />
 
           {(() => {
-            const actualGamesList = selectedPaymentDetail.bookings.filter(b => !b.id.startsWith("SNACK_") && b.game?.tag !== "SNACK");
+            const isCreditsModal = selectedPaymentDetail.bookings.some(b => b.game?.tag === "CREDITS");
+            const actualGamesList = selectedPaymentDetail.bookings.filter(b => !b.id.startsWith("SNACK_") && b.game?.tag !== "SNACK" && b.game?.tag !== "CREDITS");
             const actualSnacksList = selectedPaymentDetail.bookings.filter(b => b.id.startsWith("SNACK_") || b.game?.tag === "SNACK");
             const totalActualGamesPrice = actualGamesList.reduce((sum, b) => sum + Number(b.finalAmount), 0);
 
@@ -1165,29 +1199,33 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
                       {selectedPaymentDetail.paymentMethod}
                     </span>
                   </div>
+                  {!isCreditsModal && (
+                    <div>
+                      <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">Actual Games</p>
+                      <p className="text-xs font-bold text-zinc-400 mt-1">
+                        {formatCurrency(totalActualGamesPrice)}
+                      </p>
+                    </div>
+                  )}
                   <div>
-                    <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">Actual Games</p>
-                    <p className="text-xs font-bold text-zinc-400 mt-1">
-                      {formatCurrency(totalActualGamesPrice)}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-[10px] text-violet-400 font-bold uppercase tracking-wider">Games Invoice</p>
+                    <p className="text-[10px] text-violet-400 font-bold uppercase tracking-wider">{isCreditsModal ? "Credits" : "Games"} Invoice</p>
                     <p className="text-xs font-bold text-zinc-200 mt-1">
                       {formatCurrency(selectedPaymentDetail.totalNegotiated)}
                     </p>
                   </div>
-                  <div>
-                    <p className="text-[10px] text-violet-400 font-bold uppercase tracking-wider">Snacks Invoice</p>
-                    <p className="text-xs font-bold text-zinc-200 mt-1">
-                      {formatCurrency(selectedPaymentDetail.totalSnacks)}
-                    </p>
-                  </div>
+                  {!isCreditsModal && (
+                    <div>
+                      <p className="text-[10px] text-violet-400 font-bold uppercase tracking-wider">Snacks Invoice</p>
+                      <p className="text-xs font-bold text-zinc-200 mt-1">
+                        {formatCurrency(selectedPaymentDetail.totalSnacks)}
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 {/* Overall settled total */}
                 <div className="flex items-center justify-between text-xs bg-amber-500/5 p-3 border border-amber-500/10 rounded-xl">
-                  <p className="text-amber-400 font-bold">Overall Transaction Invoice (Games + Snacks):</p>
+                  <p className="text-amber-400 font-bold">{isCreditsModal ? "Credits" : "Overall Transaction Invoice (Games + Snacks)"}:</p>
                   <p className="text-sm font-extrabold text-amber-400">
                     {formatCurrency(selectedPaymentDetail.totalNegotiated + selectedPaymentDetail.totalSnacks)}
                   </p>
@@ -1300,6 +1338,42 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
                     </div>
                   </div>
                 )}
+
+                {/* Credits */}
+                {isCreditsModal && (() => {
+                  const creditsList = selectedPaymentDetail.bookings.filter(b => b.game?.tag === "CREDITS");
+                  return creditsList.length > 0 ? (
+                    <div className="space-y-2.5">
+                      <h4 className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Credits Added ({creditsList.length})</h4>
+                      <div className="border border-zinc-800/60 rounded-xl overflow-hidden">
+                        <table className="w-full text-left text-xs text-zinc-300 divide-y divide-zinc-800/40">
+                          <thead className="bg-zinc-950/40 font-bold text-zinc-500 uppercase text-[10px] tracking-wider">
+                            <tr>
+                              <th className="p-3">Customer</th>
+                              <th className="p-3">Description</th>
+                              <th className="p-3 text-right">Amount</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-zinc-800/40">
+                            {creditsList.map((cr) => (
+                              <tr key={cr.id} className="hover:bg-zinc-800/20 transition-colors">
+                                <td className="p-3">
+                                  <p className="font-semibold text-white">{cr.guestName ?? "Customer"}</p>
+                                </td>
+                                <td className="p-3">
+                                  <p className="font-medium text-violet-300">Prepaid Credit Top-up</p>
+                                </td>
+                                <td className="p-3 text-right text-emerald-400 font-semibold">
+                                  {formatCurrency(Number(cr.finalAmount))}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  ) : null;
+                })()}
 
                 {/* Actions */}
                 <div className="flex border-t border-zinc-800/60 pt-4">
