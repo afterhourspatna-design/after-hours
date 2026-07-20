@@ -350,6 +350,7 @@ model UserCreditBalance {
   balance         Decimal  @db.Decimal(10, 2)
   isAllGames      Boolean  @default(true)
   applicableGames Game[]   @relation("GameCreditBalances")
+  expiresAt       DateTime?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
@@ -357,6 +358,7 @@ model UserCreditBalance {
   transactions    PrepaidTransaction[]
 
   @@index([userId])
+  @@index([expiresAt])
   @@map("user_credit_balances")
 }
 

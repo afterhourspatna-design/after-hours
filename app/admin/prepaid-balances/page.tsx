@@ -18,6 +18,7 @@ interface CreditBalance {
   balance: string | number;
   isAllGames: boolean;
   applicableGames: Game[];
+  expiresAt?: string | null;
 }
 
 interface PrepaidTransaction {
@@ -29,6 +30,10 @@ interface PrepaidTransaction {
   creditsReceived: number | string;
   paymentId: string | null;
   bookingId: string | null;
+  booking?: {
+    startDateTime: string;
+    durationMinutes: number;
+  } | null;
 }
 
 interface PrepaidUser {
@@ -46,6 +51,22 @@ interface BalanceModalProps {
   onSaved: () => void;
 }
 
+function formatBookingTimeRange(startDateTime: string, durationMinutes: number) {
+  const start = new Date(startDateTime);
+  const end = new Date(start.getTime() + durationMinutes * 60000);
+  const dateLabel = start.toLocaleDateString("en-IN", { day: "numeric", month: "short" });
+  const startLabel = start.toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit", hour12: true });
+  const endLabel = end.toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit", hour12: true });
+  return `${startLabel} - ${endLabel} on ${dateLabel}`;
+}
+
+function formatDurationLabel(minutes: number) {
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  if (!h && !m) return "0h";
+  return m ? `${h}h ${m}m` : `${h}h`;
+}
+
 function BalanceModal({ user, games, onClose, onSaved }: BalanceModalProps) {
   const [moneyGiven, setMoneyGiven] = useState("");
   const [creditsReceived, setCreditsReceived] = useState("");
@@ -55,6 +76,8 @@ function BalanceModal({ user, games, onClose, onSaved }: BalanceModalProps) {
   const [paymentMethod, setPaymentMethod] = useState("CASH");
   const [cashAmount, setCashAmount] = useState<number | "">("");
   const [onlineAmount, setOnlineAmount] = useState<number | "">("");
+  const [expiryOption, setExpiryOption] = useState<string>("30");
+  const [customExpiryDate, setCustomExpiryDate] = useState("");
   const [loading, setLoading] = useState(false);
 
   const toggleGame = (id: string) => {
@@ -75,6 +98,10 @@ function BalanceModal({ user, games, onClose, onSaved }: BalanceModalProps) {
     }
     if (!isAllGames && selectedGames.length === 0) {
       toast.error("Please select at least one game");
+      return;
+    }
+    if (expiryOption === "custom" && !customExpiryDate) {
+      toast.error("Please select a custom expiry date");
       return;
     }
     if (paymentMethod === "MIXED") {
@@ -101,6 +128,8 @@ function BalanceModal({ user, games, onClose, onSaved }: BalanceModalProps) {
           paymentMethod,
           cashAmount: paymentMethod === "MIXED" ? Number(cashAmount) : paymentMethod === "CASH" ? Number(moneyGiven) : 0,
           onlineAmount: paymentMethod === "MIXED" ? Number(onlineAmount) : paymentMethod !== "CASH" ? Number(moneyGiven) : 0,
+          expiryDays: expiryOption !== "custom" ? Number(expiryOption) : null,
+          customExpiryDate: expiryOption === "custom" ? customExpiryDate : null,
         }),
       });
 
@@ -204,6 +233,40 @@ function BalanceModal({ user, games, onClose, onSaved }: BalanceModalProps) {
                   required
                 />
               </div>
+            </div>
+          )}
+
+          <div>
+            <label className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider mb-1.5 block">Expiry Option</label>
+            <select
+              value={expiryOption}
+              onChange={e => {
+                setExpiryOption(e.target.value);
+                if (e.target.value !== "custom") {
+                  setCustomExpiryDate("");
+                }
+              }}
+              className="input-field"
+            >
+              <option value="7">7 Days</option>
+              <option value="15">15 Days</option>
+              <option value="30">30 Days</option>
+              <option value="45">45 Days</option>
+              <option value="90">90 Days</option>
+              <option value="custom">Custom Date</option>
+            </select>
+          </div>
+
+          {expiryOption === "custom" && (
+            <div>
+              <label className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider mb-1.5 block">Custom Expiry Date</label>
+              <input
+                type="date"
+                value={customExpiryDate}
+                onChange={e => setCustomExpiryDate(e.target.value)}
+                className="input-field"
+                required
+              />
             </div>
           )}
 
@@ -354,8 +417,11 @@ export default function PrepaidBalancesPage() {
                       <p className="text-sm font-bold text-white group-hover:text-violet-400 transition-colors duration-300">{u.name}</p>
                       <p className="text-xs text-zinc-500">+91 {u.phone}</p>
                     </div>
-                    <div className="flex gap-1 sm:hidden">
-                      <button onClick={() => setModalUser(u)} className="p-2 rounded-lg text-zinc-500 hover:text-zinc-200 hover:bg-zinc-900 transition-all flex items-center gap-2">
+                    <div className="flex flex-wrap gap-2 sm:hidden">
+                      <button onClick={() => setExpandedUserId(expandedUserId === u.id ? null : u.id)} className="px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-300 hover:text-white hover:bg-zinc-800 transition-all text-sm font-bold">
+                        {expandedUserId === u.id ? "Hide History" : "View History"}
+                      </button>
+                      <button onClick={() => setModalUser(u)} className="px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-300 hover:text-white hover:bg-zinc-800 transition-all text-sm font-bold flex items-center gap-2">
                          <Plus className="w-4 h-4" /> Add
                       </button>
                     </div>
@@ -366,14 +432,28 @@ export default function PrepaidBalancesPage() {
                     <p className="hidden sm:block text-xs text-zinc-500 mt-0.5">+91 {u.phone}</p>
                     
                     <div className="mt-3 flex flex-wrap gap-2">
-                      {u.creditBalances.filter(cb => Number(cb.balance) > 0).map(cb => (
-                        <div key={cb.id} className="px-2.5 py-1 rounded-md bg-zinc-900/80 border border-zinc-800 text-xs">
-                          <span className="font-bold text-violet-400">₹{Number(cb.balance)}</span>
-                          <span className="text-zinc-500 ml-1.5">
-                            {cb.isAllGames ? "All Games" : cb.applicableGames.map(g => g.name).join(", ")}
-                          </span>
-                        </div>
-                      ))}
+                      {u.creditBalances.filter(cb => Number(cb.balance) > 0).map(cb => {
+                        const isExpired = cb.expiresAt && new Date(cb.expiresAt) < new Date();
+                        return (
+                          <div key={cb.id} className={cn("px-2.5 py-1 rounded-md border text-xs", isExpired ? "bg-red-900/20 border-red-500/30" : "bg-zinc-900/80 border-zinc-800")}>
+                            <span className={cn("font-bold", isExpired ? "text-red-400" : "text-violet-400")}>₹{Number(cb.balance)}</span>
+                            <span className={cn("ml-1.5", isExpired ? "text-red-500/70" : "text-zinc-500")}>
+                              {cb.isAllGames ? "All Games" : cb.applicableGames.map(g => g.name).join(", ")}
+                            </span>
+                            {cb.expiresAt && (
+                              <span className={cn("ml-1.5 text-[10px]", isExpired ? "text-red-400" : "text-emerald-500")}>
+                                {isExpired ? "Expired" : `Expires ${new Date(cb.expiresAt).toLocaleDateString("en-IN")}`}
+                              </span>
+                            )}
+                          </div>
+                        );
+                      })}
+                      <div className="px-2.5 py-1 rounded-md bg-zinc-900/80 border border-zinc-800 text-xs text-zinc-300">
+                        <span className="font-bold text-white">
+                          {formatDurationLabel(u.prepaidTransactions.reduce((sum, tx) => sum + ((tx.booking && Number(tx.amount) < 0) ? Number(tx.booking.durationMinutes) : 0), 0))}
+                        </span>
+                        <span className="text-zinc-500 ml-1.5">Hours consumed</span>
+                      </div>
                     </div>
                   </div>
   
@@ -400,15 +480,20 @@ export default function PrepaidBalancesPage() {
                             const isTopUp = Number(tx.amount) > 0 && !!tx.paymentId;
                             const isDeduction = !!tx.bookingId && Number(tx.amount) <= 0;
                             return (
-                            <div key={tx.id} className="flex items-center justify-between p-3 rounded-lg bg-zinc-900/50 border border-zinc-800/50 text-sm">
-                              <div>
-                                <div className="flex items-center gap-2 flex-wrap">
+                            <div key={tx.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 rounded-lg bg-zinc-900/50 border border-zinc-800/50 text-sm">
+                              <div className="min-w-0 flex-1">
+                                <div className="flex flex-wrap items-center gap-2">
                                   <p className={`font-bold ${Number(tx.amount) > 0 ? "text-emerald-400" : "text-red-400"}`}>
                                     {Number(tx.amount) > 0 ? "+" : ""}₹{Math.abs(Number(tx.amount))} credits
                                   </p>
                                   {isTopUp && Number(tx.moneyGiven) > 0 && (
                                     <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-zinc-800 border border-zinc-700 text-zinc-400">
                                       Paid ₹{Number(tx.moneyGiven)}
+                                    </span>
+                                  )}
+                                  {tx.booking && (
+                                    <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-zinc-800 border border-zinc-700 text-zinc-400">
+                                      {formatDurationLabel(Number(tx.booking.durationMinutes))}
                                     </span>
                                   )}
                                 </div>
@@ -418,13 +503,16 @@ export default function PrepaidBalancesPage() {
                                     hour: 'numeric', minute: '2-digit', hour12: true
                                   })}
                                 </p>
+                                {tx.booking && (
+                                  <p className="text-xs text-zinc-400 mt-1">{formatBookingTimeRange(tx.booking.startDateTime, Number(tx.booking.durationMinutes))}</p>
+                                )}
                                 {tx.description && <p className="text-xs text-zinc-400 mt-0.5">{tx.description}</p>}
                               </div>
                               {isTopUp && (
                                 <button 
                                   onClick={() => handleDeleteTransaction(tx.id)}
                                   disabled={deletingTxId === tx.id}
-                                  className="p-2 text-red-500 hover:bg-red-500/10 rounded-lg transition-colors disabled:opacity-50"
+                                  className="self-start sm:self-auto p-2 text-red-500 hover:bg-red-500/10 rounded-lg transition-colors disabled:opacity-50"
                                   title="Delete Top-up"
                                 >
                                   {deletingTxId === tx.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
