@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import type { Prisma } from "@prisma/client";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 
@@ -43,6 +44,12 @@ export async function GET(req: Request) {
             creditsReceived: true,
             paymentId: true,
             bookingId: true,
+            booking: {
+              select: {
+                startDateTime: true,
+                durationMinutes: true,
+              }
+            }
           }
         }
       },
@@ -72,7 +79,7 @@ export async function POST(req: Request) {
     const user = await prisma.appUser.findUnique({ where: { id: userId } });
     if (!user) return NextResponse.json({ error: "User not found" }, { status: 404 });
 
-    const updatedUser = await prisma.$transaction(async (tx) => {
+    const updatedUser = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       // Find if a credit balance wallet already exists for this exact game configuration
       // This is tricky because gameIds is an array. To keep it simple, we can either
       // add a new UserCreditBalance record every time, or try to merge.
