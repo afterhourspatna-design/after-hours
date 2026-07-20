@@ -97,143 +97,20 @@ export default function BookingForm({ mode = "create", initialData, prefillDate,
   );
   const [guestName, setGuestName] = useState(initialData?.guestName ?? "");
   const [guestPhone, setGuestPhone] = useState(initialData?.guestPhone ?? "");
-
-  // Guest onboarding wizard (steps 1-3, only relevant in create mode + guest)
-  // Step 1 = enter name/phone, Step 2 = OTP, Step 3 = booking details
-  const [guestStep, setGuestStep] = useState<1 | 2 | 3>(1);
-  const [otpCode, setOtpCode] = useState("");
   const [otpError, setOtpError] = useState("");
-  const [otpLoading, setOtpLoading] = useState(false);
-  const [guestVerified, setGuestVerified] = useState(false); // tracks if phone was OTP-verified
 
-  // When switching to Registered mode, reset wizard
-  function switchToRegistered() {
-    setIsGuest(false);
-    setGuestStep(1);
-    setOtpCode("");
-    setOtpError("");
-    setGuestVerified(false);
-    setGuestName("");
-    setGuestPhone("");
-    setSelectedUser(null);
-  }
-
-  // When switching to Guest mode, reset selected registered user
-  function switchToGuest() {
-    setIsGuest(true);
-    setGuestStep(1);
-    setOtpCode("");
-    setOtpError("");
-    setGuestVerified(false);
-    setSelectedUser(null);
-    setUserSearch("");
-  }
-
-  // Step 1 → 3: validate inputs, check if phone exists, register guest directly
-  async function handleSendOtp() {
-    if (guestName.trim().length < 2) { setOtpError("Please enter a valid name (at least 2 characters)"); return; }
-    if (guestPhone.replace(/\D/g, "").length !== 10) { setOtpError("Please enter a valid 10-digit phone number"); return; }
-    setOtpError("");
-    setOtpLoading(true);
-    try {
-      // Check if phone already exists
-      const lookupRes = await fetch(`/api/users?q=${encodeURIComponent(guestPhone)}&limit=5`);
-      if (lookupRes.ok) {
-        const lookupData = await lookupRes.json();
-        const existing = (lookupData.users ?? []).find((u: AppUser) => u.phone.replace(/\D/g, "") === guestPhone.replace(/\D/g, ""));
-        if (existing) {
-          // Auto-select this user and jump straight to booking
-          setSelectedUser(existing);
-          setIsGuest(false);
-          setGuestStep(3);
-          toast.success(`Customer found: ${existing.name} — proceeding to booking!`);
-          return;
-        }
-      }
-      // New customer — register directly without OTP
-      await registerAndAdvance(false);
-    } catch {
-      setOtpError("Connection error. Please try again.");
-    } finally {
-      setOtpLoading(false);
-    }
-  }
-
-  // Step 2: resend OTP via MSG91 retry endpoint (more efficient than re-calling send)
-  async function handleResendOtp() {
-    setOtpError("");
-    setOtpLoading(true);
-    try {
-      const res = await fetch("/api/users/otp/resend", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone: guestPhone.replace(/\D/g, "") }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setOtpError(data.error ?? "Failed to resend OTP");
-        return;
-      }
-      toast.success("Verification code resent via WhatsApp!");
-    } catch {
-      setOtpError("Connection error. Please try again.");
-    } finally {
-      setOtpLoading(false);
-    }
-  }
-
-  // Step 2 → 3: verify OTP, register user, advance
-  async function handleVerifyOtp() {
-    if (otpCode.length < 4) { setOtpError("Please enter the 6-digit verification code"); return; }
-    setOtpError("");
-    setOtpLoading(true);
-    try {
-      // Verify the code
-      const verifyRes = await fetch("/api/users/otp/verify", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone: guestPhone.replace(/\D/g, ""), code: otpCode }),
-      });
-      const verifyData = await verifyRes.json();
-      if (!verifyRes.ok) { setOtpError(verifyData.error ?? "Invalid code"); return; }
-      // Register the new user as verified
-      await registerAndAdvance(true);
-    } catch {
-      setOtpError("Connection error. Please try again.");
-    } finally {
-      setOtpLoading(false);
-    }
-  }
-
-  // Step 2 → 3: skip OTP, register user without verification
-  async function handleSkipVerify() {
-    setOtpLoading(true);
-    try {
-      await registerAndAdvance(false);
-    } finally {
-      setOtpLoading(false);
-    }
-  }
-
-  // Shared: create the new AppUser then move to booking details step
-  async function registerAndAdvance(isPhoneVerified: boolean) {
-    const res = await fetch("/api/users", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        name: guestName.trim(),
-        phone: guestPhone.replace(/\D/g, ""),
-        isPhoneVerified,
-      }),
-    });
-    const data = await res.json();
-    if (!res.ok) { setOtpError(data.error ?? "Failed to create customer account"); return; }
-    setSelectedUser(data);
-    setIsGuest(false); // booking will be linked to the newly created user
-    setGuestVerified(isPhoneVerified);
-    setGuestStep(3);
-    toast.success(isPhoneVerified ? "Customer verified & onboarded!" : "Customer onboarded (verification skipped)!");
-  }
+  // OTP flow helpers are preserved for future reactivation.
+  // const [guestStep, setGuestStep] = useState<1 | 2 | 3>(1);
+  // const [otpCode, setOtpCode] = useState("");
+  // const [otpLoading, setOtpLoading] = useState(false);
+  // const [guestVerified, setGuestVerified] = useState(false);
+  // function switchToRegistered() { ... }
+  // function switchToGuest() { ... }
+  // async function handleSendOtp() { ... }
+  // async function handleResendOtp() { ... }
+  // async function handleVerifyOtp() { ... }
+  // async function handleSkipVerify() { ... }
+  // async function registerAndAdvance(isPhoneVerified: boolean) { ... }
 
   // Referrer search
   const [referrerResults, setReferrerResults] = useState<AppUser[]>([]);
@@ -483,12 +360,10 @@ export default function BookingForm({ mode = "create", initialData, prefillDate,
 
     if (!selectedGame) { toast.error("Please select a game"); return; }
 
-    // In create mode, if guest is still at step 1 or 2, they haven't finished onboarding
-    if (isGuest && mode === "create" && guestStep < 3) {
-      toast.error("Please complete customer verification first");
+    if (isGuest && (!guestName.trim() || guestPhone.replace(/\D/g, "").length !== 10)) {
+      toast.error("Please enter a valid guest name and 10-digit phone number");
       return;
     }
-    if (isGuest && mode === "edit" && (!guestName || !guestPhone)) { toast.error("Guest name and phone are required"); return; }
     if (isGuest && mode === "edit" && source === "REFERRAL") {
       if (!referredByPhone || referredByPhone.replace(/\D/g, "").length !== 10) {
         toast.error("Please enter or select a valid 10-digit phone number for the referral");
@@ -514,13 +389,10 @@ export default function BookingForm({ mode = "create", initialData, prefillDate,
     }
 
     const startDT = new Date(`${bookingDate}T${startTime}:00`);
-    // In create mode, after guest wizard completion, the guest is registered as a real user
-    // so we always send userId. In edit mode, keep original guest fields.
-    const isEditGuest = isGuest && mode === "edit";
     const payload = {
-      userId: isEditGuest ? null : selectedUser?.id,
-      guestName: isEditGuest ? guestName : null,
-      guestPhone: isEditGuest ? guestPhone : null,
+      userId: isGuest ? null : selectedUser?.id,
+      guestName: isGuest ? guestName : null,
+      guestPhone: isGuest ? guestPhone : null,
       gameId: selectedGame.id,
       resourceUnitId: selectedUnit || null,
       startDateTime: startDT.toISOString(),
@@ -529,7 +401,7 @@ export default function BookingForm({ mode = "create", initialData, prefillDate,
       bookingType,
       paymentStatus,
       source: role === "CUSTOMER" ? "ONLINE" : source,
-      referredByPhone: (isEditGuest && source === "REFERRAL") ? referredByPhone.replace(/\D/g, "") : null,
+      referredByPhone: (isGuest && source === "REFERRAL") ? referredByPhone.replace(/\D/g, "") : null,
       notes: notes || null,
       couponCode: appliedCoupon || null,
       usePrepaidCredits,
@@ -639,32 +511,19 @@ export default function BookingForm({ mode = "create", initialData, prefillDate,
                 <div className="flex items-center gap-2 text-sm font-semibold text-white">
                   <Users className="w-4 h-4 text-violet-400" />
                   Customer
-                  {/* Step indicator for guest wizard */}
-                  {isGuest && mode === "create" && !isPaidLocked && (
-                    <div className="flex items-center gap-1 ml-2">
-                      {([1, 2, 3] as const).map((s) => (
-                        <div key={s} className={cn(
-                          "w-5 h-5 rounded-full text-[9px] font-bold flex items-center justify-center border transition-all",
-                          guestStep >= s
-                            ? "bg-violet-600 border-violet-500 text-white"
-                            : "bg-zinc-800 border-zinc-700 text-zinc-500"
-                        )}>{s}</div>
-                      ))}
-                    </div>
-                  )}
                 </div>
                 {/* Mode toggle — disable during wizard steps 2/3 in guest mode */}
                 <div className="flex items-center gap-2 bg-zinc-800/60 rounded-xl p-1">
                   <button type="button"
-                    onClick={switchToRegistered}
-                    disabled={isPaidLocked || (isGuest && guestStep === 2)}
+                    onClick={() => setIsGuest(false)}
+                    disabled={isPaidLocked}
                     className={cn("px-3 py-1.5 rounded-lg text-xs font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed",
                       !isGuest ? "bg-violet-600 text-white" : "text-zinc-400 hover:text-zinc-200")}>
                     <User className="w-3 h-3 inline mr-1" />Registered
                   </button>
                   <button type="button"
-                    onClick={switchToGuest}
-                    disabled={isPaidLocked || (isGuest && guestStep > 1)}
+                    onClick={() => setIsGuest(true)}
+                    disabled={isPaidLocked}
                     className={cn("px-3 py-1.5 rounded-lg text-xs font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed",
                       isGuest ? "bg-violet-600 text-white" : "text-zinc-400 hover:text-zinc-200")}>
                     Guest
@@ -707,158 +566,31 @@ export default function BookingForm({ mode = "create", initialData, prefillDate,
                 </div>
               )}
 
-              {/* ─── GUEST WIZARD STEP 1: Details ─── */}
-              {isGuest && guestStep === 1 && (
-                <div className="space-y-4">
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="text-xs text-zinc-400 mb-1 block">Guest Name *</label>
-                      <input
-                        value={guestName}
-                        onChange={e => { setGuestName(e.target.value); setOtpError(""); }}
-                        placeholder="e.g. Ahmed Ali"
-                        className="input-field"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs text-zinc-400 mb-1 block">Mobile Number (10 Digits) *</label>
-                      <div className="relative">
-                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-zinc-500 font-bold">+91</span>
-                        <input
-                          type="tel"
-                          maxLength={10}
-                          value={guestPhone}
-                          onChange={e => { setGuestPhone(e.target.value.replace(/\D/g, '').slice(0, 10)); setOtpError(""); }}
-                          placeholder="3000000000"
-                          className="input-field pl-12"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                  {otpError && (
-                    <p className="text-[10px] text-red-400 font-bold flex items-center gap-1">
-                      <AlertCircle className="w-3 h-3" /> {otpError}
-                    </p>
-                  )}
-                  <button
-                    type="button"
-                    onClick={handleSendOtp}
-                    disabled={otpLoading}
-                    className="w-full py-2.5 rounded-xl bg-violet-600 hover:bg-violet-500 text-white text-sm font-bold transition-all shadow-md shadow-violet-900/20 active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2"
-                  >
-                    {otpLoading
-                      ? <><Loader2 className="w-4 h-4 animate-spin" /> Checking…</>
-                      : <><Phone className="w-4 h-4" /> Continue <ArrowRight className="w-4 h-4" /></>}
-                  </button>
-                </div>
-              )}
-
-              {/* ─── GUEST WIZARD STEP 2: OTP Verification ─── */}
-              {isGuest && guestStep === 2 && (
-                <div className="space-y-4">
-                  <div className="bg-violet-500/5 border border-violet-500/15 rounded-xl p-3 flex items-start gap-2.5">
-                    <Phone className="w-4 h-4 text-violet-400 mt-0.5 flex-shrink-0" />
-                    <p className="text-xs text-zinc-300 leading-relaxed">
-                      Code sent to <span className="text-white font-bold">+91 {guestPhone}</span> via WhatsApp.
-                      Enter the 6-digit code below.
-                    </p>
-                  </div>
-                  <div>
-                    <label className="text-xs text-zinc-400 mb-1.5 block">Verification Code</label>
-                    <input
-                      type="text"
-                      maxLength={6}
-                      value={otpCode}
-                      onChange={e => { setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6)); setOtpError(""); }}
-                      placeholder="• • • • • •"
-                      className={cn("input-field tracking-[0.6em] text-center text-lg font-bold", otpError && "border-red-500/50 bg-red-500/5")}
-                    />
-                    {otpError && (
-                      <p className="text-[10px] text-red-400 font-bold mt-1.5 flex items-center gap-1">
-                        <AlertCircle className="w-3 h-3" /> {otpError}
-                      </p>
-                    )}
-                  </div>
-                  <div className="space-y-2">
-                    <button
-                      type="button"
-                      onClick={handleVerifyOtp}
-                      disabled={otpLoading || otpCode.length < 4}
-                      className="w-full py-2.5 rounded-xl bg-violet-600 hover:bg-violet-500 text-white text-sm font-bold transition-all shadow-md shadow-violet-900/20 active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2"
-                    >
-                      {otpLoading ? <><Loader2 className="w-4 h-4 animate-spin" /> Verifying…</> : <><CheckCircle2 className="w-4 h-4" /> Verify & Continue</>}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleSkipVerify}
-                      disabled={otpLoading}
-                      className="w-full py-2 rounded-xl border border-zinc-800 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900 text-xs font-semibold transition-all active:scale-95 disabled:opacity-50"
-                    >
-                      Skip Verification & Continue
-                    </button>
-                  </div>
-                  <div className="flex justify-between text-xs">
-                    <button type="button" onClick={() => { setGuestStep(1); setOtpCode(""); setOtpError(""); }}
-                      className="text-zinc-500 hover:text-zinc-300 font-medium">← Edit Details</button>
-                    <button type="button" onClick={handleResendOtp} disabled={otpLoading}
-                      className="text-violet-400 hover:text-violet-300 font-medium flex items-center gap-1">
-                      {otpLoading && <Loader2 className="w-3 h-3 animate-spin" />} Resend Code
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {/* ─── GUEST WIZARD STEP 3: Customer confirmed banner ─── */}
-              {isGuest && guestStep === 3 && selectedUser && (
-                <div className={cn(
-                  "rounded-xl p-3 flex items-center justify-between",
-                  guestVerified
-                    ? "bg-emerald-500/8 border border-emerald-500/20"
-                    : "bg-zinc-800/60 border border-zinc-700"
-                )}>
-                  <div className="flex items-center gap-2.5">
-                    <div className={cn("w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold",
-                      guestVerified ? "bg-emerald-500/20 text-emerald-400" : "bg-zinc-700 text-zinc-300")}>
-                      {selectedUser.name.charAt(0).toUpperCase()}
-                    </div>
-                    <div>
-                      <p className="text-sm font-bold text-white">{selectedUser.name}</p>
-                      <p className="text-[10px] text-zinc-500">+91 {selectedUser.phone}
-                        {guestVerified
-                          ? <span className="ml-2 text-emerald-400 font-semibold">✓ Verified</span>
-                          : <span className="ml-2 text-zinc-600 font-semibold">Unverified</span>}
-                      </p>
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={switchToGuest}
-                    className="text-[10px] text-zinc-500 hover:text-zinc-300 font-semibold border border-zinc-800 hover:border-zinc-700 px-2.5 py-1.5 rounded-lg transition-all"
-                  >
-                    Change
-                  </button>
-                </div>
-              )}
-
-              {/* Edit mode: show original guest fields when editing an existing guest booking */}
-              {isGuest && mode === "edit" && (
+              {isGuest && (
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="text-xs text-zinc-400 mb-1 block">Guest Name *</label>
-                    <input value={guestName} onChange={e => setGuestName(e.target.value)}
-                      placeholder="e.g. Ahmed Ali" className="input-field disabled:opacity-50 disabled:cursor-not-allowed" disabled={isPaidLocked} />
+                    <input
+                      value={guestName}
+                      onChange={e => { setGuestName(e.target.value); setOtpError(""); }}
+                      placeholder="e.g. Ahmed Ali"
+                      className="input-field disabled:opacity-50 disabled:cursor-not-allowed"
+                      disabled={isPaidLocked}
+                    />
                   </div>
                   <div>
                     <label className="text-xs text-zinc-400 mb-1 block">Mobile Number (10 Digits) *</label>
                     <div className="relative">
-                       <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-zinc-500 font-bold">+91</span>
-                       <input
-                         type="tel" maxLength={10} value={guestPhone}
-                         onChange={e => setGuestPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
-                         placeholder="3000000000"
-                         className="input-field pl-12 disabled:opacity-50 disabled:cursor-not-allowed"
-                         disabled={isPaidLocked}
-                       />
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-zinc-500 font-bold">+91</span>
+                      <input
+                        type="tel"
+                        maxLength={10}
+                        value={guestPhone}
+                        onChange={e => { setGuestPhone(e.target.value.replace(/\D/g, '').slice(0, 10)); setOtpError(""); }}
+                        placeholder="3000000000"
+                        className="input-field pl-12 disabled:opacity-50 disabled:cursor-not-allowed"
+                        disabled={isPaidLocked}
+                      />
                     </div>
                   </div>
                 </div>
