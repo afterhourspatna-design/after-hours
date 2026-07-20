@@ -129,7 +129,7 @@ export default function BookingForm({ mode = "create", initialData, prefillDate,
     setUserSearch("");
   }
 
-  // Step 1 → 2: validate inputs, check if phone exists, send OTP
+  // Step 1 → 3: validate inputs, check if phone exists, register guest directly
   async function handleSendOtp() {
     if (guestName.trim().length < 2) { setOtpError("Please enter a valid name (at least 2 characters)"); return; }
     if (guestPhone.replace(/\D/g, "").length !== 10) { setOtpError("Please enter a valid 10-digit phone number"); return; }
@@ -147,23 +147,11 @@ export default function BookingForm({ mode = "create", initialData, prefillDate,
           setIsGuest(false);
           setGuestStep(3);
           toast.success(`Customer found: ${existing.name} — proceeding to booking!`);
-          setOtpLoading(false);
           return;
         }
       }
-      // New customer — send WhatsApp OTP
-      const res = await fetch("/api/users/otp/send", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone: guestPhone.replace(/\D/g, "") }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setOtpError(data.error ?? "Failed to send OTP");
-        return;
-      }
-      toast.success("Verification code sent to WhatsApp!");
-      setGuestStep(2);
+      // New customer — register directly without OTP
+      await registerAndAdvance(false);
     } catch {
       setOtpError("Connection error. Please try again.");
     } finally {
@@ -760,7 +748,7 @@ export default function BookingForm({ mode = "create", initialData, prefillDate,
                   >
                     {otpLoading
                       ? <><Loader2 className="w-4 h-4 animate-spin" /> Checking…</>
-                      : <><Phone className="w-4 h-4" /> Send OTP & Continue <ArrowRight className="w-4 h-4" /></>}
+                      : <><Phone className="w-4 h-4" /> Continue <ArrowRight className="w-4 h-4" /></>}
                   </button>
                 </div>
               )}
