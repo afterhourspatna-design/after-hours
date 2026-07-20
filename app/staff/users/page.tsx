@@ -67,9 +67,7 @@ function UserModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => v
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!validate()) return;
-    
-    // Creating a new user — initiate OTP flow
-    await triggerOtpSend();
+    await createUser(false);
   }
 
   // Handle OTP verification and user creation
