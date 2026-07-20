@@ -70,7 +70,7 @@ export async function POST(req: Request) {
     const role = (session.user as any).role;
     if (role !== "ADMIN" && role !== "STAFF") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
-    const { userId, moneyGiven, creditsReceived, description, isAllGames, gameIds, paymentMethod, cashAmount, onlineAmount } = await req.json();
+    const { userId, moneyGiven, creditsReceived, description, isAllGames, gameIds, paymentMethod, cashAmount, onlineAmount, expiryDays, customExpiryDate } = await req.json();
 
     if (!userId || typeof creditsReceived !== "number" || typeof moneyGiven !== "number") {
       return NextResponse.json({ error: "Invalid parameters" }, { status: 400 });
@@ -78,6 +78,15 @@ export async function POST(req: Request) {
 
     const user = await prisma.appUser.findUnique({ where: { id: userId } });
     if (!user) return NextResponse.json({ error: "User not found" }, { status: 404 });
+
+    // Calculate expiry date
+    let expiresAt: Date | null = null;
+    if (expiryDays) {
+      expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + expiryDays);
+    } else if (customExpiryDate) {
+      expiresAt = new Date(customExpiryDate);
+    }
 
     const updatedUser = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       // Find if a credit balance wallet already exists for this exact game configuration
@@ -90,7 +99,7 @@ export async function POST(req: Request) {
       
       if (isAllGames) {
         creditBalance = await tx.userCreditBalance.findFirst({
-          where: { userId, isAllGames: true }
+          where: { userId, isAllGames: true, expiresAt: null }
         });
       } else if (gameIds && gameIds.length > 0) {
         // Just find one that has exactly these games? Let's just create a new one if it's complex,
@@ -102,6 +111,7 @@ export async function POST(req: Request) {
             userId,
             balance: 0,
             isAllGames: false,
+            expiresAt,
             applicableGames: {
               connect: gameIds.map((id: string) => ({ id }))
             }
@@ -114,7 +124,8 @@ export async function POST(req: Request) {
           data: {
             userId,
             balance: 0,
-            isAllGames: true
+            isAllGames: true,
+            expiresAt
           }
         });
       }
@@ -123,11 +134,12 @@ export async function POST(req: Request) {
         throw new Error("Could not determine credit balance configuration");
       }
 
-      // Update the balance
+      // Update the balance and expiry
       const updatedBalance = await tx.userCreditBalance.update({
         where: { id: creditBalance.id },
         data: {
-          balance: { increment: creditsReceived }
+          balance: { increment: creditsReceived },
+          expiresAt: expiresAt || creditBalance.expiresAt
         }
       });
 

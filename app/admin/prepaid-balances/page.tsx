@@ -18,6 +18,7 @@ interface CreditBalance {
   balance: string | number;
   isAllGames: boolean;
   applicableGames: Game[];
+  expiresAt?: string | null;
 }
 
 interface PrepaidTransaction {
@@ -75,6 +76,8 @@ function BalanceModal({ user, games, onClose, onSaved }: BalanceModalProps) {
   const [paymentMethod, setPaymentMethod] = useState("CASH");
   const [cashAmount, setCashAmount] = useState<number | "">("");
   const [onlineAmount, setOnlineAmount] = useState<number | "">("");
+  const [expiryOption, setExpiryOption] = useState<string>("30");
+  const [customExpiryDate, setCustomExpiryDate] = useState("");
   const [loading, setLoading] = useState(false);
 
   const toggleGame = (id: string) => {
@@ -95,6 +98,10 @@ function BalanceModal({ user, games, onClose, onSaved }: BalanceModalProps) {
     }
     if (!isAllGames && selectedGames.length === 0) {
       toast.error("Please select at least one game");
+      return;
+    }
+    if (expiryOption === "custom" && !customExpiryDate) {
+      toast.error("Please select a custom expiry date");
       return;
     }
     if (paymentMethod === "MIXED") {
@@ -121,6 +128,8 @@ function BalanceModal({ user, games, onClose, onSaved }: BalanceModalProps) {
           paymentMethod,
           cashAmount: paymentMethod === "MIXED" ? Number(cashAmount) : paymentMethod === "CASH" ? Number(moneyGiven) : 0,
           onlineAmount: paymentMethod === "MIXED" ? Number(onlineAmount) : paymentMethod !== "CASH" ? Number(moneyGiven) : 0,
+          expiryDays: expiryOption !== "custom" ? Number(expiryOption) : null,
+          customExpiryDate: expiryOption === "custom" ? customExpiryDate : null,
         }),
       });
 
@@ -224,6 +233,40 @@ function BalanceModal({ user, games, onClose, onSaved }: BalanceModalProps) {
                   required
                 />
               </div>
+            </div>
+          )}
+
+          <div>
+            <label className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider mb-1.5 block">Expiry Option</label>
+            <select
+              value={expiryOption}
+              onChange={e => {
+                setExpiryOption(e.target.value);
+                if (e.target.value !== "custom") {
+                  setCustomExpiryDate("");
+                }
+              }}
+              className="input-field"
+            >
+              <option value="7">7 Days</option>
+              <option value="15">15 Days</option>
+              <option value="30">30 Days</option>
+              <option value="45">45 Days</option>
+              <option value="90">90 Days</option>
+              <option value="custom">Custom Date</option>
+            </select>
+          </div>
+
+          {expiryOption === "custom" && (
+            <div>
+              <label className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider mb-1.5 block">Custom Expiry Date</label>
+              <input
+                type="date"
+                value={customExpiryDate}
+                onChange={e => setCustomExpiryDate(e.target.value)}
+                className="input-field"
+                required
+              />
             </div>
           )}
 
@@ -389,14 +432,22 @@ export default function PrepaidBalancesPage() {
                     <p className="hidden sm:block text-xs text-zinc-500 mt-0.5">+91 {u.phone}</p>
                     
                     <div className="mt-3 flex flex-wrap gap-2">
-                      {u.creditBalances.filter(cb => Number(cb.balance) > 0).map(cb => (
-                        <div key={cb.id} className="px-2.5 py-1 rounded-md bg-zinc-900/80 border border-zinc-800 text-xs">
-                          <span className="font-bold text-violet-400">₹{Number(cb.balance)}</span>
-                          <span className="text-zinc-500 ml-1.5">
-                            {cb.isAllGames ? "All Games" : cb.applicableGames.map(g => g.name).join(", ")}
-                          </span>
-                        </div>
-                      ))}
+                      {u.creditBalances.filter(cb => Number(cb.balance) > 0).map(cb => {
+                        const isExpired = cb.expiresAt && new Date(cb.expiresAt) < new Date();
+                        return (
+                          <div key={cb.id} className={cn("px-2.5 py-1 rounded-md border text-xs", isExpired ? "bg-red-900/20 border-red-500/30" : "bg-zinc-900/80 border-zinc-800")}>
+                            <span className={cn("font-bold", isExpired ? "text-red-400" : "text-violet-400")}>₹{Number(cb.balance)}</span>
+                            <span className={cn("ml-1.5", isExpired ? "text-red-500/70" : "text-zinc-500")}>
+                              {cb.isAllGames ? "All Games" : cb.applicableGames.map(g => g.name).join(", ")}
+                            </span>
+                            {cb.expiresAt && (
+                              <span className={cn("ml-1.5 text-[10px]", isExpired ? "text-red-400" : "text-emerald-500")}>
+                                {isExpired ? "Expired" : `Expires ${new Date(cb.expiresAt).toLocaleDateString("en-IN")}`}
+                              </span>
+                            )}
+                          </div>
+                        );
+                      })}
                       <div className="px-2.5 py-1 rounded-md bg-zinc-900/80 border border-zinc-800 text-xs text-zinc-300">
                         <span className="font-bold text-white">
                           {formatDurationLabel(u.prepaidTransactions.reduce((sum, tx) => sum + ((tx.booking && Number(tx.amount) < 0) ? Number(tx.booking.durationMinutes) : 0), 0))}

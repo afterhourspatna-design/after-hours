@@ -28,7 +28,7 @@ interface AppUser {
   name: string;
   phone: string;
   email?: string | null;
-  creditBalances?: { id: string; balance: string | number; isAllGames: boolean; applicableGames: { id: string }[] }[];
+  creditBalances?: { id: string; balance: string | number; isAllGames: boolean; applicableGames: { id: string }[]; expiresAt?: string | null }[];
 }
 
 interface PriceBreakdown {
@@ -1025,6 +1025,12 @@ export default function BookingForm({ mode = "create", initialData, prefillDate,
               }
               
               if (!applicableBalance) return null;
+
+              // Check if credit is expired
+              const now = new Date();
+              const isExpired = applicableBalance.expiresAt && new Date(applicableBalance.expiresAt) < now;
+              
+              if (isExpired) return null;
               
               return (
                 <div className="pt-4 border-t border-zinc-800/60 space-y-4">
@@ -1039,6 +1045,11 @@ export default function BookingForm({ mode = "create", initialData, prefillDate,
                         <span className="ml-1 opacity-70">
                           ({applicableBalance.isAllGames ? "All Games Wallet" : "Specific Game Wallet"})
                         </span>
+                        {applicableBalance.expiresAt && (
+                          <span className="ml-2 text-emerald-400">
+                            Expires: {new Date(applicableBalance.expiresAt).toLocaleDateString("en-IN")}
+                          </span>
+                        )}
                       </p>
                     </div>
                     <label className="relative inline-flex items-center cursor-pointer">
