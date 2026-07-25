@@ -149,6 +149,32 @@ export default function LiveActivityList({
     (item) => item.type === "active" || item.type === "ending-soon" || item.type === "overtime"
   ).length;
 
+  const overtimeItems = activeItems.filter((item) => item.type === "overtime");
+
+  async function handleClearAllOvertime() {
+    if (overtimeItems.length === 0) return;
+    if (!confirm(`Mark all ${overtimeItems.length} overtime session(s) as completed?`)) return;
+
+    setLoading(true);
+    try {
+      const promises = overtimeItems.map(({ b }) =>
+        fetch(`/api/bookings/${b.id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ bookingStatus: "COMPLETED" }),
+        })
+      );
+      await Promise.all(promises);
+      const completedIds = overtimeItems.map(({ b }) => b.id);
+      setBookings((prev) => prev.filter((item) => !completedIds.includes(item.id)));
+    } catch (err) {
+      console.error(err);
+      alert("Error completing overtime sessions");
+    } finally {
+      setLoading(false);
+    }
+  }
+
   return (
     <div className="glass-card border-zinc-900/50 bg-zinc-950/30">
       <div className="px-5 py-4 border-b border-zinc-900 flex items-center justify-between">
@@ -157,6 +183,15 @@ export default function LiveActivityList({
           <h3 className="text-sm font-bold text-white">Live activity</h3>
         </div>
         <div className="flex items-center gap-2">
+          {overtimeItems.length > 0 && (
+            <button
+              onClick={handleClearAllOvertime}
+              disabled={loading}
+              className="text-[10px] font-bold text-red-400 hover:text-white px-2 py-1 rounded-lg bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 transition-all flex items-center gap-1 active:scale-95 disabled:opacity-50"
+            >
+              Clear Overtime ({overtimeItems.length})
+            </button>
+          )}
           {loading && <Loader2 className="w-3.5 h-3.5 text-zinc-500 animate-spin" />}
           <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">
             {currentlyPlayingCount} active

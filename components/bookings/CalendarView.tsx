@@ -1,19 +1,28 @@
 "use client";
 import { useEffect, useState, useCallback } from "react";
+import { createPortal } from "react-dom";
 import FullCalendar from "@fullcalendar/react";
 import timeGridPlugin from "@fullcalendar/timegrid";
 import dayGridPlugin from "@fullcalendar/daygrid";
 import interactionPlugin from "@fullcalendar/interaction";
 import { useRouter } from "next/navigation";
-import { GAME_COLOR_MAP, BOOKING_STATUS_CONFIG } from "@/lib/utils";
+import { GAME_COLOR_MAP, BOOKING_STATUS_CONFIG, cn } from "@/lib/utils";
 import { format } from "date-fns";
+import { X, Clock, Gamepad2, IndianRupee, CreditCard, Edit3, Phone } from "lucide-react";
 
 interface CalendarBooking {
   id: string;
   startDateTime: string;
   endDateTime: string;
   bookingStatus: string;
+  paymentStatus: string;
   guestName: string | null;
+  guestPhone: string | null;
+  durationMinutes: number;
+  finalAmount: number;
+  accessoriesCount?: number;
+  usedCreditAmount?: number | null;
+  notes?: string | null;
   game: { name: string; tag: string; id: string };
   resourceUnit: { unitName: string } | null;
   user: { name: string; phone: string } | null;
@@ -42,6 +51,8 @@ export default function CalendarView({
   const [games, setGames] = useState<Game[]>([]);
   const [selectedGameTag, setSelectedGameTag] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [selectedBooking, setSelectedBooking] = useState<CalendarBooking | null>(null);
+  const [activeEventEl, setActiveEventEl] = useState<HTMLElement | null>(null);
 
   const fetchBookings = useCallback(async (start: Date, end: Date) => {
     try {
@@ -107,11 +118,28 @@ export default function CalendarView({
     };
   });
 
-  function handleEventClick({ event }: any) {
-    if (role === "ADMIN") {
-      router.push(`/admin/bookings/${event.id}/edit`);
-    } else if (role === "STAFF") {
-      router.push(`/staff/bookings/${event.id}/edit`);
+  function closePopover() {
+    if (activeEventEl) {
+      activeEventEl.style.overflow = "";
+      activeEventEl.style.zIndex = "";
+    }
+    setSelectedBooking(null);
+    setActiveEventEl(null);
+  }
+
+  function handleEventClick(info: any) {
+    if (activeEventEl) {
+      activeEventEl.style.overflow = "";
+      activeEventEl.style.zIndex = "";
+    }
+
+    const b = info.event.extendedProps.booking;
+    setSelectedBooking(b);
+
+    if (info.el) {
+      info.el.style.overflow = "visible";
+      info.el.style.zIndex = "9999";
+      setActiveEventEl(info.el);
     }
   }
 
@@ -229,6 +257,147 @@ export default function CalendarView({
           }}
         />
       </div>
+
+      {/* Booking Details Popover (Portal into clicked event element) */}
+      {selectedBooking && activeEventEl && (
+        (() => {
+          const rect = activeEventEl.getBoundingClientRect();
+          const popoverWidth = 290;
+          const minLeftBoundary = 260; // Distance to clear left navigation sidebar
+
+          let positionClass = "";
+
+          // Horizontal positioning check
+          if (rect.right + popoverWidth + 16 <= window.innerWidth) {
+            // Room on right: place popover to the right of card
+            positionClass += " left-full ml-2";
+          } else if (rect.left - popoverWidth >= minLeftBoundary) {
+            // Room on left without hitting left sidebar: place popover to the left of card
+            positionClass += " right-full mr-2";
+          } else {
+            // Tight bounds: overlay safely aligned inside calendar grid
+            positionClass += " right-0";
+          }
+
+          // Vertical positioning check
+          if (rect.bottom + 280 > window.innerHeight && rect.top > 280) {
+            positionClass += " bottom-0";
+          } else {
+            positionClass += " top-0";
+          }
+
+          return createPortal(
+            <>
+              {/* Invisible Backdrop for click-outside dismissal */}
+              <div 
+                className="fixed inset-0 z-[9998] bg-transparent cursor-default pointer-events-auto"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  closePopover();
+                }}
+              />
+              
+              <div 
+                className={cn(
+                  "absolute z-[9999] bg-zinc-950/95 border border-zinc-800 rounded-2xl p-3.5 w-[290px] shadow-2xl space-y-3 text-white backdrop-blur-md cursor-auto pointer-events-auto animate-in fade-in zoom-in-95 duration-150",
+                  positionClass
+                )}
+                onClick={(e) => e.stopPropagation()}
+              >
+                {/* Header */}
+                <div className="flex items-start justify-between border-b border-zinc-900 pb-2">
+                  <div>
+                    <div className="flex items-center gap-1.5">
+                      <h3 className="text-sm font-bold text-white tracking-tight leading-none">
+                        {selectedBooking.user?.name ?? selectedBooking.guestName ?? "Guest"}
+                      </h3>
+                      <span className={cn(
+                        "px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider",
+                        selectedBooking.bookingStatus === "CONFIRMED" ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20" :
+                        selectedBooking.bookingStatus === "HOLD" ? "bg-amber-500/10 text-amber-400 border border-amber-500/20" :
+                        selectedBooking.bookingStatus === "COMPLETED" ? "bg-blue-500/10 text-blue-400 border border-blue-500/20" :
+                        "bg-zinc-800 text-zinc-400 border border-zinc-700"
+                      )}>
+                        {selectedBooking.bookingStatus}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-zinc-400 mt-1 flex items-center gap-1">
+                      <Phone className="w-3 h-3 text-zinc-500" />
+                      +91 {selectedBooking.user?.phone ?? selectedBooking.guestPhone ?? "N/A"}
+                    </p>
+                  </div>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      closePopover();
+                    }}
+                    className="text-zinc-500 hover:text-white p-1 rounded-lg hover:bg-zinc-900 transition-colors"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+
+                {/* Details Grid */}
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div className="bg-zinc-900/60 p-2 rounded-xl border border-zinc-800/80 space-y-0.5">
+                    <p className="text-[9px] font-bold uppercase tracking-wider text-zinc-500 flex items-center gap-1">
+                      <Gamepad2 className="w-3 h-3 text-violet-400" /> Game / Unit
+                    </p>
+                    <p className="font-bold text-zinc-200 text-[11px] truncate">{selectedBooking.game.name}</p>
+                    <p className="text-[10px] text-zinc-400 truncate">{selectedBooking.resourceUnit?.unitName ?? "Unassigned"}</p>
+                  </div>
+
+                  <div className="bg-zinc-900/60 p-2 rounded-xl border border-zinc-800/80 space-y-0.5">
+                    <p className="text-[9px] font-bold uppercase tracking-wider text-zinc-500 flex items-center gap-1">
+                      <Clock className="w-3 h-3 text-amber-400" /> Time Slot
+                    </p>
+                    <p className="font-bold text-zinc-200 text-[11px]">{selectedBooking.durationMinutes} Mins</p>
+                    <p className="text-[10px] text-zinc-400 truncate">
+                      {format(new Date(selectedBooking.startDateTime), "h:mm a")} - {format(new Date(selectedBooking.endDateTime), "h:mm a")}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Notes if any */}
+                {selectedBooking.notes && (
+                  <div className="bg-zinc-900/50 p-2 rounded-xl border border-zinc-900 text-[10px]">
+                    <p className="text-[8px] font-bold uppercase tracking-wider text-zinc-500 mb-0.5">Notes</p>
+                    <p className="text-zinc-300 italic truncate">"{selectedBooking.notes}"</p>
+                  </div>
+                )}
+
+                {/* Action Footer */}
+                <div className="flex items-center justify-end gap-2 pt-2 border-t border-zinc-900">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      closePopover();
+                    }}
+                    className="px-2.5 py-1 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-zinc-300 text-[11px] font-bold transition-all"
+                  >
+                    Close
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      closePopover();
+                      const editPath = role === "ADMIN" 
+                        ? `/admin/bookings/${selectedBooking.id}/edit` 
+                        : `/staff/bookings/${selectedBooking.id}/edit`;
+                      router.push(editPath);
+                    }}
+                    className="px-3 py-1 rounded-lg bg-violet-600 hover:bg-violet-500 text-white text-[11px] font-bold transition-all flex items-center gap-1 shadow-lg shadow-violet-900/20 active:scale-95"
+                  >
+                    <Edit3 className="w-3 h-3" />
+                    Edit Booking
+                  </button>
+                </div>
+              </div>
+            </>,
+            activeEventEl
+          );
+        })()
+      )}
     </div>
   );
 }
