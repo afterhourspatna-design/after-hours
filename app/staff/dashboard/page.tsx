@@ -7,7 +7,7 @@ import { BookingStatusBadge, PaymentStatusBadge } from "@/components/ui/StatusBa
 import HoldAlert from "@/components/bookings/HoldAlert";
 import StatCard from "@/components/ui/StatCard";
 import LiveActivityList from "@/components/dashboard/LiveActivityList";
-import { BookOpen, Clock, Zap, Plus, Calendar, Search, Users } from "lucide-react";
+import { BookOpen, Clock, Zap, Plus, Calendar, Search, Users, ChevronLeft, ChevronRight } from "lucide-react";
 
 function getISTStartAndEnd(date: Date) {
   const formatter = new Intl.DateTimeFormat("en-US", {
@@ -26,12 +26,55 @@ function getISTStartAndEnd(date: Date) {
   return { start, end };
 }
 
-export default async function StaffDashboard() {
+export default async function StaffDashboard({
+  searchParams,
+}: {
+  searchParams: Promise<{ period?: string; from?: string; to?: string }>;
+}) {
   const session = await auth();
   if (!session?.user) redirect("/login");
 
+  const { period = "today", from, to } = await searchParams;
   const now = new Date();
-  const bounds = getISTStartAndEnd(now);
+
+  let selectedDate = new Date();
+  if (period === "custom" && from) {
+    const [y, m, d] = from.split("-").map(Number);
+    selectedDate = new Date(Date.UTC(y, m - 1, d, 12, 0, 0, 0));
+  }
+
+  const formatISTDate = (d: Date) => {
+    const formatter = new Intl.DateTimeFormat("en-US", {
+      timeZone: "Asia/Kolkata",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    });
+    const parts = formatter.formatToParts(d);
+    const year = parts.find(p => p.type === "year")!.value;
+    const month = parts.find(p => p.type === "month")!.value;
+    const day = parts.find(p => p.type === "day")!.value;
+    return `${year}-${month}-${day}`;
+  };
+
+  const todayISTStr = formatISTDate(now);
+  const selectedISTStr = formatISTDate(selectedDate);
+  const isToday = selectedISTStr === todayISTStr;
+
+  const prevDay = new Date(selectedDate.getTime() - 24 * 60 * 60 * 1000);
+  const nextDay = new Date(selectedDate.getTime() + 24 * 60 * 60 * 1000);
+
+  const prevDayStr = formatISTDate(prevDay);
+  const nextDayStr = formatISTDate(nextDay);
+
+  const backUrl = `/staff/dashboard?period=custom&from=${prevDayStr}&to=${prevDayStr}`;
+  const forwardUrl = `/staff/dashboard?period=custom&from=${nextDayStr}&to=${nextDayStr}`;
+
+  const currentDateLabel = isToday 
+    ? "Today" 
+    : selectedDate.toLocaleDateString("en-IN", { day: 'numeric', month: 'short', year: 'numeric' });
+
+  const bounds = getISTStartAndEnd(selectedDate);
   const todayStart = bounds.start;
   const todayEnd = bounds.end;
   const nextWeek = new Date(todayEnd.getTime() + (7 * 24 * 60 * 60 * 1000));
@@ -112,10 +155,36 @@ export default async function StaffDashboard() {
           <h1 className="text-3xl font-bold text-white tracking-tight">Staff Dashboard</h1>
           <p className="text-sm text-zinc-500 font-medium">Welcome, {session.user.name}</p>
         </div>
-        <a href="/staff/bookings/new"
-          className="flex items-center gap-2 px-5 py-2.5 bg-violet-600 hover:bg-violet-500 text-white text-xs font-bold rounded-xl transition-all shadow-lg shadow-violet-900/20 active:scale-95">
-          <Plus className="w-4 h-4" /> New booking
-        </a>
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Day Shifter Navigation */}
+          <div className="flex items-center gap-1 bg-zinc-900/80 p-1 rounded-xl border border-zinc-800 shadow-md">
+            <a
+              href={backUrl}
+              className="p-1.5 text-zinc-400 hover:text-white hover:bg-zinc-800 rounded-lg transition-all"
+              title="Previous Day"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </a>
+            <span className="text-xs font-bold text-zinc-200 px-2.5 min-w-[75px] text-center select-none">
+              {currentDateLabel}
+            </span>
+            <a
+              href={forwardUrl}
+              className={cn(
+                "p-1.5 text-zinc-400 hover:text-white hover:bg-zinc-800 rounded-lg transition-all",
+                isToday && "opacity-40 pointer-events-none"
+              )}
+              title="Next Day"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </a>
+          </div>
+
+          <a href="/staff/bookings/new"
+            className="flex items-center gap-2 px-5 py-2.5 bg-violet-600 hover:bg-violet-500 text-white text-xs font-bold rounded-xl transition-all shadow-lg shadow-violet-900/20 active:scale-95">
+            <Plus className="w-4 h-4" /> New booking
+          </a>
+        </div>
       </div>
 
       {/* Stat Cards */}

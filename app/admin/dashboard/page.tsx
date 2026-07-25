@@ -5,7 +5,8 @@ import { BookingStatus } from "@prisma/client";
 import { formatCurrency, cn } from "@/lib/utils";
 import {
   BookOpen, Users, IndianRupee, TrendingUp, Zap, Clock, AlertTriangle,
-  Download, Plus, Search, Filter, SlidersHorizontal, Gamepad2, Coffee
+  Download, Plus, Search, Filter, SlidersHorizontal, Gamepad2, Coffee,
+  ChevronLeft, ChevronRight
 } from "lucide-react";
 import StatCard from "@/components/ui/StatCard";
 import HoldAlert from "@/components/bookings/HoldAlert";
@@ -352,6 +353,44 @@ export default async function AdminDashboard({
   const { period = "today", from, to } = await searchParams;
   const data = await getDashboardData(period, from, to);
   const now = new Date();
+
+  let selectedDate = new Date();
+  if (period === "custom" && from) {
+    const [y, m, d] = from.split("-").map(Number);
+    selectedDate = new Date(Date.UTC(y, m - 1, d, 12, 0, 0, 0));
+  }
+
+  const formatISTDate = (d: Date) => {
+    const formatter = new Intl.DateTimeFormat("en-US", {
+      timeZone: "Asia/Kolkata",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    });
+    const parts = formatter.formatToParts(d);
+    const year = parts.find(p => p.type === "year")!.value;
+    const month = parts.find(p => p.type === "month")!.value;
+    const day = parts.find(p => p.type === "day")!.value;
+    return `${year}-${month}-${day}`;
+  };
+
+  const todayISTStr = formatISTDate(now);
+  const selectedISTStr = formatISTDate(selectedDate);
+  const isToday = selectedISTStr === todayISTStr;
+
+  const prevDay = new Date(selectedDate.getTime() - 24 * 60 * 60 * 1000);
+  const nextDay = new Date(selectedDate.getTime() + 24 * 60 * 60 * 1000);
+
+  const prevDayStr = formatISTDate(prevDay);
+  const nextDayStr = formatISTDate(nextDay);
+
+  const backUrl = `/admin/dashboard?period=custom&from=${prevDayStr}&to=${prevDayStr}`;
+  const forwardUrl = `/admin/dashboard?period=custom&from=${nextDayStr}&to=${nextDayStr}`;
+
+  const currentDateLabel = isToday 
+    ? "Today" 
+    : selectedDate.toLocaleDateString("en-IN", { day: 'numeric', month: 'short', year: 'numeric' });
+
   const currentlyPlayingCount = data.activeBookings.filter(b => {
     const start = new Date(b.startDateTime).getTime();
     const end = new Date(b.endDateTime).getTime();
@@ -455,7 +494,31 @@ export default async function AdminDashboard({
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Day Shifter Navigation */}
+          <div className="flex items-center gap-1 bg-zinc-900/80 p-1 rounded-xl border border-zinc-800 shadow-md">
+            <a
+              href={backUrl}
+              className="p-1.5 text-zinc-400 hover:text-white hover:bg-zinc-800 rounded-lg transition-all"
+              title="Previous Day"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </a>
+            <span className="text-xs font-bold text-zinc-200 px-2.5 min-w-[75px] text-center select-none">
+              {currentDateLabel}
+            </span>
+            <a
+              href={forwardUrl}
+              className={cn(
+                "p-1.5 text-zinc-400 hover:text-white hover:bg-zinc-800 rounded-lg transition-all",
+                isToday && "opacity-40 pointer-events-none"
+              )}
+              title="Next Day"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </a>
+          </div>
+
           <button className="flex items-center gap-2 px-4 py-2.5 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-300 text-xs font-bold rounded-xl transition-all">
             <Download className="w-4 h-4" />
             Export
@@ -621,8 +684,9 @@ export default async function AdminDashboard({
                 const maxVal = Math.max(...data.last7DaysRevenue.map(item => item.amount), 100);
                 const heightPct = maxVal > 0 ? (d.amount / maxVal) * 100 : 0;
                 
-                const gamePct = d.amount > 0 ? (d.gameAmount / d.amount) * 100 : 0;
+                const creditsPct = d.amount > 0 ? (d.creditsAmount / d.amount) * 100 : 0;
                 const snacksPct = d.amount > 0 ? (d.snacksAmount / d.amount) * 100 : 0;
+                const gamePct = d.amount > 0 ? (d.gameAmount / d.amount) * 100 : 0;
 
                 const formattedAmount = d.amount >= 1000 
                   ? `₹${(d.amount / 1000).toFixed(1)}k` 
@@ -633,25 +697,30 @@ export default async function AdminDashboard({
                     <div className="absolute -top-5 text-[9px] font-bold text-zinc-400 whitespace-nowrap z-0">
                       {d.amount > 0 ? formattedAmount : ""}
                     </div>
-                    <div className="absolute -top-14 bg-zinc-900 text-[10px] font-bold text-white px-2 py-1.5 rounded-lg border border-zinc-700 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-20 flex flex-col items-center gap-1 shadow-xl pointer-events-none">
+                    <div className="absolute -top-16 bg-zinc-900 text-[10px] font-bold text-white px-2 py-1.5 rounded-lg border border-zinc-700 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-20 flex flex-col items-center gap-1 shadow-xl pointer-events-none">
                       <span>Total: ₹{d.amount.toLocaleString()}</span>
-                      {d.gameAmount > 0 && <span className="text-zinc-400 text-[9px]">Game: ₹{d.gameAmount.toLocaleString()}</span>}
+                      {d.gameAmount > 0 && <span className="text-violet-400 text-[9px]">Game: ₹{d.gameAmount.toLocaleString()}</span>}
                       {d.snacksAmount > 0 && <span className="text-amber-400 text-[9px]">Snacks: ₹{d.snacksAmount.toLocaleString()}</span>}
+                      {d.creditsAmount > 0 && <span className="text-cyan-400 text-[9px]">Prepaid: ₹{d.creditsAmount.toLocaleString()}</span>}
                     </div>
                     <div className="w-full h-24 flex items-end relative z-10">
                       <div
                         className={cn(
                           "w-full rounded-t-md transition-all duration-500 cursor-help flex flex-col justify-end overflow-hidden",
-                          i === 6 ? "shadow-[0_0_15px_rgba(139,92,246,0.3)]" : ""
+                          i === 6 ? "shadow-[0_0_15px_rgba(6,182,212,0.3)]" : ""
                         )}
                         style={{ height: `${heightPct}%` }}
                       >
+                        <div 
+                          className={cn("w-full transition-all duration-500", i === 6 ? "bg-cyan-400" : "bg-cyan-500/80 group-hover:bg-cyan-400")} 
+                          style={{ height: `${creditsPct}%` }} 
+                        />
                         <div 
                           className={cn("w-full transition-all duration-500", i === 6 ? "bg-amber-400" : "bg-amber-500/80 group-hover:bg-amber-400")} 
                           style={{ height: `${snacksPct}%` }} 
                         />
                         <div 
-                          className={cn("w-full transition-all duration-500", i === 6 ? "bg-violet-500" : "bg-zinc-800 group-hover:bg-zinc-700")} 
+                          className={cn("w-full transition-all duration-500", i === 6 ? "bg-violet-500" : "bg-violet-600/80 group-hover:bg-violet-500")} 
                           style={{ height: `${gamePct}%` }} 
                         />
                       </div>
