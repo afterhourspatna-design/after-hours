@@ -71,6 +71,7 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
+  const [includeAdvanceBookings, setIncludeAdvanceBookings] = useState(true);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [paymentHistory, setPaymentHistory] = useState<PaymentGroup[]>([]);
   const [showPayModal, setShowPayModal] = useState(false);
@@ -129,6 +130,7 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
           page: "1",
           limit: "1000", // Unpaid tabs shouldn't be paginated so we can batch settle everything at once
           includeSnacks: "1",
+          includeAdvance: includeAdvanceBookings ? "1" : "0",
           ...(search ? { q: search } : {}),
           paymentStatus: "UNPAID",
         });
@@ -244,7 +246,7 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
     } finally {
       setLoading(false);
     }
-  }, [page, search, activeTab, startDate, endDate]);
+  }, [page, search, activeTab, startDate, endDate, includeAdvanceBookings]);
 
   useEffect(() => {
     fetchBookings();
@@ -518,6 +520,26 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
             <RefreshCw className="w-4 h-4" />
           </button>
         </div>
+
+        {activeTab === "UNPAID" && (
+          <label className={cn(
+            "inline-flex items-center gap-2 px-3 py-2 rounded-xl border text-xs whitespace-nowrap w-fit transition-colors",
+            includeAdvanceBookings
+              ? "border-cyan-500/40 bg-cyan-500/10 text-cyan-300"
+              : "border-zinc-800 bg-zinc-900/60 text-zinc-300"
+          )}>
+            <input
+              type="checkbox"
+              checked={includeAdvanceBookings}
+              onChange={(e) => {
+                setIncludeAdvanceBookings(e.target.checked);
+                setPage(1);
+              }}
+              className="rounded border-zinc-700 text-cyan-500 focus:ring-cyan-500 bg-zinc-900 h-4 w-4"
+            />
+            Include advance bookings
+          </label>
+        )}
 
         {/* Date Filter Row for History tab */}
         {activeTab === "PAID" && (
