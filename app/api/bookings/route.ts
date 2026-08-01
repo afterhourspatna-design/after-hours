@@ -49,6 +49,7 @@ export async function GET(req: NextRequest) {
   const search = searchParams.get("q");
   const dateFrom = searchParams.get("from");
   const dateTo = searchParams.get("to");
+  const includeAdvance = searchParams.get("includeAdvance") !== "0";
   const forCalendar = searchParams.get("calendar") === "1";
 
   const where: any = {
@@ -97,6 +98,33 @@ export async function GET(req: NextRequest) {
       { user: { name: { contains: search, mode: "insensitive" } } },
       { user: { phone: { contains: search } } },
     ];
+  }
+  if (!includeAdvance) {
+    const now = new Date();
+    const formatter = new Intl.DateTimeFormat("en-US", {
+      timeZone: "Asia/Kolkata",
+      year: "numeric",
+      month: "numeric",
+      day: "numeric",
+    });
+    const parts = formatter.formatToParts(now);
+    const year = parseInt(parts.find(p => p.type === "year")!.value, 10);
+    const month = parseInt(parts.find(p => p.type === "month")!.value, 10) - 1;
+    const day = parseInt(parts.find(p => p.type === "day")!.value, 10);
+    const todayEndIST = new Date(Date.UTC(year, month, day, 23, 59, 59, 999) - (5.5 * 60 * 60 * 1000));
+
+    const existingStartFilter = where.startDateTime ?? {};
+    let cappedLte = todayEndIST;
+
+    if (existingStartFilter.lte) {
+      const existingLte = new Date(existingStartFilter.lte);
+      cappedLte = existingLte < todayEndIST ? existingLte : todayEndIST;
+    }
+
+    where.startDateTime = {
+      ...existingStartFilter,
+      lte: cappedLte,
+    };
   }
 
   if (forCalendar) {

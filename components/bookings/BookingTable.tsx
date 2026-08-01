@@ -54,6 +54,7 @@ function BookingTableInner({ role = "ADMIN" }: BookingTableProps) {
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState(searchParams.get("q") ?? "");
   const [statusFilter, setStatusFilter] = useState(searchParams.get("status") ?? "ALL");
+  const [includeAdvanceBookings, setIncludeAdvanceBookings] = useState(true);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
@@ -68,6 +69,7 @@ function BookingTableInner({ role = "ADMIN" }: BookingTableProps) {
         limit: String(LIMIT),
         ...(search ? { q: search } : {}),
         ...(statusFilter !== "ALL" ? { status: statusFilter } : {}),
+        includeAdvance: includeAdvanceBookings ? "1" : "0",
       });
       const res = await fetch(`/api/bookings?${params}`);
       if (res.ok) {
@@ -78,7 +80,7 @@ function BookingTableInner({ role = "ADMIN" }: BookingTableProps) {
     } finally {
       setLoading(false);
     }
-  }, [page, search, statusFilter]);
+  }, [page, search, statusFilter, includeAdvanceBookings]);
 
   useEffect(() => { fetchBookings(); }, [fetchBookings]);
 
@@ -168,6 +170,24 @@ function BookingTableInner({ role = "ADMIN" }: BookingTableProps) {
             </button>
           ))}
         </div>
+
+        <label className={cn(
+          "inline-flex items-center gap-2 px-3 py-2 rounded-xl border text-xs whitespace-nowrap transition-colors",
+          includeAdvanceBookings
+            ? "border-cyan-500/40 bg-cyan-500/10 text-cyan-300"
+            : "border-zinc-800 bg-zinc-900/60 text-zinc-300"
+        )}>
+          <input
+            type="checkbox"
+            checked={includeAdvanceBookings}
+            onChange={(e) => {
+              setIncludeAdvanceBookings(e.target.checked);
+              setPage(1);
+            }}
+            className="rounded border-zinc-700 text-cyan-500 focus:ring-cyan-500 bg-zinc-900 h-4 w-4"
+          />
+          Include advance bookings
+        </label>
 
         <div className="flex gap-2 flex-shrink-0">
           <button onClick={fetchBookings}
