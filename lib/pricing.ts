@@ -87,6 +87,23 @@ function calculateBlockBaseAmount(params: {
     return rHour;
   }
 
+  if (tag === "ps4") {
+    // PS4 Rates:
+    // 1 Controller: 30m = 70, 1h = 100
+    // 2 Controllers: 30m = 80, 1h = 120
+    let rHalf = 70;
+    let rHour = 100;
+    if (accessoriesCount === 2) {
+      rHalf = 80;
+      rHour = 120;
+    }
+
+    if (blockMinutes <= 30) {
+      return rHalf;
+    }
+    return rHour;
+  }
+
   if (tag === "metaquest") {
     // Meta Quest Rates: 20m: ₹80, 30m: ₹120, 40m: ₹150, 60m: ₹200
     if (blockMinutes <= 20) return 80;

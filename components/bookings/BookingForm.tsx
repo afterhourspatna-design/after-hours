@@ -150,6 +150,7 @@ export default function BookingForm({ mode = "create", initialData, prefillDate,
       case "foosball":
       case "soccer":
       case "ps5":
+      case "ps4":
       case "tabletennis":
       case "pool":
       case "carrom":
@@ -225,12 +226,12 @@ export default function BookingForm({ mode = "create", initialData, prefillDate,
         if (g) {
           setSelectedGame(g);
           if (mode === "create") {
-            setAccessoriesCount(g.tag === "ps5" ? 1 : g.tag === "tabletennis" ? 2 : g.tag === "pool" ? 2 : 0);
+            setAccessoriesCount(g.tag === "ps5" ? 1 : g.tag === "ps4" ? 1 : g.tag === "tabletennis" ? 2 : g.tag === "pool" ? 2 : 0);
             if ((g.tag === "pool" || g.tag === "cards") && !selectedUnit) {
               setSelectedUnit(g.resourceUnits[0]?.id ?? "");
             }
           } else if (mode === "edit" && (!initialData?.accessoriesCount || initialData.accessoriesCount === 0)) {
-            setAccessoriesCount(g.tag === "ps5" ? 1 : g.tag === "tabletennis" ? 2 : g.tag === "pool" ? 2 : 0);
+            setAccessoriesCount(g.tag === "ps5" ? 1 : g.tag === "ps4" ? 1 : g.tag === "tabletennis" ? 2 : g.tag === "pool" ? 2 : 0);
           }
         }
       }
@@ -651,10 +652,10 @@ export default function BookingForm({ mode = "create", initialData, prefillDate,
               </div>
             </div>
 
-            {selectedGame && ["ps5", "tabletennis", "pool"].includes(selectedGame.tag) && (
+            {selectedGame && ["ps5", "ps4", "tabletennis", "pool"].includes(selectedGame.tag) && (
               <div className="pt-4 border-t border-zinc-800/80 space-y-3 animate-in fade-in duration-300">
                 <label className="text-xs font-semibold text-zinc-300 block">
-                  {selectedGame.tag === "ps5" ? "Controller Configuration" : selectedGame.tag === "tabletennis" ? "Racquet Options" : "Pool Stick Options"}
+                  {selectedGame.tag === "ps5" ? "Controller Configuration" : selectedGame.tag === "ps4" ? "Controller Configuration" : selectedGame.tag === "tabletennis" ? "Racquet Options" : "Pool Stick Options"}
                 </label>
                 <div className={cn(
                   "grid gap-3",
@@ -683,6 +684,33 @@ export default function BookingForm({ mode = "create", initialData, prefillDate,
                       >
                         <span className="text-xs font-bold tracking-wide">{opt.label}</span>
                         <span className={cn("text-sm font-black mt-1", active ? "text-violet-400" : "text-zinc-500")}>
+                          ₹{price}
+                        </span>
+                      </button>
+                    );
+                  })}
+
+                  {selectedGame.tag === "ps4" && [
+                    { count: 1, label: "1 Controller", price30: 70, price60: 100 },
+                    { count: 2, label: "2 Controllers", price30: 80, price60: 120 },
+                  ].map((opt) => {
+                    const active = accessoriesCount === opt.count;
+                    const price = durationMinutes <= 30 ? opt.price30 : opt.price60;
+                    return (
+                      <button
+                        key={opt.count}
+                        type="button"
+                        onClick={() => setAccessoriesCount(opt.count)}
+                        disabled={isPaidLocked}
+                        className={cn(
+                          "flex flex-col items-center justify-center p-3.5 rounded-xl border text-center transition-all duration-300",
+                          active
+                            ? "bg-gradient-to-br from-sky-600/35 to-blue-600/35 border-sky-500 shadow-lg shadow-sky-500/10 text-white scale-[1.02]"
+                            : "bg-zinc-900/60 border-zinc-800 hover:border-zinc-700 text-zinc-400 hover:text-zinc-300"
+                        )}
+                      >
+                        <span className="text-xs font-bold tracking-wide">{opt.label}</span>
+                        <span className={cn("text-sm font-black mt-1", active ? "text-sky-400" : "text-zinc-500")}>
                           ₹{price}
                         </span>
                       </button>

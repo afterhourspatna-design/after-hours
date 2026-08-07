@@ -136,6 +136,7 @@ export const PAYMENT_STATUS_CONFIG = {
 
 export const GAME_COLOR_MAP: Record<string, string> = {
   ps5:         "#7c3aed",
+  ps4:         "#0ea5e9",
   metaquest:   "#2563eb",
   soccer:      "#16a34a",
   tabletennis: "#0891b2",

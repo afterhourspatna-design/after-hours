@@ -136,6 +136,24 @@ async function main() {
     },
   });
 
+  const ps4 = await prisma.game.create({
+    data: {
+      name: "PS4",
+      tag: "ps4",
+      description: "PlayStation 4 gaming station",
+      basePrice: 100,
+      minTimeMinutes: 30,
+      maxTimeMinutes: 60,
+      deposit: 500,
+      isActive: true,
+      totalUnits: 1,
+      hasAccessories: true,
+      defaultAccessories: 1,
+      maxAccessories: 2,
+      accessoryPrice: 20.00,
+    },
+  });
+
   const metaQuest = await prisma.game.create({
     data: {
       name: "Meta Quest",
@@ -245,6 +263,7 @@ async function main() {
   // ─── Resource Units ───────────────────────────────────────────────────
   const ps5Unit1 = await prisma.resourceUnit.create({ data: { gameId: ps5.id, unitName: "PS5 - Unit 1" } });
   const ps5Unit2 = await prisma.resourceUnit.create({ data: { gameId: ps5.id, unitName: "PS5 - Unit 2" } });
+  const ps4Unit = await prisma.resourceUnit.create({ data: { gameId: ps4.id, unitName: "PS4 - Unit 1" } });
   const metaUnit = await prisma.resourceUnit.create({ data: { gameId: metaQuest.id, unitName: "Meta Quest - Unit 1" } });
   const soccerUnit = await prisma.resourceUnit.create({ data: { gameId: soccerTable.id, unitName: "Soccer Table - 1" } });
   const ttUnit = await prisma.resourceUnit.create({ data: { gameId: tableTennis.id, unitName: "Table Tennis - 1" } });

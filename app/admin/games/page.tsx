@@ -20,7 +20,7 @@ interface Game {
 }
 
 const GAME_ICONS: Record<string, string> = {
-  ps5: "🎮", metaquest: "🥽", soccer: "⚽", tabletennis: "🏓",
+  ps5: "🎮", ps4: "🎮", metaquest: "🥽", soccer: "⚽", tabletennis: "🏓",
   pool: "🎱", basketball: "🏀", foosball: "⚽", event: "🎉",
   carrom: "🎯", jenga: "🧱", cards: "🃏",
 };
