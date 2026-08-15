@@ -84,6 +84,10 @@ model AppUser {
   creditBalances         UserCreditBalance[]
   prepaidTransactions    PrepaidTransaction[]
 
+  // Streak Challenges
+  streakChallenges       StreakChallenge[]   @relation("StreakOwner")
+  issuedStreakChallenges StreakChallenge[]   @relation("StreakIssuedBy")
+
   @@index([phone])
   @@index([role])
   @@map("app_users")
@@ -310,6 +314,12 @@ enum DiscountType {
   FIXED
 }
 
+enum StreakStatus {
+  ACTIVE
+  ISSUED
+  EXPIRED
+}
+
 model Coupon {
   id               String        @id @default(cuid())
   code             String        @unique
@@ -383,4 +393,28 @@ model PrepaidTransaction {
   @@index([creditBalanceId])
   @@index([createdAt])
   @@map("prepaid_transactions")
+}
+
+// ─────────────────────────────────────────
+// STREAK CHALLENGE
+// ─────────────────────────────────────────
+
+model StreakChallenge {
+  id          String       @id @default(cuid())
+  userId      String
+  startDate   DateTime     // manually chosen by admin/staff
+  endDate     DateTime     // startDate + 30 days (stored for queries/display)
+  status      StreakStatus @default(ACTIVE)
+  issuedAt    DateTime?
+  issuedById  String?
+  notes       String?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  user        AppUser  @relation("StreakOwner", fields: [userId], references: [id], onDelete: Cascade)
+  issuedBy    AppUser? @relation("StreakIssuedBy", fields: [issuedById], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([status])
+  @@map("streak_challenges")
 }
