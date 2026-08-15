@@ -420,7 +420,7 @@ export async function POST(req: NextRequest) {
       finalAmount,
       usedCreditAmount,
       paymentStatus: initialPaymentStatus,
-      bookingStatus: BookingStatus.CONFIRMED,
+      bookingStatus: role === "CUSTOMER" ? BookingStatus.PENDING : BookingStatus.CONFIRMED,
       source: finalSource,
       notes: data.notes ?? null,
       holdExpiresAt: null,
