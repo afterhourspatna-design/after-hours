@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
-import type { Prisma } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { relevanceScore, orderByIds } from "@/lib/search-rank";
 
 export async function GET(req: Request) {
   try {
@@ -24,37 +25,62 @@ export async function GET(req: Request) {
       whereClause.creditBalances = { some: { balance: { gt: 0 } } };
     }
 
-    const users = await prisma.appUser.findMany({
-      where: whereClause,
-      select: {
-        id: true,
-        name: true,
-        phone: true,
-        creditBalances: {
-          include: { applicableGames: { select: { id: true, name: true, tag: true } } }
-        },
-        prepaidTransactions: {
-          orderBy: { createdAt: 'desc' },
-          select: {
-            id: true,
-            amount: true,
-            description: true,
-            createdAt: true,
-            moneyGiven: true,
-            creditsReceived: true,
-            paymentId: true,
-            bookingId: true,
-            booking: {
-              select: {
-                startDateTime: true,
-                durationMinutes: true,
-              }
+    const userSelect = {
+      id: true,
+      name: true,
+      phone: true,
+      creditBalances: {
+        include: { applicableGames: { select: { id: true, name: true, tag: true } } }
+      },
+      prepaidTransactions: {
+        orderBy: { createdAt: 'desc' },
+        select: {
+          id: true,
+          amount: true,
+          description: true,
+          createdAt: true,
+          moneyGiven: true,
+          creditsReceived: true,
+          paymentId: true,
+          bookingId: true,
+          booking: {
+            select: {
+              startDateTime: true,
+              durationMinutes: true,
             }
           }
         }
-      },
-      orderBy: { name: 'asc' }
-    });
+      }
+    };
+
+    if (!q) {
+      const users = await prisma.appUser.findMany({
+        where: whereClause,
+        select: userSelect,
+        orderBy: { name: 'asc' }
+      });
+      return NextResponse.json({ users });
+    }
+
+    // Search term present: rank by relevance in the database.
+    const matched = await prisma.appUser.findMany({ where: whereClause, select: { id: true } });
+    if (matched.length === 0) {
+      return NextResponse.json({ users: [] });
+    }
+    const matchedIds = matched.map((m) => m.id);
+    const ranked = await prisma.$queryRaw<{ id: string }[]>(Prisma.sql`
+      SELECT u.id FROM "app_users" u
+      WHERE u.id IN (${Prisma.join(matchedIds.map((id) => Prisma.sql`${id}`), ", ")})
+      ORDER BY
+        ${relevanceScore(q, [
+          { table: "u", column: "name" },
+          { table: "u", column: "phone" },
+        ])},
+        u."createdAt" DESC
+    `);
+    const rankedIds = ranked.map((r) => r.id);
+    const usersFull = await prisma.appUser.findMany({ where: { id: { in: rankedIds } }, select: userSelect });
+    const users = orderByIds(usersFull, rankedIds);
 
     return NextResponse.json({ users });
   } catch (error) {
