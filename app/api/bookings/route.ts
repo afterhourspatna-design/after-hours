@@ -147,7 +147,7 @@ export async function GET(req: NextRequest) {
 
   const includeSnacks = searchParams.get("includeSnacks") === "1";
 
-  const bookingInclude = {
+  const bookingInclude: Prisma.BookingInclude = {
     game: { select: { name: true, tag: true } },
     resourceUnit: { select: { unitName: true } },
     user: { select: { name: true, phone: true, createdAt: true, referredByPhone: true, _count: { select: { bookings: { where: { paymentStatus: "PAID" } } } } } },
@@ -195,7 +195,7 @@ export async function GET(req: NextRequest) {
     allocations: snack.allocations ?? [],
   });
 
-  const snackWhere = paymentStatus === "UNPAID"
+  const snackWhere: Prisma.SnackOrderWhereInput = paymentStatus === "UNPAID"
     ? { paymentStatus: { in: ["UNPAID", "PARTIAL"] } }
     : (paymentStatus ? { paymentStatus } : {});
 

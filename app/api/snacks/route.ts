@@ -90,7 +90,7 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const snackInclude = {
+    const snackInclude: Prisma.SnackOrderInclude = {
       user: { select: { name: true, phone: true } },
       items: {
         orderBy: { createdAt: "desc" },

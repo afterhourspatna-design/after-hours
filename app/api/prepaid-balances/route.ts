@@ -25,7 +25,7 @@ export async function GET(req: Request) {
       whereClause.creditBalances = { some: { balance: { gt: 0 } } };
     }
 
-    const userSelect = {
+    const userSelect: Prisma.AppUserSelect = {
       id: true,
       name: true,
       phone: true,
