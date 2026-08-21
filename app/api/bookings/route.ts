@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { Prisma } from "@prisma/client";
 import { checkAvailability, suggestAvailableUnit, expireStaleHolds } from "@/lib/booking-helpers";
 import { calculateBookingPrice } from "@/lib/pricing";
 import { BookingStatus, BookingSource, BookingType, PaymentStatus } from "@prisma/client";
 import { addMinutes } from "date-fns";
 import { z } from "zod";
+import { relevanceScore, scoreMatch, orderByIds } from "@/lib/search-rank";
 
 const createBookingSchema = z.object({
   userId: z.string().optional().nullable(),
@@ -145,33 +147,29 @@ export async function GET(req: NextRequest) {
 
   const includeSnacks = searchParams.get("includeSnacks") === "1";
 
-  const [bookings, total, snackOrders] = await Promise.all([
-    prisma.booking.findMany({
-      where,
-      include: {
-        game: { select: { name: true, tag: true } },
-        resourceUnit: { select: { unitName: true } },
-        user: { select: { name: true, phone: true, createdAt: true, referredByPhone: true, _count: { select: { bookings: { where: { paymentStatus: "PAID" } } } } } },
-        createdBy: { select: { name: true } },
-        allocations: true,
-      },
-      orderBy: { startDateTime: "desc" },
-      ...(includeSnacks ? {} : { skip: (page - 1) * limit, take: limit }),
-    }),
-    includeSnacks ? Promise.resolve(0) : prisma.booking.count({ where }),
-    // Fetch snack orders only if requested and matching the same payment status criteria
-    (includeSnacks && !status ? prisma.snackOrder.findMany({
-      where: paymentStatus === "UNPAID" ? { paymentStatus: { in: ["UNPAID", "PARTIAL"] } } : (paymentStatus ? { paymentStatus } : {}),
-      include: {
-        user: { select: { name: true, phone: true, createdAt: true, referredByPhone: true, _count: { select: { bookings: { where: { paymentStatus: "PAID" } } } } } },
-        allocations: true,
-      },
-      orderBy: { createdAt: "desc" }
-    }) : Promise.resolve([]))
-  ]);
+  const bookingInclude: Prisma.BookingInclude = {
+    game: { select: { name: true, tag: true } },
+    resourceUnit: { select: { unitName: true } },
+    user: { select: { name: true, phone: true, createdAt: true, referredByPhone: true, _count: { select: { bookings: { where: { paymentStatus: "PAID" } } } } } },
+    createdBy: { select: { name: true } },
+    allocations: true,
+  };
 
-  // Map snack orders to dummy booking shape
-  const mappedSnacks = includeSnacks ? snackOrders.map((snack: any) => ({
+  const mapBooking = (b: any) => {
+    let isNewUser = false;
+    if (b.user) isNewUser = b.user._count?.bookings === 0;
+    return {
+      ...b,
+      isNewUser,
+      finalAmount: Number(b.finalAmount),
+      negotiatedAmount: b.negotiatedAmount !== null ? Number(b.negotiatedAmount) : null,
+      discountAmount: Number(b.discountAmount),
+      couponDiscount: Number(b.couponDiscount),
+      createdByName: b.createdBy?.name || null,
+    };
+  };
+
+  const mapSnack = (snack: any) => ({
     id: `SNACK_${snack.id}`,
     userId: snack.userId,
     guestName: snack.guestName,
@@ -195,35 +193,102 @@ export async function GET(req: NextRequest) {
     paymentId: snack.paymentId,
     snacksAmount: Number(snack.amount),
     allocations: snack.allocations ?? [],
-  })) : [];
-
-  // Map bookings to calculate balance due and clean up big decimals
-  const mappedBookings = bookings.map((b: any) => {
-    let isNewUser = false;
-    if (b.user) {
-      isNewUser = b.user._count?.bookings === 0;
-    }
-    
-    return {
-      ...b,
-      isNewUser,
-      finalAmount: Number(b.finalAmount),
-      negotiatedAmount: b.negotiatedAmount !== null ? Number(b.negotiatedAmount) : null,
-      discountAmount: Number(b.discountAmount),
-      couponDiscount: Number(b.couponDiscount),
-      createdByName: b.createdBy?.name || null,
-    };
   });
 
-  const combinedBookings = [...mappedBookings, ...mappedSnacks].sort((a: any, b: any) =>
-    new Date(b.startDateTime).getTime() - new Date(a.startDateTime).getTime()
-  );
+  const snackWhere: Prisma.SnackOrderWhereInput = paymentStatus === "UNPAID"
+    ? { paymentStatus: { in: ["UNPAID", "PARTIAL"] } }
+    : (paymentStatus ? { paymentStatus } : {});
 
-  const finalBookings = includeSnacks 
-    ? combinedBookings.slice((page - 1) * limit, page * limit) 
-    : combinedBookings;
+  const bookingRankFields = [
+    { table: "u", column: "name" },
+    { table: "b", column: "guestName" },
+    { table: "u", column: "phone" },
+    { table: "b", column: "guestPhone" },
+    { table: "b", column: "notes" },
+  ];
 
-  const finalTotal = includeSnacks ? combinedBookings.length : total;
+  let finalBookings: any[] = [];
+  let finalTotal = 0;
+
+  if (search) {
+    // Collect every booking matching the current filters, then rank by relevance.
+    const matched = await prisma.booking.findMany({ where, select: { id: true } });
+    const matchedIds = matched.map((m) => m.id);
+
+    if (matchedIds.length === 0) {
+      finalBookings = [];
+      finalTotal = 0;
+    } else if (includeSnacks) {
+      // Rank ALL matches, merge with snacks, then paginate the combined list.
+      const rankedAll = await prisma.$queryRaw<{ id: string }[]>(Prisma.sql`
+        SELECT b.id FROM "bookings" b
+        LEFT JOIN "app_users" u ON b."userId" = u.id
+        WHERE b.id IN (${Prisma.join(matchedIds.map((id) => Prisma.sql`${id}`), ", ")})
+        ORDER BY
+          ${relevanceScore(search, bookingRankFields)},
+          b."startDateTime" DESC
+      `);
+      const rankedIds = rankedAll.map((r) => r.id);
+      const [bks, snacks] = await Promise.all([
+        prisma.booking.findMany({ where: { id: { in: rankedIds } }, include: bookingInclude }),
+        status
+          ? Promise.resolve([])
+          : prisma.snackOrder.findMany({
+              where: snackWhere,
+              include: { user: { select: { name: true, phone: true, createdAt: true, referredByPhone: true, _count: { select: { bookings: { where: { paymentStatus: "PAID" } } } } } }, allocations: true },
+              orderBy: { createdAt: "desc" },
+            }),
+      ]);
+      const combined = [...bks.map(mapBooking), ...snacks.map(mapSnack)].sort((a: any, b: any) => {
+        const sa = scoreMatch(search, [a.user?.name, a.guestName, a.user?.phone, a.guestPhone, a.notes]);
+        const sb = scoreMatch(search, [b.user?.name, b.guestName, b.user?.phone, b.guestPhone, b.notes]);
+        if (sa !== sb) return sa - sb;
+        return new Date(b.startDateTime).getTime() - new Date(a.startDateTime).getTime();
+      });
+      finalBookings = combined.slice((page - 1) * limit, page * limit);
+      finalTotal = combined.length;
+    } else {
+      // Rank with pagination, then fetch the page in ranked order.
+      const ranked = await prisma.$queryRaw<{ id: string }[]>(Prisma.sql`
+        SELECT b.id FROM "bookings" b
+        LEFT JOIN "app_users" u ON b."userId" = u.id
+        WHERE b.id IN (${Prisma.join(matchedIds.map((id) => Prisma.sql`${id}`), ", ")})
+        ORDER BY
+          ${relevanceScore(search, bookingRankFields)},
+          b."startDateTime" DESC
+        LIMIT ${limit} OFFSET ${(page - 1) * limit}
+      `);
+      const rankedIds = ranked.map((r) => r.id);
+      const bks = rankedIds.length
+        ? await prisma.booking.findMany({ where: { id: { in: rankedIds } }, include: bookingInclude })
+        : [];
+      finalBookings = orderByIds(bks.map(mapBooking), rankedIds);
+      finalTotal = matchedIds.length;
+    }
+  } else {
+    // No search term: original behaviour (date ordering, server-side pagination).
+    const [bks, totalCount, snacks] = await Promise.all([
+      prisma.booking.findMany({
+        where,
+        include: bookingInclude,
+        orderBy: { startDateTime: "desc" },
+        ...(includeSnacks ? {} : { skip: (page - 1) * limit, take: limit }),
+      }),
+      includeSnacks ? Promise.resolve(0) : prisma.booking.count({ where }),
+      (includeSnacks && !status
+        ? prisma.snackOrder.findMany({
+            where: snackWhere,
+            include: { user: { select: { name: true, phone: true, createdAt: true, referredByPhone: true, _count: { select: { bookings: { where: { paymentStatus: "PAID" } } } } } }, allocations: true },
+            orderBy: { createdAt: "desc" },
+          })
+        : Promise.resolve([])),
+    ]);
+    const combined = [...bks.map(mapBooking), ...snacks.map(mapSnack)].sort(
+      (a: any, b: any) => new Date(b.startDateTime).getTime() - new Date(a.startDateTime).getTime()
+    );
+    finalBookings = includeSnacks ? combined.slice((page - 1) * limit, page * limit) : combined;
+    finalTotal = includeSnacks ? combined.length : totalCount;
+  }
 
   return NextResponse.json({ bookings: finalBookings, total: finalTotal, page, limit });
 }

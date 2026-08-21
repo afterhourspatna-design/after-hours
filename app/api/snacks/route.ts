@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { Prisma } from "@prisma/client";
+import { relevanceScore, orderByIds } from "@/lib/search-rank";
 
 export async function POST(req: NextRequest) {
   const session = await auth();
@@ -88,22 +90,52 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const [snacks, total] = await Promise.all([
-      prisma.snackOrder.findMany({
-        where,
-        include: {
-          user: { select: { name: true, phone: true } },
-          items: {
-            orderBy: { createdAt: "desc" },
-            include: { addedBy: { select: { name: true } } }
-          }
-        },
+    const snackInclude: Prisma.SnackOrderInclude = {
+      user: { select: { name: true, phone: true } },
+      items: {
         orderBy: { createdAt: "desc" },
-        skip: (page - 1) * limit,
-        take: limit,
-      }),
-      prisma.snackOrder.count({ where }),
-    ]);
+        include: { addedBy: { select: { name: true } } }
+      }
+    };
+
+    if (!search) {
+      const [snacks, total] = await Promise.all([
+        prisma.snackOrder.findMany({ where, include: snackInclude, orderBy: { createdAt: "desc" }, skip: (page - 1) * limit, take: limit }),
+        prisma.snackOrder.count({ where }),
+      ]);
+      return NextResponse.json({ snacks, total, page, limit });
+    }
+
+    // Search term present: rank by relevance in the database.
+    const matched = await prisma.snackOrder.findMany({ where, select: { id: true } });
+    const total = matched.length;
+    if (total === 0) {
+      return NextResponse.json({ snacks: [], total: 0, page, limit });
+    }
+
+    const matchedIds = matched.map((m) => m.id);
+    const ranked = await prisma.$queryRaw<{ id: string }[]>(Prisma.sql`
+      SELECT s.id FROM "snack_orders" s
+      LEFT JOIN "app_users" u ON s."userId" = u.id
+      WHERE s.id IN (${Prisma.join(matchedIds.map((id) => Prisma.sql`${id}`), ", ")})
+      ORDER BY
+        ${relevanceScore(search, [
+          { table: "u", column: "name" },
+          { table: "s", column: "guestName" },
+          { table: "u", column: "phone" },
+          { table: "s", column: "guestPhone" },
+        ])},
+        s."createdAt" DESC
+      LIMIT ${limit} OFFSET ${(page - 1) * limit}
+    `);
+
+    if (ranked.length === 0) {
+      return NextResponse.json({ snacks: [], total, page, limit });
+    }
+
+    const rankedIds = ranked.map((r) => r.id);
+    const snacksFull = await prisma.snackOrder.findMany({ where: { id: { in: rankedIds } }, include: snackInclude });
+    const snacks = orderByIds(snacksFull, rankedIds);
 
     return NextResponse.json({ snacks, total, page, limit });
   } catch (error) {
