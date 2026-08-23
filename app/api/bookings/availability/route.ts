@@ -1,14 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
-import { checkAvailability } from "@/lib/booking-helpers";
+import { checkAvailability, suggestAvailableUnit } from "@/lib/booking-helpers";
 import { auth } from "@/auth";
 import { z } from "zod";
 import { addMinutes } from "date-fns";
 
 const schema = z.object({
-  resourceUnitId: z.string(),
+  resourceUnitId: z.string().optional(),
+  gameId: z.string().optional(),
   startDateTime: z.string().datetime(),
   durationMinutes: z.number().min(5),
   excludeBookingId: z.string().optional(),
+}).refine(data => data.resourceUnitId || data.gameId, {
+  message: "Either resourceUnitId or gameId must be provided",
 });
 
 export async function GET(req: NextRequest) {
@@ -17,7 +20,8 @@ export async function GET(req: NextRequest) {
 
   const { searchParams } = req.nextUrl;
   const parsed = schema.safeParse({
-    resourceUnitId: searchParams.get("resourceUnitId"),
+    resourceUnitId: searchParams.get("resourceUnitId") ?? undefined,
+    gameId: searchParams.get("gameId") ?? undefined,
     startDateTime: searchParams.get("startDateTime"),
     durationMinutes: parseInt(searchParams.get("durationMinutes") ?? "60"),
     excludeBookingId: searchParams.get("excludeBookingId") ?? undefined,
@@ -25,10 +29,17 @@ export async function GET(req: NextRequest) {
 
   if (!parsed.success) return NextResponse.json({ error: "Invalid params" }, { status: 400 });
 
-  const { resourceUnitId, startDateTime, durationMinutes, excludeBookingId } = parsed.data;
+  const { resourceUnitId, gameId, startDateTime, durationMinutes, excludeBookingId } = parsed.data;
   const start = new Date(startDateTime);
   const end = addMinutes(start, durationMinutes);
 
-  const result = await checkAvailability({ resourceUnitId, startDateTime: start, endDateTime: end, excludeBookingId });
-  return NextResponse.json(result);
+  if (resourceUnitId) {
+    const result = await checkAvailability({ resourceUnitId, startDateTime: start, endDateTime: end, excludeBookingId });
+    return NextResponse.json(result);
+  } else if (gameId) {
+    const suggested = await suggestAvailableUnit({ gameId, startDateTime: start, endDateTime: end, excludeBookingId });
+    return NextResponse.json({ available: !!suggested });
+  }
+
+  return NextResponse.json({ error: "Invalid request" }, { status: 400 });
 }

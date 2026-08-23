@@ -297,18 +297,28 @@ export default function BookingForm({ mode = "create", initialData, prefillDate,
 
   // Check unit availability
   useEffect(() => {
-    if (!selectedUnit || !bookingDate || !startTime) { setUnitAvailability(null); return; }
+    if (!selectedGame || !bookingDate || !startTime) { setUnitAvailability(null); return; }
+    
+    // Clear state while checking
+    setUnitAvailability(null);
+
     const startDT = new Date(`${bookingDate}T${startTime}:00`);
     const params = new URLSearchParams({
-      resourceUnitId: selectedUnit,
       startDateTime: startDT.toISOString(),
       durationMinutes: String(durationMinutes),
       ...(initialData?.id ? { excludeBookingId: initialData.id } : {}),
     });
+    
+    if (selectedUnit) {
+      params.append("resourceUnitId", selectedUnit);
+    } else {
+      params.append("gameId", selectedGame.id);
+    }
+
     fetch(`/api/bookings/availability?${params}`)
       .then(r => r.json())
       .then(d => setUnitAvailability(d.available));
-  }, [selectedUnit, bookingDate, startTime, durationMinutes]);
+  }, [selectedUnit, selectedGame, bookingDate, startTime, durationMinutes]);
 
   // Mini Availability Calendar logic
   const [dayBookings, setDayBookings] = useState<any[]>([]);
@@ -368,7 +378,7 @@ export default function BookingForm({ mode = "create", initialData, prefillDate,
     if (!isGuest && !selectedUser) { toast.error("Please select a user or switch to Guest mode"); return; }
     if (selectedGame.tag === "pool" && !selectedUnit) { toast.error("Please select a specific Pool Table (Indian or American)"); return; }
     if (selectedGame.tag === "cards" && !selectedUnit) { toast.error("Please select a specific Card Game (Uno, Monopoly, or Card)"); return; }
-    if (unitAvailability === false) { toast.error("This unit is not available at the selected time"); return; }
+    if (unitAvailability === false) { toast.error(selectedUnit ? "This unit is not available at the selected time" : "No units available at the selected time"); return; }
     
     if (mode === "create" && advanceAmount !== "" && advanceAmount > 0) {
       if (paymentMethod === "MIXED") {
@@ -633,10 +643,15 @@ export default function BookingForm({ mode = "create", initialData, prefillDate,
                     <option key={u.id} value={u.id}>{u.unitName}</option>
                   ))}
                 </select>
-                {unitAvailability === false && (
-                  <p className="text-xs text-red-400 mt-1">⚠ This unit is already booked at this time</p>
+                {unitAvailability === null && selectedGame && bookingDate && startTime && (
+                  <p className="text-xs text-zinc-400 mt-1 flex items-center gap-1">
+                    <Loader2 className="w-3 h-3 animate-spin" /> Checking availability...
+                  </p>
                 )}
-                {unitAvailability === true && selectedUnit && (
+                {unitAvailability === false && (
+                  <p className="text-xs text-red-400 mt-1">⚠ {selectedUnit ? "This unit is already booked at this time" : "No units available at this time"}</p>
+                )}
+                {unitAvailability === true && (
                   <p className="text-xs text-emerald-400 mt-1">✓ Available</p>
                 )}
               </div>
