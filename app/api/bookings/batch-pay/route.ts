@@ -192,13 +192,23 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Verify all bookings are unpaid or partial (unless paying only snacks)
+    // Verify bookings if we are paying for them
     if (!isOnlySnacks) {
       const invalidStatus = bookings.filter((b) => b.paymentStatus === PaymentStatus.PAID);
-      const invalidSnacks = snackOrders.filter((s) => s.paymentStatus === PaymentStatus.PAID);
-      if (invalidStatus.length > 0 || invalidSnacks.length > 0) {
+      if (invalidStatus.length > 0) {
         return NextResponse.json(
-          { error: "One or more selected items are already paid" },
+          { error: "One or more selected bookings are already paid" },
+          { status: 400 }
+        );
+      }
+    }
+
+    // Always verify snacks if we are paying for them
+    if (snacksAmount > 0) {
+      const invalidSnacks = snackOrders.filter((s) => s.paymentStatus === PaymentStatus.PAID);
+      if (invalidSnacks.length > 0) {
+        return NextResponse.json(
+          { error: "One or more selected snacks are already paid" },
           { status: 400 }
         );
       }

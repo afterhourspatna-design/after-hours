@@ -185,16 +185,6 @@ export default function BookingForm({ mode = "create", initialData, prefillDate,
     (initialData?.gameId ? 0 : 0)
   );
 
-  // Reset American Pool to 2 sticks if it was 4
-  useEffect(() => {
-    if (selectedGame?.tag === "pool") {
-      const isAmerican = selectedGame.resourceUnits.find(u => u.id === selectedUnit)?.unitName?.includes("American");
-      if (isAmerican && accessoriesCount === 4) {
-        setAccessoriesCount(2);
-      }
-    }
-  }, [selectedUnit, selectedGame, accessoriesCount]);
-
   // Advance Payment
   const [advanceAmount, setAdvanceAmount] = useState<number | "">("");
   const [paymentMethod, setPaymentMethod] = useState<string>("CASH");
@@ -747,10 +737,7 @@ export default function BookingForm({ mode = "create", initialData, prefillDate,
                   {selectedGame.tag === "pool" && [
                     { count: 2, label: "2 Sticks", price30: 80, price60: 150 },
                     { count: 4, label: "4 Sticks", price30: 100, price60: 180 },
-                  ].filter(opt => {
-                    const isAmerican = selectedGame?.resourceUnits.find(u => u.id === selectedUnit)?.unitName?.includes("American");
-                    return !(isAmerican && opt.count === 4);
-                  }).map((opt) => {
+                  ].map((opt) => {
                     const active = accessoriesCount === opt.count;
                     const price = durationMinutes <= 30 ? opt.price30 : opt.price60;
                     return (
