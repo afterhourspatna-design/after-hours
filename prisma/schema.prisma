@@ -88,6 +88,10 @@ model AppUser {
   streakChallenges       StreakChallenge[]   @relation("StreakOwner")
   issuedStreakChallenges StreakChallenge[]   @relation("StreakIssuedBy")
 
+  // Tournaments
+  createdTournaments     Tournament[]        @relation("CreatedTournaments")
+  tournamentEntries      TournamentParticipant[]
+
   @@index([phone])
   @@index([role])
   @@map("app_users")
@@ -114,6 +118,7 @@ model Game {
   resourceUnits   ResourceUnit[]
   bookings        Booking[]
   creditBalances  UserCreditBalance[] @relation("GameCreditBalances")
+  tournaments     Tournament[]
 
   @@index([tag])
   @@index([isActive])
@@ -196,6 +201,7 @@ model Payment {
 
   allocations      PaymentAllocation[]
   prepaidTransactions PrepaidTransaction[]
+  tournamentParticipants TournamentParticipant[]
   user             AppUser?      @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   @@index([createdAt])
@@ -417,4 +423,111 @@ model StreakChallenge {
   @@index([userId])
   @@index([status])
   @@map("streak_challenges")
+}
+
+// ─────────────────────────────────────────
+// TOURNAMENTS & KNOCKOUT BRACKET SYSTEM
+// ─────────────────────────────────────────
+
+enum TournamentStatus {
+  DRAFT
+  UPCOMING
+  REGISTRATION_OPEN
+  REGISTRATION_CLOSED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum TournamentFormat {
+  SINGLE_ELIMINATION
+  DOUBLE_ELIMINATION
+  ROUND_ROBIN
+}
+
+enum MatchStatus {
+  SCHEDULED
+  IN_PROGRESS
+  COMPLETED
+  BYE
+  CANCELLED
+}
+
+model Tournament {
+  id              String           @id @default(cuid())
+  title           String
+  description     String?          @db.Text
+  gameId          String
+  startDate       DateTime
+  endDate         DateTime?
+  entryFee        Decimal          @default(0.00) @db.Decimal(10, 2)
+  prizePool       Decimal          @default(0.00) @db.Decimal(10, 2)
+  prize1st        String?
+  prize2nd        String?
+  prize3rd        String?
+  maxParticipants Int              @default(16)
+  format          TournamentFormat @default(SINGLE_ELIMINATION)
+  status          TournamentStatus @default(UPCOMING)
+  rules           String?          @db.Text
+  bannerUrl       String?
+  createdById     String?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  game            Game             @relation(fields: [gameId], references: [id])
+  createdBy       AppUser?         @relation("CreatedTournaments", fields: [createdById], references: [id], onDelete: SetNull)
+  participants    TournamentParticipant[]
+  matches         TournamentMatch[]
+
+  @@index([status])
+  @@index([gameId])
+  @@map("tournaments")
+}
+
+model TournamentParticipant {
+  id           String      @id @default(cuid())
+  tournamentId String
+  userId       String?
+  playerName   String?
+  playerPhone  String?
+  playerEmail  String?
+  seedNumber   Int?
+  paymentId    String?
+  isPaid       Boolean     @default(false)
+  isCheckedIn  Boolean     @default(false)
+  createdAt    DateTime    @default(now())
+
+  tournament   Tournament  @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  user         AppUser?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  payment      Payment?    @relation(fields: [paymentId], references: [id], onDelete: SetNull)
+  matchesAsP1  TournamentMatch[] @relation("MatchPlayer1")
+  matchesAsP2  TournamentMatch[] @relation("MatchPlayer2")
+  wonMatches   TournamentMatch[] @relation("MatchWinner")
+
+  @@unique([tournamentId, userId])
+  @@map("tournament_participants")
+}
+
+model TournamentMatch {
+  id           String      @id @default(cuid())
+  tournamentId String
+  roundNumber  Int         // 1 = Round 1, 2 = QF, 3 = SF, 4 = Final
+  matchNumber  Int         // Match order in round
+  player1Id    String?
+  player2Id    String?
+  scoreP1      Int         @default(0)
+  scoreP2      Int         @default(0)
+  winnerId     String?
+  nextMatchId  String?
+  status       MatchStatus @default(SCHEDULED)
+  scheduledAt  DateTime?
+  completedAt  DateTime?
+
+  tournament   Tournament  @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  player1      TournamentParticipant? @relation("MatchPlayer1", fields: [player1Id], references: [id], onDelete: SetNull)
+  player2      TournamentParticipant? @relation("MatchPlayer2", fields: [player2Id], references: [id], onDelete: SetNull)
+  winner       TournamentParticipant? @relation("MatchWinner", fields: [winnerId], references: [id], onDelete: SetNull)
+
+  @@index([tournamentId])
+  @@map("tournament_matches")
 }
