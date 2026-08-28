@@ -6,11 +6,16 @@ import { z } from "zod";
 const updateSchema = z.object({
   title: z.string().optional(),
   description: z.string().optional().nullable(),
-  status: z.enum(["DRAFT", "UPCOMING", "REGISTRATION_OPEN", "REGISTRATION_CLOSED", "IN_PROGRESS", "COMPLETED", "CANCELLED"]).optional(),
+  gameId: z.string().optional(),
+  startDate: z.string().datetime().optional(),
+  endDate: z.string().datetime().optional().nullable(),
+  entryFee: z.number().optional(),
   prizePool: z.number().optional(),
   prize1st: z.string().optional().nullable(),
   prize2nd: z.string().optional().nullable(),
   prize3rd: z.string().optional().nullable(),
+  maxParticipants: z.number().int().optional(),
+  status: z.enum(["DRAFT", "UPCOMING", "REGISTRATION_OPEN", "REGISTRATION_CLOSED", "IN_PROGRESS", "COMPLETED", "CANCELLED"]).optional(),
   rules: z.string().optional().nullable(),
 });
 

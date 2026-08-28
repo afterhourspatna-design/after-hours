@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Trophy, Plus, Users, Swords, Award, Calendar, Sparkles, RefreshCw, Loader2, X, Trash2, Search, UserCheck, UserX } from "lucide-react";
+import { Trophy, Plus, Users, Swords, Award, Calendar, Sparkles, RefreshCw, Loader2, X, Trash2, Search, UserCheck, UserX, Edit3, Shuffle, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import InstaVictoryCard from "@/components/tournaments/InstaVictoryCard";
@@ -24,10 +24,13 @@ export default function TournamentsDashboard() {
 
   // Modal States
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [editingTournamentId, setEditingTournamentId] = useState<string | null>(null);
   const [showRegisterModal, setShowRegisterModal] = useState(false);
+  const [editingParticipant, setEditingParticipant] = useState<any | null>(null);
   const [showScoreModal, setShowScoreModal] = useState(false);
   const [selectedMatch, setSelectedMatch] = useState<any | null>(null);
   const [showInstaCard, setShowInstaCard] = useState(false);
+  const [showCustomPairingsModal, setShowCustomPairingsModal] = useState(false);
 
   // Customer Search Filter inside Register Modal
   const [userSearchQuery, setUserSearchQuery] = useState("");
@@ -56,8 +59,17 @@ export default function TournamentsDashboard() {
     paidAmount: "" as string | number,
   });
 
+  const [editPlayerForm, setEditPlayerForm] = useState({
+    playerName: "",
+    playerPhone: "",
+    seedNumber: 1,
+  });
+
   const [scoreForm, setScoreForm] = useState({ scoreP1: 0, scoreP2: 0, winnerId: "" });
   const [submitting, setSubmitting] = useState(false);
+
+  // Custom Pairings State: array of { p1Id, p2Id }
+  const [customPairings, setCustomPairings] = useState<{ p1Id: string; p2Id: string }[]>([]);
 
   // Fetch Tournaments, Games & Users
   const fetchTournaments = async () => {
@@ -97,12 +109,53 @@ export default function TournamentsDashboard() {
     }
   };
 
-  const handleCreateTournament = async (e: React.FormEvent) => {
+  // Open Create/Edit Tournament Modal
+  const openTournamentModal = (t?: any) => {
+    if (t) {
+      setEditingTournamentId(t.id);
+      setCreateForm({
+        title: t.title || "",
+        description: t.description || "",
+        gameId: t.gameId || (games[0]?.id || ""),
+        startDate: t.startDate ? new Date(t.startDate).toISOString().slice(0, 16) : new Date().toISOString().slice(0, 16),
+        endDate: t.endDate ? new Date(t.endDate).toISOString().slice(0, 16) : "",
+        entryFee: Number(t.entryFee) || "",
+        prizePool: Number(t.prizePool) || "",
+        prize1st: t.prize1st || "",
+        prize2nd: t.prize2nd || "",
+        prize3rd: t.prize3rd || "",
+        maxParticipants: t.maxParticipants || 32,
+        rules: t.rules || "",
+      });
+    } else {
+      setEditingTournamentId(null);
+      setCreateForm({
+        title: "",
+        description: "",
+        gameId: games[0]?.id || "",
+        startDate: new Date().toISOString().slice(0, 16),
+        endDate: "",
+        entryFee: "",
+        prizePool: "",
+        prize1st: "",
+        prize2nd: "",
+        prize3rd: "",
+        maxParticipants: 32,
+        rules: "",
+      });
+    }
+    setShowCreateModal(true);
+  };
+
+  const handleSaveTournament = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitting(true);
     try {
-      const res = await fetch("/api/tournaments", {
-        method: "POST",
+      const url = editingTournamentId ? `/api/tournaments/${editingTournamentId}` : "/api/tournaments";
+      const method = editingTournamentId ? "PATCH" : "POST";
+
+      const res = await fetch(url, {
+        method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...createForm,
@@ -114,12 +167,13 @@ export default function TournamentsDashboard() {
         }),
       });
       if (res.ok) {
-        toast.success("Tournament created successfully!");
+        toast.success(editingTournamentId ? "Tournament updated!" : "Tournament created!");
         setShowCreateModal(false);
+        if (editingTournamentId) loadSingleTournament(editingTournamentId);
         fetchTournaments();
       } else {
         const data = await res.json();
-        toast.error(data.error || "Failed to create tournament");
+        toast.error(data.error || "Failed to save tournament");
       }
     } catch {
       toast.error("Network error");
@@ -175,6 +229,41 @@ export default function TournamentsDashboard() {
     }
   };
 
+  // Open Edit Participant Modal
+  const openEditParticipantModal = (p: any) => {
+    setEditingParticipant(p);
+    setEditPlayerForm({
+      playerName: p.user?.name || p.playerName || "",
+      playerPhone: p.user?.phone || p.playerPhone || "",
+      seedNumber: p.seedNumber || 1,
+    });
+  };
+
+  const handleSaveParticipant = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedTournament || !editingParticipant) return;
+    setSubmitting(true);
+    try {
+      const res = await fetch(`/api/tournaments/${selectedTournament.id}/participants/${editingParticipant.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(editPlayerForm),
+      });
+      if (res.ok) {
+        toast.success("Player details updated!");
+        setEditingParticipant(null);
+        loadSingleTournament(selectedTournament.id);
+      } else {
+        const data = await res.json();
+        toast.error(data.error || "Failed to update player");
+      }
+    } catch {
+      toast.error("Network error");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   const handleDeleteParticipant = async (participantId: string, name: string) => {
     if (!selectedTournament) return;
     if (!confirm(`Remove ${name} from this tournament?`)) return;
@@ -193,14 +282,39 @@ export default function TournamentsDashboard() {
     }
   };
 
-  const handleGenerateBracket = async () => {
+  // Open Custom Pairings Modal
+  const openCustomPairingsModal = () => {
+    if (!selectedTournament || !selectedTournament.participants || selectedTournament.participants.length < 2) {
+      toast.error("Need at least 2 players to arrange pairings");
+      return;
+    }
+    const players = selectedTournament.participants;
+    const initialPairs: { p1Id: string; p2Id: string }[] = [];
+    for (let i = 0; i < players.length; i += 2) {
+      initialPairs.push({
+        p1Id: players[i]?.id || "",
+        p2Id: players[i + 1]?.id || "",
+      });
+    }
+    setCustomPairings(initialPairs);
+    setShowCustomPairingsModal(true);
+  };
+
+  const handleGenerateBracket = async (overridePairings?: any[]) => {
     if (!selectedTournament) return;
-    if (!confirm("Generate knockout bracket? This will randomize all registered players into pairings.")) return;
+    const isCustom = Array.isArray(overridePairings);
+    if (!isCustom && !confirm("Randomize & generate knockout bracket?")) return;
+
     setSubmitting(true);
     try {
-      const res = await fetch(`/api/tournaments/${selectedTournament.id}/generate-bracket`, { method: "POST" });
+      const res = await fetch(`/api/tournaments/${selectedTournament.id}/generate-bracket`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(isCustom ? { customPairings: overridePairings } : {}),
+      });
       if (res.ok) {
-        toast.success("Knockout bracket generated successfully!");
+        toast.success(isCustom ? "Custom match pairings generated!" : "Knockout bracket generated!");
+        setShowCustomPairingsModal(false);
         loadSingleTournament(selectedTournament.id);
         fetchTournaments();
       } else {
@@ -288,14 +402,11 @@ export default function TournamentsDashboard() {
             <h1 className="text-2xl font-extrabold text-white tracking-tight">Tournaments & Esports Hub</h1>
           </div>
           <p className="text-xs text-zinc-400">
-            Organize knockouts, register players with search, update live match scores, and share victory poster tiles!
+            Edit tournaments & players, arrange custom match pairings, update live scores, and share victory posters!
           </p>
         </div>
         <button
-          onClick={() => {
-            if (games.length > 0) setCreateForm(prev => ({ ...prev, gameId: games[0].id }));
-            setShowCreateModal(true);
-          }}
+          onClick={() => openTournamentModal()}
           className="flex items-center justify-center gap-2 px-5 py-3 bg-violet-600 hover:bg-violet-500 text-white font-bold text-sm rounded-xl transition-all shadow-lg shadow-violet-900/30"
         >
           <Plus className="w-4 h-4" /> Create Tournament
@@ -365,9 +476,9 @@ export default function TournamentsDashboard() {
                         <Calendar className="w-3.5 h-3.5 text-zinc-500" /> {formatDate(t.startDate)}
                       </p>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1.5">
                       <span className={cn(
-                        "text-[10px] font-black px-2.5 py-1 rounded-full uppercase border",
+                        "text-[10px] font-black px-2 py-0.5 rounded-full uppercase border",
                         t.status === "COMPLETED" ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" :
                         t.status === "IN_PROGRESS" ? "bg-amber-500/10 text-amber-400 border-amber-500/20" :
                         "bg-blue-500/10 text-blue-400 border-blue-500/20"
@@ -377,12 +488,22 @@ export default function TournamentsDashboard() {
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
+                          openTournamentModal(t);
+                        }}
+                        className="p-1.5 rounded-lg bg-zinc-900 hover:bg-violet-500/20 text-zinc-400 hover:text-violet-300 transition-all"
+                        title="Edit Tournament"
+                      >
+                        <Edit3 className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
                           handleDeleteTournament(t.id, t.title);
                         }}
                         className="p-1.5 rounded-lg bg-zinc-900 hover:bg-rose-500/20 text-zinc-500 hover:text-rose-400 transition-all"
                         title="Delete Tournament"
                       >
-                        <Trash2 className="w-4 h-4" />
+                        <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     </div>
                   </div>
@@ -445,7 +566,15 @@ export default function TournamentsDashboard() {
             </div>
 
             {selectedTournament && (
-              <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+              <div className="flex items-center gap-2 w-full sm:w-auto justify-end flex-wrap">
+                <button
+                  onClick={() => openTournamentModal(selectedTournament)}
+                  className="px-3 py-2 bg-zinc-800 hover:bg-zinc-700 text-white font-bold text-xs rounded-xl transition-all flex items-center gap-1.5"
+                  title="Edit Tournament Settings"
+                >
+                  <Edit3 className="w-3.5 h-3.5" /> Edit
+                </button>
+
                 <button
                   onClick={() => {
                     setRegisterForm({ userId: "", playerName: "", playerPhone: "", paymentMethod: Number(selectedTournament.entryFee) > 0 ? "CASH" : "FREE", paidAmount: Number(selectedTournament.entryFee) });
@@ -455,12 +584,22 @@ export default function TournamentsDashboard() {
                 >
                   <Users className="w-3.5 h-3.5" /> Add Player ({selectedTournament.participants?.length || 0})
                 </button>
+
                 <button
-                  onClick={handleGenerateBracket}
+                  onClick={openCustomPairingsModal}
+                  className="px-3 py-2 bg-amber-600/20 hover:bg-amber-600 border border-amber-500/40 text-amber-300 hover:text-black font-bold text-xs rounded-xl transition-all flex items-center gap-1.5"
+                  title="Manually arrange match pairings"
+                >
+                  <Shuffle className="w-3.5 h-3.5" /> Match Pairings
+                </button>
+
+                <button
+                  onClick={() => handleGenerateBracket()}
                   className="px-3 py-2 bg-violet-600 hover:bg-violet-500 text-white font-bold text-xs rounded-xl transition-all flex items-center gap-1.5 shadow-lg shadow-violet-900/30"
                 >
                   <RefreshCw className="w-3.5 h-3.5" /> Auto Bracket
                 </button>
+
                 {selectedTournament.status === "COMPLETED" && (
                   <button
                     onClick={() => setShowInstaCard(true)}
@@ -469,6 +608,7 @@ export default function TournamentsDashboard() {
                     <Sparkles className="w-3.5 h-3.5" /> Share Insta Poster
                   </button>
                 )}
+
                 <button
                   onClick={() => handleDeleteTournament(selectedTournament.id, selectedTournament.title)}
                   className="px-3 py-2 bg-rose-950/60 hover:bg-rose-600 text-rose-300 hover:text-white font-bold text-xs rounded-xl transition-all flex items-center gap-1.5 border border-rose-800/40"
@@ -504,8 +644,15 @@ export default function TournamentsDashboard() {
                         </span>
                         <span>{pName}</span>
                         <button
+                          onClick={() => openEditParticipantModal(p)}
+                          className="text-zinc-500 hover:text-violet-300 p-0.5 rounded transition-colors"
+                          title="Edit Player Details"
+                        >
+                          <Edit3 className="w-3.5 h-3.5" />
+                        </button>
+                        <button
                           onClick={() => handleDeleteParticipant(p.id, pName)}
-                          className="text-zinc-600 hover:text-rose-400 p-0.5 rounded transition-colors ml-1"
+                          className="text-zinc-600 hover:text-rose-400 p-0.5 rounded transition-colors"
                           title="Remove Player"
                         >
                           <UserX className="w-3.5 h-3.5" />
@@ -529,15 +676,23 @@ export default function TournamentsDashboard() {
               <div className="space-y-1">
                 <h3 className="text-base font-bold text-white">Knockout Bracket Not Generated Yet</h3>
                 <p className="text-xs text-zinc-400 max-w-sm mx-auto">
-                  Registered participants: <strong>{selectedTournament.participants?.length || 0}</strong>. Click below to generate randomized pairings.
+                  Registered participants: <strong>{selectedTournament.participants?.length || 0}</strong>. Click below to generate or customize pairings.
                 </p>
               </div>
-              <button
-                onClick={handleGenerateBracket}
-                className="px-6 py-3 bg-violet-600 hover:bg-violet-500 text-white font-bold text-xs rounded-xl transition-all shadow-xl shadow-violet-900/30"
-              >
-                Generate Knockout Bracket Now
-              </button>
+              <div className="flex justify-center gap-3">
+                <button
+                  onClick={openCustomPairingsModal}
+                  className="px-5 py-3 bg-amber-600 hover:bg-amber-500 text-black font-bold text-xs rounded-xl transition-all shadow-xl shadow-amber-900/30 flex items-center gap-2"
+                >
+                  <Shuffle className="w-4 h-4" /> Custom Match Pairings
+                </button>
+                <button
+                  onClick={() => handleGenerateBracket()}
+                  className="px-5 py-3 bg-violet-600 hover:bg-violet-500 text-white font-bold text-xs rounded-xl transition-all shadow-xl shadow-violet-900/30"
+                >
+                  Random Auto Bracket
+                </button>
+              </div>
             </div>
           ) : (
             /* Visual Knockout Bracket Diagram */
@@ -649,17 +804,19 @@ export default function TournamentsDashboard() {
         </div>
       )}
 
-      {/* ── MODAL: Create Tournament ── */}
+      {/* ── MODAL: Create / Edit Tournament ── */}
       {showCreateModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
           <div className="glass-card max-w-md w-full p-6 space-y-5 border-zinc-700">
             <div className="flex items-center justify-between">
-              <h3 className="text-lg font-bold text-white">Create New Tournament</h3>
+              <h3 className="text-lg font-bold text-white">
+                {editingTournamentId ? "Edit Tournament Settings" : "Create New Tournament"}
+              </h3>
               <button onClick={() => setShowCreateModal(false)} className="text-zinc-400 hover:text-white">
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <form onSubmit={handleCreateTournament} className="space-y-4 text-xs">
+            <form onSubmit={handleSaveTournament} className="space-y-4 text-xs">
               <div>
                 <label className="block text-zinc-400 font-bold mb-1">Tournament Title</label>
                 <input
@@ -772,7 +929,63 @@ export default function TournamentsDashboard() {
                 disabled={submitting}
                 className="w-full py-3 bg-violet-600 hover:bg-violet-500 text-white font-bold rounded-xl transition-all shadow-lg shadow-violet-900/30"
               >
-                {submitting ? "Creating..." : "Create Tournament"}
+                {submitting ? "Saving..." : editingTournamentId ? "Save Changes" : "Create Tournament"}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── MODAL: Edit Participant Details ── */}
+      {editingParticipant && selectedTournament && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+          <div className="glass-card max-w-sm w-full p-6 space-y-4 border-zinc-700">
+            <div className="flex items-center justify-between">
+              <h3 className="text-base font-bold text-white">Edit Player Details</h3>
+              <button onClick={() => setEditingParticipant(null)} className="text-zinc-400 hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <form onSubmit={handleSaveParticipant} className="space-y-3 text-xs">
+              <div>
+                <label className="block text-zinc-400 font-bold mb-1">Player Name</label>
+                <input
+                  type="text"
+                  required
+                  value={editPlayerForm.playerName}
+                  onChange={e => setEditPlayerForm(f => ({ ...f, playerName: e.target.value }))}
+                  className="w-full bg-zinc-950 text-white border border-zinc-700 rounded-xl px-3 py-2"
+                />
+              </div>
+
+              <div>
+                <label className="block text-zinc-400 font-bold mb-1">Phone Number</label>
+                <input
+                  type="tel"
+                  required
+                  value={editPlayerForm.playerPhone}
+                  onChange={e => setEditPlayerForm(f => ({ ...f, playerPhone: e.target.value }))}
+                  className="w-full bg-zinc-950 text-white border border-zinc-700 rounded-xl px-3 py-2"
+                />
+              </div>
+
+              <div>
+                <label className="block text-zinc-400 font-bold mb-1">Seed Number</label>
+                <input
+                  type="number"
+                  min="1"
+                  value={editPlayerForm.seedNumber}
+                  onChange={e => setEditPlayerForm(f => ({ ...f, seedNumber: Number(e.target.value) }))}
+                  className="w-full bg-zinc-950 text-white border border-zinc-700 rounded-xl px-3 py-2"
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={submitting}
+                className="w-full py-3 bg-violet-600 hover:bg-violet-500 text-white font-bold rounded-xl transition-all"
+              >
+                {submitting ? "Saving..." : "Save Player Info"}
               </button>
             </form>
           </div>
@@ -923,6 +1136,94 @@ export default function TournamentsDashboard() {
                 {submitting ? "Registering..." : "Confirm Registration"}
               </button>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── MODAL: Custom Match Pairings Builder ── */}
+      {showCustomPairingsModal && selectedTournament && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+          <div className="glass-card max-w-lg w-full p-6 space-y-4 border-zinc-700">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-base font-bold text-white flex items-center gap-2">
+                  <Shuffle className="w-4 h-4 text-amber-400" /> Arrange Round 1 Pairings
+                </h3>
+                <p className="text-xs text-zinc-400 mt-0.5">Select which player plays against whom in Round 1</p>
+              </div>
+              <button onClick={() => setShowCustomPairingsModal(false)} className="text-zinc-400 hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-3 max-h-[60vh] overflow-y-auto custom-scroll pr-1">
+              {customPairings.map((pair, idx) => (
+                <div key={idx} className="p-3 rounded-xl bg-zinc-950 border border-zinc-800 space-y-2">
+                  <span className="text-[10px] font-bold text-amber-400 uppercase tracking-wider">
+                    Match #{idx + 1}
+                  </span>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-[10px] text-zinc-500 mb-1">Player 1</label>
+                      <select
+                        value={pair.p1Id}
+                        onChange={e => {
+                          const val = e.target.value;
+                          setCustomPairings(pairs => pairs.map((p, i) => i === idx ? { ...p, p1Id: val } : p));
+                        }}
+                        className="w-full bg-zinc-900 text-white text-xs border border-zinc-700 rounded-lg p-2 font-semibold"
+                      >
+                        {selectedTournament.participants.map((p: any) => (
+                          <option key={p.id} value={p.id}>{p.user?.name || p.playerName || "Player"}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-[10px] text-zinc-500 mb-1">Player 2</label>
+                      <select
+                        value={pair.p2Id}
+                        onChange={e => {
+                          const val = e.target.value;
+                          setCustomPairings(pairs => pairs.map((p, i) => i === idx ? { ...p, p2Id: val } : p));
+                        }}
+                        className="w-full bg-zinc-900 text-white text-xs border border-zinc-700 rounded-lg p-2 font-semibold"
+                      >
+                        <option value="">-- BYE (Auto Advance) --</option>
+                        {selectedTournament.participants.map((p: any) => (
+                          <option key={p.id} value={p.id}>{p.user?.name || p.playerName || "Player"}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="flex gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  // Auto-shuffle list
+                  const shuffled = [...selectedTournament.participants].sort(() => Math.random() - 0.5);
+                  const pairs = [];
+                  for (let i = 0; i < shuffled.length; i += 2) {
+                    pairs.push({ p1Id: shuffled[i]?.id || "", p2Id: shuffled[i + 1]?.id || "" });
+                  }
+                  setCustomPairings(pairs);
+                }}
+                className="flex-1 py-2.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 font-bold text-xs rounded-xl transition-all"
+              >
+                Randomize Pairings
+              </button>
+              <button
+                type="button"
+                onClick={() => handleGenerateBracket(customPairings)}
+                disabled={submitting}
+                className="flex-1 py-2.5 bg-amber-500 hover:bg-amber-400 text-black font-extrabold text-xs rounded-xl transition-all shadow-lg shadow-amber-950/30 flex items-center justify-center gap-1.5"
+              >
+                <Check className="w-4 h-4" /> Save & Build Bracket
+              </button>
+            </div>
           </div>
         </div>
       )}
