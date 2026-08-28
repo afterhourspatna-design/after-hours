@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Trophy, Plus, Users, Swords, Award, Calendar, Sparkles, CheckCircle2, ChevronRight, Play, RefreshCw, Loader2, DollarSign, X } from "lucide-react";
+import { Trophy, Plus, Users, Swords, Award, Calendar, Sparkles, RefreshCw, Loader2, X, Trash2, Search, UserCheck, UserX } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import InstaVictoryCard from "@/components/tournaments/InstaVictoryCard";
@@ -15,7 +15,7 @@ function formatDate(d: string | Date) {
 }
 
 export default function TournamentsDashboard() {
-  const [activeTab, setActiveTab] = useState<"tournaments" | "bracket" | "register" | "hall">("tournaments");
+  const [activeTab, setActiveTab] = useState<"tournaments" | "bracket" | "hall">("tournaments");
   const [tournaments, setTournaments] = useState<any[]>([]);
   const [selectedTournament, setSelectedTournament] = useState<any | null>(null);
   const [games, setGames] = useState<any[]>([]);
@@ -28,6 +28,9 @@ export default function TournamentsDashboard() {
   const [showScoreModal, setShowScoreModal] = useState(false);
   const [selectedMatch, setSelectedMatch] = useState<any | null>(null);
   const [showInstaCard, setShowInstaCard] = useState(false);
+
+  // Customer Search Filter inside Register Modal
+  const [userSearchQuery, setUserSearchQuery] = useState("");
 
   // Form States
   const [createForm, setCreateForm] = useState({
@@ -56,14 +59,14 @@ export default function TournamentsDashboard() {
   const [scoreForm, setScoreForm] = useState({ scoreP1: 0, scoreP2: 0, winnerId: "" });
   const [submitting, setSubmitting] = useState(false);
 
-  // Load Tournaments & Games
+  // Fetch Tournaments, Games & Users
   const fetchTournaments = async () => {
     setLoading(true);
     try {
       const [resT, resG, resU] = await Promise.all([
         fetch("/api/tournaments"),
         fetch("/api/games"),
-        fetch("/api/users?limit=100")
+        fetch("/api/users?limit=200")
       ]);
       if (resT.ok) setTournaments(await resT.json());
       if (resG.ok) setGames(await resG.json());
@@ -125,6 +128,23 @@ export default function TournamentsDashboard() {
     }
   };
 
+  const handleDeleteTournament = async (tournamentId: string, title: string) => {
+    if (!confirm(`Are you sure you want to delete "${title}"? This action cannot be undone.`)) return;
+    try {
+      const res = await fetch(`/api/tournaments/${tournamentId}`, { method: "DELETE" });
+      if (res.ok) {
+        toast.success("Tournament deleted!");
+        if (selectedTournament?.id === tournamentId) setSelectedTournament(null);
+        fetchTournaments();
+      } else {
+        const data = await res.json();
+        toast.error(data.error || "Failed to delete tournament");
+      }
+    } catch {
+      toast.error("Network error");
+    }
+  };
+
   const handleRegisterPlayer = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedTournament) return;
@@ -141,6 +161,7 @@ export default function TournamentsDashboard() {
       if (res.ok) {
         toast.success("Player registered!");
         setShowRegisterModal(false);
+        setUserSearchQuery("");
         loadSingleTournament(selectedTournament.id);
         fetchTournaments();
       } else {
@@ -151,6 +172,24 @@ export default function TournamentsDashboard() {
       toast.error("Network error");
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleDeleteParticipant = async (participantId: string, name: string) => {
+    if (!selectedTournament) return;
+    if (!confirm(`Remove ${name} from this tournament?`)) return;
+    try {
+      const res = await fetch(`/api/tournaments/${selectedTournament.id}/participants/${participantId}`, { method: "DELETE" });
+      if (res.ok) {
+        toast.success("Player removed from tournament");
+        loadSingleTournament(selectedTournament.id);
+        fetchTournaments();
+      } else {
+        const data = await res.json();
+        toast.error(data.error || "Failed to remove player");
+      }
+    } catch {
+      toast.error("Network error");
     }
   };
 
@@ -204,6 +243,12 @@ export default function TournamentsDashboard() {
     }
   };
 
+  // Filter users by search query in Register modal
+  const filteredUsers = users.filter(u =>
+    u.name?.toLowerCase().includes(userSearchQuery.toLowerCase()) ||
+    u.phone?.includes(userSearchQuery)
+  );
+
   // Group matches by round number
   const roundsMap: Record<number, any[]> = {};
   if (selectedTournament?.matches) {
@@ -243,7 +288,7 @@ export default function TournamentsDashboard() {
             <h1 className="text-2xl font-extrabold text-white tracking-tight">Tournaments & Esports Hub</h1>
           </div>
           <p className="text-xs text-zinc-400">
-            Organize knockouts, register players, update live match scores, and share victory posters!
+            Organize knockouts, register players with search, update live match scores, and share victory poster tiles!
           </p>
         </div>
         <button
@@ -302,7 +347,7 @@ export default function TournamentsDashboard() {
                 <div
                   key={t.id}
                   className={cn(
-                    "glass-card p-5 space-y-4 border transition-all hover:border-violet-500/50 cursor-pointer",
+                    "glass-card p-5 space-y-4 border transition-all hover:border-violet-500/50 cursor-pointer relative group",
                     selectedTournament?.id === t.id ? "border-violet-500 bg-violet-950/10" : "border-zinc-800"
                   )}
                   onClick={() => {
@@ -320,14 +365,26 @@ export default function TournamentsDashboard() {
                         <Calendar className="w-3.5 h-3.5 text-zinc-500" /> {formatDate(t.startDate)}
                       </p>
                     </div>
-                    <span className={cn(
-                      "text-[10px] font-black px-2.5 py-1 rounded-full uppercase border",
-                      t.status === "COMPLETED" ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" :
-                      t.status === "IN_PROGRESS" ? "bg-amber-500/10 text-amber-400 border-amber-500/20" :
-                      "bg-blue-500/10 text-blue-400 border-blue-500/20"
-                    )}>
-                      {t.status}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className={cn(
+                        "text-[10px] font-black px-2.5 py-1 rounded-full uppercase border",
+                        t.status === "COMPLETED" ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" :
+                        t.status === "IN_PROGRESS" ? "bg-amber-500/10 text-amber-400 border-amber-500/20" :
+                        "bg-blue-500/10 text-blue-400 border-blue-500/20"
+                      )}>
+                        {t.status}
+                      </span>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteTournament(t.id, t.title);
+                        }}
+                        className="p-1.5 rounded-lg bg-zinc-900 hover:bg-rose-500/20 text-zinc-500 hover:text-rose-400 transition-all"
+                        title="Delete Tournament"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
 
                   <div className="grid grid-cols-3 gap-2 pt-3 border-t border-zinc-800/60 text-center text-xs">
@@ -358,7 +415,7 @@ export default function TournamentsDashboard() {
                       <Users className="w-3.5 h-3.5" /> + Register Player
                     </button>
                     <span className="text-xs font-bold text-zinc-400 flex items-center gap-1 group-hover:text-white">
-                      View Bracket <ChevronRight className="w-4 h-4" />
+                      View Bracket →
                     </span>
                   </div>
                 </div>
@@ -371,7 +428,7 @@ export default function TournamentsDashboard() {
       {/* ── TAB 2: Live Knockout Bracket & Scorecards ── */}
       {activeTab === "bracket" && (
         <div className="space-y-6">
-          {/* Tournament Selector Selector Bar */}
+          {/* Tournament Selector Bar */}
           <div className="glass-card p-4 flex flex-col sm:flex-row items-center justify-between gap-3">
             <div className="flex items-center gap-3 w-full sm:w-auto">
               <Trophy className="w-5 h-5 text-amber-400 flex-shrink-0" />
@@ -412,9 +469,54 @@ export default function TournamentsDashboard() {
                     <Sparkles className="w-3.5 h-3.5" /> Share Insta Poster
                   </button>
                 )}
+                <button
+                  onClick={() => handleDeleteTournament(selectedTournament.id, selectedTournament.title)}
+                  className="px-3 py-2 bg-rose-950/60 hover:bg-rose-600 text-rose-300 hover:text-white font-bold text-xs rounded-xl transition-all flex items-center gap-1.5 border border-rose-800/40"
+                  title="Delete Tournament"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
               </div>
             )}
           </div>
+
+          {/* Registered Players List & Management Section */}
+          {selectedTournament && selectedTournament.participants && (
+            <div className="glass-card p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-xs font-bold text-zinc-400 uppercase tracking-wider flex items-center gap-1.5">
+                  <Users className="w-4 h-4 text-violet-400" /> Registered Participants ({selectedTournament.participants.length})
+                </h3>
+              </div>
+              {selectedTournament.participants.length === 0 ? (
+                <p className="text-xs text-zinc-500 py-2">No players registered yet.</p>
+              ) : (
+                <div className="flex items-center gap-2 overflow-x-auto custom-scroll pb-2">
+                  {selectedTournament.participants.map((p: any) => {
+                    const pName = p.user?.name || p.playerName || "Player";
+                    return (
+                      <div
+                        key={p.id}
+                        className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-zinc-950 border border-zinc-800 text-xs font-semibold text-white flex-shrink-0 group"
+                      >
+                        <span className="w-5 h-5 rounded-full bg-violet-600/20 text-violet-400 font-extrabold text-[10px] flex items-center justify-center">
+                          #{p.seedNumber || "1"}
+                        </span>
+                        <span>{pName}</span>
+                        <button
+                          onClick={() => handleDeleteParticipant(p.id, pName)}
+                          className="text-zinc-600 hover:text-rose-400 p-0.5 rounded transition-colors ml-1"
+                          title="Remove Player"
+                        >
+                          <UserX className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
 
           {!selectedTournament ? (
             <div className="glass-card p-12 text-center space-y-2">
@@ -677,7 +779,7 @@ export default function TournamentsDashboard() {
         </div>
       )}
 
-      {/* ── MODAL: Register Player ── */}
+      {/* ── MODAL: Register Player (with Search) ── */}
       {showRegisterModal && selectedTournament && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
           <div className="glass-card max-w-sm w-full p-6 space-y-4 border-zinc-700">
@@ -688,22 +790,92 @@ export default function TournamentsDashboard() {
               </button>
             </div>
             <form onSubmit={handleRegisterPlayer} className="space-y-3 text-xs">
-              <div>
-                <label className="block text-zinc-400 font-bold mb-1">Select Existing User (Optional)</label>
-                <select
-                  value={registerForm.userId}
-                  onChange={e => {
-                    const uId = e.target.value;
-                    const uObj = users.find(u => u.id === uId);
-                    setRegisterForm(f => ({ ...f, userId: uId, playerName: uObj?.name || "", playerPhone: uObj?.phone || "" }));
-                  }}
-                  className="w-full bg-zinc-950 text-white border border-zinc-700 rounded-xl px-3 py-2"
-                >
-                  <option value="">-- New / Walk-in Player --</option>
-                  {users.map(u => (
-                    <option key={u.id} value={u.id}>{u.name} ({u.phone})</option>
-                  ))}
-                </select>
+              
+              {/* User Search Input & Results List */}
+              <div className="space-y-2">
+                <label className="block text-zinc-400 font-bold">Search Existing Customer</label>
+                <div className="relative">
+                  <Search className="w-3.5 h-3.5 text-zinc-500 absolute left-3 top-3" />
+                  <input
+                    type="text"
+                    placeholder="Type name or phone number..."
+                    value={userSearchQuery}
+                    onChange={async (e) => {
+                      const query = e.target.value;
+                      setUserSearchQuery(query);
+                      if (query.trim().length >= 1) {
+                        try {
+                          const res = await fetch(`/api/users?q=${encodeURIComponent(query)}&limit=20`);
+                          if (res.ok) {
+                            const data = await res.json();
+                            setUsers(data.users ?? data ?? []);
+                          }
+                        } catch (err) {
+                          console.error(err);
+                        }
+                      }
+                    }}
+                    className="w-full bg-zinc-950 text-white border border-zinc-700 rounded-xl pl-9 pr-3 py-2 text-xs focus:outline-none focus:border-violet-500"
+                  />
+                  {userSearchQuery && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setUserSearchQuery("");
+                        fetch("/api/users?limit=100").then(r => r.json()).then(d => setUsers(d.users ?? d ?? []));
+                      }}
+                      className="absolute right-3 top-2.5 text-zinc-500 hover:text-white text-xs font-bold"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+
+                {/* Quick Select Customer Cards */}
+                <div className="max-h-36 overflow-y-auto custom-scroll space-y-1 bg-zinc-950 p-1.5 rounded-xl border border-zinc-800">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setRegisterForm(f => ({ ...f, userId: "", playerName: "", playerPhone: "" }));
+                    }}
+                    className={cn(
+                      "w-full text-left p-2 rounded-lg text-xs flex items-center justify-between transition-all",
+                      !registerForm.userId ? "bg-violet-600/20 text-violet-300 border border-violet-500/40" : "hover:bg-zinc-900 text-zinc-400"
+                    )}
+                  >
+                    <span className="font-bold">+ New / Walk-in Player</span>
+                    {!registerForm.userId && <UserCheck className="w-3.5 h-3.5 text-violet-400" />}
+                  </button>
+
+                  {filteredUsers.length === 0 ? (
+                    <p className="text-[11px] text-zinc-500 text-center py-2">No matching customers found</p>
+                  ) : (
+                    filteredUsers.map((u) => {
+                      const isSelected = registerForm.userId === u.id;
+                      return (
+                        <button
+                          key={u.id}
+                          type="button"
+                          onClick={() => {
+                            setRegisterForm(f => ({ ...f, userId: u.id, playerName: u.name || "", playerPhone: u.phone || "" }));
+                          }}
+                          className={cn(
+                            "w-full text-left p-2 rounded-lg text-xs flex items-center justify-between transition-all border",
+                            isSelected
+                              ? "bg-violet-600/20 text-white border-violet-500/40 font-bold"
+                              : "bg-zinc-900/50 border-transparent hover:bg-zinc-900 text-zinc-300"
+                          )}
+                        >
+                          <div>
+                            <p className="font-bold text-white leading-tight">{u.name}</p>
+                            <p className="text-[10px] text-zinc-500 font-mono">{u.phone}</p>
+                          </div>
+                          {isSelected && <UserCheck className="w-3.5 h-3.5 text-violet-400 flex-shrink-0" />}
+                        </button>
+                      );
+                    })
+                  )}
+                </div>
               </div>
 
               <div>
@@ -826,7 +998,7 @@ export default function TournamentsDashboard() {
         </div>
       )}
 
-      {/* ── Insta Story Export Poster Modal ── */}
+      {/* ── Insta Story Export Poster Modal (with Swipable Individual Tiles) ── */}
       {showInstaCard && selectedTournament && (
         <InstaVictoryCard
           tournamentTitle={selectedTournament.title}
