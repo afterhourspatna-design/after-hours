@@ -2,11 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 
-/**
- * Clean Single-Elimination Knockout Generator
- * - Minimizes BYEs: Only awards BYEs when player count is odd (e.g. 10 players -> 5 matches, NO byes!).
- * - Every pair plays each other in Round 1 for maximum fun!
- */
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -30,27 +25,44 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: "At least 2 registered participants are required to generate a bracket" }, { status: 400 });
   }
 
-  // Shuffle participants for randomized pairings
-  const participants = [...tournament.participants];
-  for (let i = participants.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [participants[i], participants[j]] = [participants[j], participants[i]];
+  const body = await req.json().catch(() => ({}));
+  const customPairings: { p1Id: string; p2Id?: string }[] | null = body?.customPairings || null;
+
+  // Order or shuffle participants
+  let participants = [...tournament.participants];
+  if (!customPairings) {
+    // Fisher-Yates shuffle for randomized pairings
+    for (let i = participants.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [participants[i], participants[j]] = [participants[j], participants[i]];
+    }
   }
 
   // Delete existing matches for this tournament
   await prisma.tournamentMatch.deleteMany({ where: { tournamentId } });
 
-  // Compute number of rounds needed (e.g., 10 players -> 5 -> 3 -> 2 -> 1 = 4 rounds)
-  // Or for 25 players -> 13 -> 7 -> 4 -> 2 -> 1
-  let currentRoundCount = N;
+  let activePlayers: any[] = [];
+  if (customPairings && Array.isArray(customPairings) && customPairings.length > 0) {
+    // Map custom pairings
+    for (const pair of customPairings) {
+      const p1 = participants.find(p => p.id === pair.p1Id);
+      const p2 = pair.p2Id ? participants.find(p => p.id === pair.p2Id) : null;
+      if (p1) activePlayers.push(p1);
+      if (p2) activePlayers.push(p2);
+    }
+    // Include any unassigned participants at the end
+    const assignedIds = new Set(activePlayers.map(p => p.id));
+    const unassigned = participants.filter(p => !assignedIds.has(p.id));
+    activePlayers.push(...unassigned);
+  } else {
+    activePlayers = [...participants];
+  }
+
   let roundNumber = 1;
   const roundMatchMap: Map<number, any[]> = new Map();
 
-  let activePlayers = [...participants];
-
   while (activePlayers.length > 1) {
     const matchesInRound = [];
-    const nextActivePlayers: any[] = [];
     const numMatches = Math.floor(activePlayers.length / 2);
 
     for (let i = 0; i < numMatches; i++) {
