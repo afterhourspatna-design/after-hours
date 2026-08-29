@@ -91,11 +91,19 @@ function calculateBlockBaseAmount(params: {
     // PS4 Rates:
     // 1 Controller: 30m = 70, 1h = 100
     // 2 Controllers: 30m = 80, 1h = 120
+    // 3 Controllers: 30m = 100, 1h = 150
+    // 4 Controllers: 30m = 120, 1h = 180
     let rHalf = 70;
     let rHour = 100;
     if (accessoriesCount === 2) {
       rHalf = 80;
       rHour = 120;
+    } else if (accessoriesCount === 3) {
+      rHalf = 100;
+      rHour = 150;
+    } else if (accessoriesCount === 4) {
+      rHalf = 120;
+      rHour = 180;
     }
 
     if (blockMinutes <= 30) {
