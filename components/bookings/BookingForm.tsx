@@ -664,7 +664,7 @@ export default function BookingForm({ mode = "create", initialData, prefillDate,
                 </label>
                 <div className={cn(
                   "grid gap-3",
-                  selectedGame.tag === "ps5" ? "grid-cols-2 sm:grid-cols-4" : "grid-cols-2"
+                  ["ps5", "ps4"].includes(selectedGame.tag) ? "grid-cols-2 sm:grid-cols-4" : "grid-cols-2"
                 )}>
                   {selectedGame.tag === "ps5" && [
                     { count: 1, label: "1 Controller", price30: 80, price60: 120 },
@@ -698,6 +698,8 @@ export default function BookingForm({ mode = "create", initialData, prefillDate,
                   {selectedGame.tag === "ps4" && [
                     { count: 1, label: "1 Controller", price30: 70, price60: 100 },
                     { count: 2, label: "2 Controllers", price30: 80, price60: 120 },
+                    { count: 3, label: "3 Controllers", price30: 100, price60: 150 },
+                    { count: 4, label: "4 Controllers", price30: 120, price60: 180 },
                   ].map((opt) => {
                     const active = accessoriesCount === opt.count;
                     const price = durationMinutes <= 30 ? opt.price30 : opt.price60;
