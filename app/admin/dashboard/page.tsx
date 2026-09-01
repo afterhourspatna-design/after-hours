@@ -143,11 +143,11 @@ async function getDashboardData(period: string = "today", from?: string, to?: st
     periodTournamentPayments,
     last7DaysTournamentPayments,
   ] = await Promise.all([
-    prisma.booking.count(),
-    prisma.booking.count({ where: whereRange }),
-    prisma.booking.count({ where: { startDateTime: { gte: boundsToday.start, lte: boundsToday.end } } }),
-    prisma.booking.count({ where: { startDateTime: { gte: boundsWeek.start, lte: boundsWeek.end } } }),
-    prisma.booking.count({ where: { startDateTime: { gte: boundsMonth.start, lte: boundsMonth.end } } }),
+    prisma.booking.count({ where: { bookingStatus: { in: [BookingStatus.CONFIRMED, BookingStatus.COMPLETED] } } }),
+    prisma.booking.count({ where: { ...whereRange, bookingStatus: { in: [BookingStatus.CONFIRMED, BookingStatus.COMPLETED] } } }),
+    prisma.booking.count({ where: { startDateTime: { gte: boundsToday.start, lte: boundsToday.end }, bookingStatus: { in: [BookingStatus.CONFIRMED, BookingStatus.COMPLETED] } } }),
+    prisma.booking.count({ where: { startDateTime: { gte: boundsWeek.start, lte: boundsWeek.end }, bookingStatus: { in: [BookingStatus.CONFIRMED, BookingStatus.COMPLETED] } } }),
+    prisma.booking.count({ where: { startDateTime: { gte: boundsMonth.start, lte: boundsMonth.end }, bookingStatus: { in: [BookingStatus.CONFIRMED, BookingStatus.COMPLETED] } } }),
     prisma.booking.findMany({
       where: {
         bookingStatus: { in: [BookingStatus.CONFIRMED, BookingStatus.HOLD] },
