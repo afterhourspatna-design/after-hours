@@ -614,7 +614,7 @@ export default function BookingForm({ mode = "create", initialData, prefillDate,
                     const g = games.find(g => g.id === e.target.value) ?? null;
                     setSelectedGame(g);
                     if (g) {
-                      setAccessoriesCount(g.tag === "ps5" ? 1 : g.tag === "tabletennis" ? 2 : g.tag === "pool" ? 2 : 0);
+                      setAccessoriesCount(["ps5", "ps4"].includes(g.tag) ? 1 : g.tag === "tabletennis" ? 2 : g.tag === "pool" ? 2 : 0);
                       if (g.tag === "pool" || g.tag === "cards") {
                         setSelectedUnit(g.resourceUnits[0]?.id ?? "");
                       } else {
