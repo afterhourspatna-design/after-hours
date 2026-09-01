@@ -57,6 +57,7 @@ interface PaymentGroup {
   totalOnline: number;
   totalSnacks: number;
   customerNames: string;
+  customerPhones: string;
   bookings: Booking[];
 }
 
@@ -223,6 +224,12 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
               .filter((a: any) => a.snackOrder)
               .reduce((sum: number, a: any) => sum + Number(a.amount), 0);
 
+            const phoneSet = new Set<string>();
+            for (const b of allBookings) {
+              if (b.user?.phone) phoneSet.add(b.user.phone);
+              else if (b.guestPhone) phoneSet.add(b.guestPhone);
+            }
+
             return {
               paymentId: p.id,
               updatedAt: p.createdAt,
@@ -233,6 +240,7 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
               totalOnline: Number(p.onlineAmount),
               totalSnacks,
               customerNames: p.customerNames,
+              customerPhones: Array.from(phoneSet).join(", "),
               bookings: allBookings,
             };
           });
@@ -715,7 +723,10 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
                           </p>
                         </td>
                         <td>
-                          <p className="font-medium text-white text-sm">{p.customerNames}</p>
+                          <div>
+                            <p className="font-medium text-white text-sm">{p.customerNames}</p>
+                            {p.customerPhones && <p className="text-xs text-zinc-600">{p.customerPhones}</p>}
+                          </div>
                         </td>
                         <td>
                           <p className="text-sm text-zinc-300">
