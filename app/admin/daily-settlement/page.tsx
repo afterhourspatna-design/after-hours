@@ -7,6 +7,7 @@ import {
   Gamepad2, Coffee, Zap, Trophy, ArrowRight, ShieldAlert, Calendar
 } from "lucide-react";
 import StatCard from "@/components/ui/StatCard";
+import FundSettlementPanel from "@/components/settlement/FundSettlementPanel";
 
 function getISTStartAndEnd(date: Date) {
   const formatter = new Intl.DateTimeFormat("en-US", {
@@ -300,6 +301,9 @@ export default async function DailySettlementPage({
           </div>
         </div>
       </div>
+
+      {/* Fund Sources: Opening/Closing balances & Transfers */}
+      <FundSettlementPanel date={selectedDateStr} />
 
       {/* Stream Breakdown */}
       <div className="glass-card p-6 border-zinc-800/80 bg-zinc-950/40">

@@ -49,6 +49,12 @@ enum BookingSource {
   CREDITS
 }
 
+enum FundSource {
+  COUNTER
+  HOUSE
+  BANK
+}
+
 // ─────────────────────────────────────────
 // MODELS
 // ─────────────────────────────────────────
@@ -91,6 +97,13 @@ model AppUser {
   // Tournaments
   createdTournaments     Tournament[]        @relation("CreatedTournaments")
   tournamentEntries      TournamentParticipant[]
+
+  // Expenses
+  createdExpenses        Expense[]
+
+  // Fund Sources (Daily Settlement)
+  actualBalancesSet       DailyActualBalance[]
+  fundTransactionsCreated FundTransaction[]
 
   @@index([phone])
   @@index([role])
@@ -530,4 +543,88 @@ model TournamentMatch {
 
   @@index([tournamentId])
   @@map("tournament_matches")
+}
+
+// ─────────────────────────────────────────
+// EXPENSE MANAGEMENT (Admin-only)
+// ─────────────────────────────────────────
+
+model ExpenseCategory {
+  id        String    @id @default(cuid())
+  name      String    @unique
+  isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  expenses  Expense[]
+
+  @@index([isActive])
+  @@map("expense_categories")
+}
+
+model Expense {
+  id          String          @id @default(cuid())
+  date        DateTime
+  paymentMode FundSource
+  categoryId  String
+  amount      Decimal         @db.Decimal(10, 2)
+  notes       String?
+  createdById String?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  category    ExpenseCategory @relation(fields: [categoryId], references: [id])
+  createdBy   AppUser?        @relation(fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([date])
+  @@index([categoryId])
+  @@index([paymentMode])
+  @@map("expenses")
+}
+
+// ─────────────────────────────────────────
+// FUND SOURCES: ACTUAL BALANCES & TRANSFERS
+// ─────────────────────────────────────────
+
+// A manually-entered, physically-reconciled CLOSING balance for a source on a
+// given date (e.g. an end-of-day till count, or a bank statement figure).
+// It may differ from the system's calculated/expected closing for that same
+// date — that difference is surfaced to the admin. The actual closing of date
+// D becomes the opening of date D+1. The very first entry an admin makes is
+// typically the actual closing of the day *before* they start using the
+// ledger (e.g. actual closing of 31-Aug to seed the opening of 1-Sep).
+model DailyActualBalance {
+  id        String     @id @default(cuid())
+  date      DateTime
+  source    FundSource
+  amount    Decimal    @db.Decimal(10, 2)
+  notes     String?
+  setById   String?
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  setBy     AppUser?   @relation(fields: [setById], references: [id], onDelete: SetNull)
+
+  @@unique([date, source])
+  @@index([date])
+  @@map("daily_actual_balances")
+}
+
+model FundTransaction {
+  id          String     @id @default(cuid())
+  date        DateTime
+  fromSource  FundSource
+  toSource    FundSource
+  amount      Decimal    @db.Decimal(10, 2)
+  notes       String?
+  createdById String?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  createdBy   AppUser?   @relation(fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([date])
+  @@index([fromSource])
+  @@index([toSource])
+  @@map("fund_transactions")
 }
