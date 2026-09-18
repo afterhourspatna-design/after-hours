@@ -56,9 +56,9 @@ NEXT_PUBLIC_FEATURE_CUSTOMER_PORTAL="true"
 
 ### Step 2: Database Setup
 1. Ensure your PostgreSQL instance is running.
-2. Run migrations to create the schema:
+2. Push the schema to the database (this project uses `db push`, not migration files):
    ```bash
-   npx prisma migrate deploy
+   npx prisma db push
    ```
 3. (Optional) Seed the initial admin account:
    ```bash
