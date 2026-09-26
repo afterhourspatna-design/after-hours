@@ -3,6 +3,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
 import { relevanceScore, orderByIds } from "@/lib/search-rank";
+import { resolveSnackProduct } from "@/lib/snacks";
 
 export async function POST(req: NextRequest) {
   const session = await auth();
@@ -14,12 +15,25 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json();
-  const { userId, guestName, guestPhone, amount, paymentStatus, notes } = body;
+  const { userId, guestName, guestPhone, paymentStatus, productId, productName, notes } = body;
+  const unitPrice = Number(body.unitPrice);
+  const quantity = Number(body.quantity) || 1;
 
-  if (!amount || amount <= 0) {
-    return NextResponse.json({ error: "Invalid amount" }, { status: 400 });
+  if (!unitPrice || unitPrice <= 0) {
+    return NextResponse.json({ error: "Invalid price" }, { status: 400 });
+  }
+  if (quantity <= 0) {
+    return NextResponse.json({ error: "Invalid quantity" }, { status: 400 });
   }
 
+  let product;
+  try {
+    product = await resolveSnackProduct({ productId, productName, unitPrice });
+  } catch (err: any) {
+    return NextResponse.json({ error: err.message || "Invalid product" }, { status: 400 });
+  }
+
+  const amount = Number((unitPrice * quantity).toFixed(2));
   const userIdFromSession = (session.user as any).id;
   const validUser = await prisma.appUser.findUnique({ where: { id: userIdFromSession } });
 
@@ -33,9 +47,19 @@ export async function POST(req: NextRequest) {
       items: {
         create: {
           amount,
-          notes: notes || "Initial Amount",
+          notes: notes || null,
+          productId: product.id,
+          quantity,
+          unitPrice,
           addedById: validUser ? userIdFromSession : null,
         }
+      }
+    },
+    include: {
+      user: { select: { name: true, phone: true } },
+      items: {
+        orderBy: { createdAt: "desc" },
+        include: { addedBy: { select: { name: true } }, product: { select: { name: true } } }
       }
     },
   });
@@ -47,7 +71,7 @@ export async function POST(req: NextRequest) {
       action: "CREATE_SNACK_ORDER",
       entityType: "SnackOrder",
       entityId: snackOrder.id,
-      meta: { changes: { amount, notes, paymentStatus } },
+      meta: { changes: { amount, product: product.name, quantity, unitPrice, notes, paymentStatus } },
     }
   });
 
@@ -94,7 +118,7 @@ export async function GET(req: NextRequest) {
       user: { select: { name: true, phone: true } },
       items: {
         orderBy: { createdAt: "desc" },
-        include: { addedBy: { select: { name: true } } }
+        include: { addedBy: { select: { name: true } }, product: { select: { name: true } } }
       }
     };
 
