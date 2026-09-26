@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo, Fragment } from "react";
 import { toast } from "sonner";
 import {
-  Search, Download, RefreshCw, ChevronLeft, ChevronRight, CreditCard, X, Info, Coins, CheckCircle
+  Search, Download, RefreshCw, ChevronLeft, ChevronRight, CreditCard, X, Info, Coins, CheckCircle, Plus, Trash2
 } from "lucide-react";
 import {
   cn, formatCurrency, formatDate, formatTimeRange, formatDuration,
@@ -81,7 +81,10 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
   // Payment Form States
   const [negotiatedInput, setNegotiatedInput] = useState("");
   const [amountPayingNowInput, setAmountPayingNowInput] = useState("");
-  const [snacksInput, setSnacksInput] = useState("");
+  const [snacksInput, setSnacksInput] = useState(""); // lump-sum, edit-existing-payment mode only
+  const [newSnackItems, setNewSnackItems] = useState<{ amount: string; notes: string }[]>([]);
+  const [snackItemAmountInput, setSnackItemAmountInput] = useState("");
+  const [snackItemNotesInput, setSnackItemNotesInput] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<"CASH" | "ONLINE" | "MIXED">("ONLINE");
   const [cashInput, setCashInput] = useState("");
   const [onlineInput, setOnlineInput] = useState("");
@@ -281,6 +284,51 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
     setSelectedIds(next);
   };
 
+  // Group unpaid bookings/snack tabs by customer so settling one person's
+  // whole balance doesn't mean hunting for their rows across a flat list.
+  // Key: phone number (registered or guest) when we have one, otherwise the
+  // row's own id (so items with no phone at all just sit in their own group).
+  interface BookingGroup {
+    key: string;
+    name: string;
+    phone: string;
+    items: Booking[];
+    total: number;
+    earliest: string;
+  }
+
+  const groupedBookings = useMemo<BookingGroup[]>(() => {
+    const groups = new Map<string, BookingGroup>();
+    for (const b of bookings) {
+      const phone = b.user?.phone || b.guestPhone || "";
+      const key = phone || `single:${b.id}`;
+      const name = b.user?.name ?? b.guestName ?? "Guest";
+      let group = groups.get(key);
+      if (!group) {
+        group = { key, name, phone, items: [], total: 0, earliest: b.startDateTime };
+        groups.set(key, group);
+      }
+      group.items.push(b);
+      group.total += Number(b.finalAmount);
+      if (new Date(b.startDateTime) < new Date(group.earliest)) group.earliest = b.startDateTime;
+    }
+    return Array.from(groups.values()).sort(
+      (a, b) => new Date(a.earliest).getTime() - new Date(b.earliest).getTime()
+    );
+  }, [bookings]);
+
+  const handleSelectGroup = (group: BookingGroup) => {
+    const groupIds = group.items.map((b) => b.id);
+    const allSelected = groupIds.every((id) => selectedIds.has(id));
+    const next = new Set(selectedIds);
+    if (allSelected) {
+      groupIds.forEach((id) => next.delete(id));
+    } else {
+      groupIds.forEach((id) => next.add(id));
+    }
+    setSelectedIds(next);
+  };
+
   // Math totals for checkout
   const selectedBookings = editPaymentId
     ? paymentHistory.find(p => p.paymentId === editPaymentId)?.bookings || []
@@ -350,8 +398,7 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
     setNegotiatedInput(String(newGamesAmount));
 
     // Auto-update Amount Paying Now to reflect the new discount while accounting for prior payments
-    const currentSnacks = Number(snacksInput) || 0;
-    const newTotalToPay = newGamesAmount + currentSnacks - (editPaymentId ? 0 : previouslyPaidTotal);
+    const newTotalToPay = newGamesAmount + snacksVal - (editPaymentId ? 0 : previouslyPaidTotal);
     setAmountPayingNowInput(String(Math.max(0, newTotalToPay)));
   };
 
@@ -359,7 +406,6 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
   const handleOpenPayModal = () => {
     if (selectedIds.size === 0) return;
     setNegotiatedInput(String(totalActualGamesAmount));
-    setSnacksInput(totalActualSnacksAmount > 0 ? String(totalActualSnacksAmount) : "");
     setAmountPayingNowInput(String(totalBalanceDueGames + totalBalanceDueSnacks));
     setPaymentMethod("ONLINE");
     setCashInput("");
@@ -367,6 +413,9 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
     setPayOnlySnacks(false);
     setEditPaymentId(null);
     setSelectedCouponCode("");
+    setNewSnackItems([]);
+    setSnackItemAmountInput("");
+    setSnackItemNotesInput("");
     setShowPayModal(true);
   };
 
@@ -381,6 +430,9 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
     setCashInput(p.totalCash ? String(p.totalCash) : "");
     setOnlineInput(p.totalOnline ? String(p.totalOnline) : "");
     setPayOnlySnacks(p.totalNegotiated === 0 && p.totalSnacks > 0);
+    setNewSnackItems([]);
+    setSnackItemAmountInput("");
+    setSnackItemNotesInput("");
     setShowPayModal(true);
   };
 
@@ -390,12 +442,41 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
     setEditPaymentId(null);
     setPayOnlySnacks(false);
     setSelectedIds(new Set());
+    setNewSnackItems([]);
+    setSnackItemAmountInput("");
+    setSnackItemNotesInput("");
   };
 
+  // Assume newly added/removed snack items get paid today too, same as every
+  // other amount field here — staff can still override Amount Paying Now by hand.
+  const recomputeAmountPayingNow = (updatedNewSnacksTotal: number) => {
+    const updatedSnacksVal = totalActualSnacksAmount + updatedNewSnacksTotal;
+    const t = totalNegotiatedVal + updatedSnacksVal - (editPaymentId ? 0 : previouslyPaidTotal);
+    setAmountPayingNowInput(String(Math.max(0, t)));
+  };
+
+  const handleAddSnackItem = () => {
+    const amount = Number(snackItemAmountInput);
+    if (!amount || amount <= 0) return;
+    setNewSnackItems((prev) => [...prev, { amount: snackItemAmountInput, notes: snackItemNotesInput.trim() }]);
+    setSnackItemAmountInput("");
+    setSnackItemNotesInput("");
+    recomputeAmountPayingNow(newSnacksTotal + amount);
+  };
+
+  const handleRemoveSnackItem = (index: number) => {
+    const removed = Number(newSnackItems[index]?.amount) || 0;
+    setNewSnackItems((prev) => prev.filter((_, i) => i !== index));
+    recomputeAmountPayingNow(newSnacksTotal - removed);
+  };
 
   // Real-time values
   const totalNegotiatedVal = payOnlySnacks ? 0 : (Number(negotiatedInput) || 0);
-  const snacksVal = Number(snacksInput) || 0;
+  const newSnacksTotal = newSnackItems.reduce((sum, i) => sum + (Number(i.amount) || 0), 0);
+  // Edit-existing-payment mode still uses the lump-sum field; new-payment mode
+  // derives the invoice from whatever's already on the selected tab(s) plus
+  // whatever's freshly added at checkout.
+  const snacksVal = editPaymentId ? (Number(snacksInput) || 0) : (totalActualSnacksAmount + newSnacksTotal);
   const cashVal = Number(cashInput) || 0;
   const onlineVal = Number(onlineInput) || 0;
   const totalWithSnacks = totalNegotiatedVal + snacksVal;
@@ -404,7 +485,7 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
   // Real-time validations
   const isSplitInvalid = paymentMethod === "MIXED" && Math.abs(cashVal + onlineVal - amountPayingNowVal) > 0.01;
   const isNegotiatedInvalid = totalNegotiatedVal < 0;
-  const isSnacksInvalid = editPaymentId ? snacksVal < 0 : snacksVal < totalActualSnacksAmount;
+  const isSnacksInvalid = snacksVal < 0;
   const isAmountPayingNowInvalid = amountPayingNowVal < 0;
   const isSubmitDisabled = isNegotiatedInvalid || isSnacksInvalid || isSplitInvalid || isAmountPayingNowInvalid || submittingPayment;
 
@@ -437,7 +518,9 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
         : {
           bookingIds: Array.from(selectedIds),
           negotiatedAmount: totalNegotiatedVal,
-          snacksAmount: snacksVal,
+          snackItems: newSnackItems
+            .filter((i) => Number(i.amount) > 0)
+            .map((i) => ({ amount: Number(i.amount), notes: i.notes.trim() || null })),
           amountPayingNow: amountPayingNowVal,
           paymentMethod,
           cashAmount: paymentMethod === "MIXED" ? cashVal : paymentMethod === "CASH" ? amountPayingNowVal : 0,
@@ -620,73 +703,96 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
                   </tr>
                 </thead>
                 <tbody>
-                  {bookings.map((b) => {
-                    const customerName = b.user?.name ?? b.guestName ?? "Guest";
-                    const customerPhone = b.user?.phone ?? b.guestPhone ?? "";
-                    const isChecked = selectedIds.has(b.id);
+                  {groupedBookings.map((group) => {
+                    const groupChecked = group.items.every((b) => selectedIds.has(b.id));
+                    const groupPartiallyChecked = !groupChecked && group.items.some((b) => selectedIds.has(b.id));
 
                     return (
-                      <tr
-                        key={b.id}
-                        onClick={() => handleSelectRow(b.id)}
-                        className={cn(
-                          "cursor-pointer select-none",
-                          isChecked && "bg-violet-900/10"
-                        )}
-                      >
+                    <Fragment key={group.key}>
+                      <tr className="bg-zinc-900/60">
                         <td onClick={(e) => e.stopPropagation()}>
                           <input
                             type="checkbox"
-                            checked={isChecked}
-                            onChange={() => handleSelectRow(b.id)}
+                            checked={groupChecked}
+                            ref={(el) => { if (el) el.indeterminate = groupPartiallyChecked; }}
+                            onChange={() => handleSelectGroup(group)}
                             className="rounded border-zinc-700 text-violet-600 focus:ring-violet-500 bg-zinc-900 h-4 w-4"
+                            title="Select all for this customer"
                           />
                         </td>
-                        <td>
-                          <div>
-                            <p className="font-medium text-white text-sm flex items-center gap-2">
-                              {customerName}
+                        <td colSpan={6}>
+                          <div className="flex items-center justify-between gap-2 cursor-pointer" onClick={() => handleSelectGroup(group)}>
+                            <div className="flex items-center gap-2">
+                              <span className="font-semibold text-white text-sm">{group.name}</span>
+                              {group.phone && <span className="text-xs text-zinc-500">{group.phone}</span>}
+                              <span className="text-xs text-zinc-600">· {group.items.length} {group.items.length === 1 ? "item" : "items"}</span>
+                            </div>
+                            <span className="text-sm font-bold text-white whitespace-nowrap">{formatCurrency(group.total)}</span>
+                          </div>
+                        </td>
+                      </tr>
+                      {group.items.map((b) => {
+                        const isChecked = selectedIds.has(b.id);
+
+                        return (
+                          <tr
+                            key={b.id}
+                            onClick={() => handleSelectRow(b.id)}
+                            className={cn(
+                              "cursor-pointer select-none",
+                              isChecked && "bg-violet-900/10"
+                            )}
+                          >
+                            <td onClick={(e) => e.stopPropagation()}>
+                              <input
+                                type="checkbox"
+                                checked={isChecked}
+                                onChange={() => handleSelectRow(b.id)}
+                                className="rounded border-zinc-700 text-violet-600 focus:ring-violet-500 bg-zinc-900 h-4 w-4"
+                              />
+                            </td>
+                            <td>
                               {b.isNewUser && (
                                 <span className="bg-emerald-500/20 text-emerald-400 text-[10px] px-1.5 py-0.5 rounded font-bold uppercase tracking-wider border border-emerald-500/30">
                                   New
                                 </span>
                               )}
-                            </p>
-                            {customerPhone && <p className="text-xs text-zinc-600">{customerPhone}</p>}
-                          </div>
-                        </td>
-                        <td>
-                          <p className="text-sm text-zinc-200">{b.game.name}</p>
-                          {b.resourceUnit && <p className="text-xs text-zinc-600">{b.resourceUnit.unitName}</p>}
-                        </td>
-                        <td className="whitespace-nowrap">
-                          <p className="text-sm text-zinc-200">{formatDate(b.startDateTime)}</p>
-                          <p className="text-xs text-zinc-600">{formatTimeRange(b.startDateTime, b.endDateTime)}</p>
-                        </td>
-                        <td className="text-sm text-zinc-400 whitespace-nowrap">
-                          {formatDuration(b.durationMinutes)}
-                        </td>
-                        <td className="text-sm font-medium text-white whitespace-nowrap">
-                          {b.paymentStatus === "PARTIAL" ? (
-                            <div className="flex flex-col">
-                              <span className="text-zinc-500 line-through text-xs">{formatCurrency(Number(b.finalAmount))}</span>
-                              <span className="text-amber-400 font-bold">{formatCurrency(Number(b.finalAmount) - (b.allocations?.reduce((s: any, a: any) => s + Number(a.amount), 0) || 0))}</span>
-                            </div>
-                          ) : (
-                            formatCurrency(Number(b.finalAmount))
-                          )}
-                        </td>
-                        <td>
-                          <span className={cn(
-                            "inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold uppercase border",
-                            b.paymentStatus === "PARTIAL"
-                              ? "bg-amber-600/10 text-amber-400 border-amber-600/20"
-                              : "bg-red-600/10 text-red-400 border-red-600/20"
-                          )}>
-                            {b.paymentStatus}
-                          </span>
-                        </td>
-                      </tr>
+                            </td>
+                            <td>
+                              <p className="text-sm text-zinc-200">{b.game.name}</p>
+                              {b.resourceUnit && <p className="text-xs text-zinc-600">{b.resourceUnit.unitName}</p>}
+                            </td>
+                            <td className="whitespace-nowrap">
+                              <p className="text-sm text-zinc-200">{formatDate(b.startDateTime)}</p>
+                              <p className="text-xs text-zinc-600">{formatTimeRange(b.startDateTime, b.endDateTime)}</p>
+                            </td>
+                            <td className="text-sm text-zinc-400 whitespace-nowrap">
+                              {formatDuration(b.durationMinutes)}
+                            </td>
+                            <td className="text-sm font-medium text-white whitespace-nowrap">
+                              {b.paymentStatus === "PARTIAL" ? (
+                                <div className="flex flex-col">
+                                  <span className="text-zinc-500 line-through text-xs">{formatCurrency(Number(b.finalAmount))}</span>
+                                  <span className="text-amber-400 font-bold">{formatCurrency(Number(b.finalAmount) - (b.allocations?.reduce((s: any, a: any) => s + Number(a.amount), 0) || 0))}</span>
+                                </div>
+                              ) : (
+                                formatCurrency(Number(b.finalAmount))
+                              )}
+                            </td>
+                            <td>
+                              <span className={cn(
+                                "inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold uppercase border",
+                                b.paymentStatus === "PARTIAL"
+                                  ? "bg-amber-600/10 text-amber-400 border-amber-600/20"
+                                  : "bg-red-600/10 text-red-400 border-red-600/20"
+                              )}>
+                                {b.paymentStatus}
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </Fragment>
                     );
                   })}
                 </tbody>
@@ -959,9 +1065,15 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
                 <span>{formatCurrency(totalActualGamesAmount)}</span>
               </div>
               <div className="flex justify-between text-xs text-zinc-400">
-                <span>Snacks Total</span>
+                <span>Snacks Total{!editPaymentId && totalActualSnacksAmount > 0 ? " (existing tab)" : ""}</span>
                 <span>{formatCurrency(totalActualSnacksAmount)}</span>
               </div>
+              {!editPaymentId && newSnacksTotal > 0 && (
+                <div className="flex justify-between text-xs text-zinc-400">
+                  <span>New Snack Items (checkout)</span>
+                  <span>{formatCurrency(newSnacksTotal)}</span>
+                </div>
+              )}
               {dynamicCouponDiscount > 0 && (
                 <div className="flex justify-between text-xs text-emerald-400 font-medium">
                   <span>Coupon Discount</span>
@@ -976,7 +1088,7 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
               )}
               <div className="border-t border-zinc-800/60 pt-2 flex justify-between text-sm font-bold text-white">
                 <span>Total Outstanding</span>
-                <span>{formatCurrency(totalActualAmount - dynamicCouponDiscount - (editPaymentId ? 0 : previouslyPaidTotal))}</span>
+                <span>{formatCurrency(totalActualAmount + (editPaymentId ? 0 : newSnacksTotal) - dynamicCouponDiscount - (editPaymentId ? 0 : previouslyPaidTotal))}</span>
               </div>
             </div>
 
@@ -1001,22 +1113,91 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
               </div>
               <div>
                 <label className="text-[10px] uppercase tracking-wider text-zinc-500 font-bold block mb-1.5">Final Snacks Price</label>
-                <input
-                  type="number"
-                  value={snacksInput}
-                  onChange={(e) => {
-                    setSnacksInput(e.target.value);
-                    const newSnacksAmount = Number(e.target.value) || 0;
-                    const t = totalNegotiatedVal + newSnacksAmount - (editPaymentId ? 0 : previouslyPaidTotal);
-                    setAmountPayingNowInput(String(Math.max(0, t)));
-                  }}
-                  disabled={submittingPayment}
-                  placeholder="Snacks Price"
-                  className="input-field text-sm font-semibold w-full"
-                  title="Final Snacks Price"
-                />
+                {editPaymentId ? (
+                  <input
+                    type="number"
+                    value={snacksInput}
+                    onChange={(e) => {
+                      setSnacksInput(e.target.value);
+                      const newSnacksAmount = Number(e.target.value) || 0;
+                      const t = totalNegotiatedVal + newSnacksAmount - (editPaymentId ? 0 : previouslyPaidTotal);
+                      setAmountPayingNowInput(String(Math.max(0, t)));
+                    }}
+                    disabled={submittingPayment}
+                    placeholder="Snacks Price"
+                    className="input-field text-sm font-semibold w-full"
+                    title="Final Snacks Price"
+                  />
+                ) : (
+                  <div
+                    className="input-field text-sm font-semibold w-full text-zinc-300 flex items-center"
+                    title="Existing open tab total. Add new items being bought right now below."
+                  >
+                    {formatCurrency(snacksVal)}
+                  </div>
+                )}
               </div>
             </div>
+
+            {/* Add snack items being bought right now, at checkout */}
+            {!editPaymentId && (
+              <div className="space-y-2 bg-zinc-950/40 rounded-xl p-3 border border-zinc-800/40">
+                <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider">Add Snack Item (at checkout)</p>
+                {newSnackItems.length > 0 && (
+                  <div className="space-y-1.5">
+                    {newSnackItems.map((item, idx) => (
+                      <div key={idx} className="flex items-center justify-between gap-2 text-xs bg-zinc-900/60 rounded-lg px-2.5 py-1.5">
+                        <span className="text-zinc-300 truncate">{item.notes || "Snack item"}</span>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span className="font-semibold text-white">{formatCurrency(Number(item.amount) || 0)}</span>
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveSnackItem(idx)}
+                            disabled={submittingPayment}
+                            className="text-zinc-500 hover:text-red-400 transition-colors"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <div className="flex gap-2">
+                  <input
+                    type="number"
+                    value={snackItemAmountInput}
+                    onChange={(e) => setSnackItemAmountInput(e.target.value)}
+                    disabled={submittingPayment}
+                    placeholder="Amount"
+                    className="input-field text-xs w-24"
+                  />
+                  <input
+                    type="text"
+                    value={snackItemNotesInput}
+                    onChange={(e) => setSnackItemNotesInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        handleAddSnackItem();
+                      }
+                    }}
+                    disabled={submittingPayment}
+                    placeholder="What did they buy? (e.g. 2x Coke, chips)"
+                    className="input-field text-xs flex-1"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleAddSnackItem}
+                    disabled={submittingPayment || !snackItemAmountInput || Number(snackItemAmountInput) <= 0}
+                    className="px-3 py-2 bg-violet-600 hover:bg-violet-500 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-lg transition-colors"
+                    title="Add item"
+                  >
+                    <Plus className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            )}
 
             <div>
               <label className="text-[10px] uppercase tracking-wider text-emerald-400 font-bold block mb-1.5">Amount Paying Now</label>
@@ -1138,15 +1319,6 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
               </div>
             )}
 
-            {/* Warning alert if snacksVal is less than pre-existing unpaid snacks */}
-            {!editPaymentId && snacksVal < totalActualSnacksAmount && (
-              <div className="flex items-start gap-2 p-3 bg-red-500/10 border border-red-500/20 text-red-400 rounded-xl text-xs">
-                <Info className="w-4 h-4 flex-shrink-0 mt-0.5" />
-                <p>
-                  Validation error: Snacks amount cannot be less than pre-existing unpaid snacks (₹{totalActualSnacksAmount}). Adjust/delete snacks in the Snacks tab first.
-                </p>
-              </div>
-            )}
 
             {/* Actions */}
             <div className="flex gap-2 border-t border-zinc-800/60 pt-4">
