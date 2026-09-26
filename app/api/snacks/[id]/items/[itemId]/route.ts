@@ -54,7 +54,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
       include: {
         items: {
           orderBy: { createdAt: "desc" },
-          include: { addedBy: { select: { name: true } } }
+          include: { addedBy: { select: { name: true } }, product: { select: { name: true } } }
         }
       }
     });

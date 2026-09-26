@@ -260,16 +260,38 @@ model SnackOrder {
 model SnackOrderItem {
   id           String      @id @default(cuid())
   snackOrderId String
-  amount       Decimal     @db.Decimal(10, 2)
-  notes        String?     // Optional description of items added
+  amount       Decimal     @db.Decimal(10, 2) // = unitPrice * quantity, snapshotted at add-time
+  notes        String?     // Optional extra remark, on top of (or instead of) a catalog product
+  productId    String?
+  quantity     Int?
+  unitPrice    Decimal?    @db.Decimal(10, 2) // snapshot of the product's price when this line was added
   addedById    String?
   createdAt    DateTime    @default(now())
 
-  snackOrder   SnackOrder  @relation(fields: [snackOrderId], references: [id], onDelete: Cascade)
-  addedBy      AppUser?    @relation(fields: [addedById], references: [id], onDelete: SetNull)
+  snackOrder   SnackOrder    @relation(fields: [snackOrderId], references: [id], onDelete: Cascade)
+  product      SnackProduct? @relation(fields: [productId], references: [id], onDelete: SetNull)
+  addedBy      AppUser?      @relation(fields: [addedById], references: [id], onDelete: SetNull)
 
   @@index([snackOrderId])
+  @@index([productId])
   @@map("snack_order_items")
+}
+
+// The snack menu/catalog. `price` is the current default — individual sold
+// items snapshot their own unitPrice (see SnackOrderItem) so a later price
+// change here never rewrites what a past order was actually sold for.
+model SnackProduct {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  price     Decimal  @db.Decimal(10, 2)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  items     SnackOrderItem[]
+
+  @@index([isActive])
+  @@map("snack_products")
 }
 
 model DiscountRule {

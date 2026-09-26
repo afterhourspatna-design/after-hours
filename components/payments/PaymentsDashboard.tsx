@@ -3,16 +3,18 @@
 import { useState, useEffect, useCallback, useMemo, Fragment } from "react";
 import { toast } from "sonner";
 import {
-  Search, Download, RefreshCw, ChevronLeft, ChevronRight, CreditCard, X, Info, Coins, CheckCircle, Plus, Trash2
+  Search, Download, RefreshCw, ChevronLeft, ChevronRight, CreditCard, X, Info, Coins, CheckCircle, Plus, Coffee
 } from "lucide-react";
 import {
   cn, formatCurrency, formatDate, formatTimeRange, formatDuration,
 } from "@/lib/utils";
 import { TableSkeleton } from "@/components/ui/LoadingSkeleton";
 import EmptyState from "@/components/ui/EmptyState";
+import SnackProductPicker, { SnackItemPayload } from "@/components/snacks/SnackProductPicker";
 
 interface Booking {
   id: string;
+  userId?: string | null;
   guestName: string | null;
   guestPhone: string | null;
   startDateTime: string;
@@ -82,9 +84,6 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
   const [negotiatedInput, setNegotiatedInput] = useState("");
   const [amountPayingNowInput, setAmountPayingNowInput] = useState("");
   const [snacksInput, setSnacksInput] = useState(""); // lump-sum, edit-existing-payment mode only
-  const [newSnackItems, setNewSnackItems] = useState<{ amount: string; notes: string }[]>([]);
-  const [snackItemAmountInput, setSnackItemAmountInput] = useState("");
-  const [snackItemNotesInput, setSnackItemNotesInput] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<"CASH" | "ONLINE" | "MIXED">("ONLINE");
   const [cashInput, setCashInput] = useState("");
   const [onlineInput, setOnlineInput] = useState("");
@@ -329,6 +328,74 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
     setSelectedIds(next);
   };
 
+  // Quick-add snacks for a customer directly from their group — no trip to
+  // the Snacks page, no searching for them again, since we already know who
+  // they are from their booking.
+  const [snackQuickAddGroup, setSnackQuickAddGroup] = useState<BookingGroup | null>(null);
+  // The tab this modal session is adding to. Resolved once when the modal
+  // opens (from whatever tab already exists in the group, if any), then
+  // pinned to whatever the first add's response says — never re-derived from
+  // `bookings`/`groupedBookings` mid-session, since those only refresh after
+  // a round trip and would otherwise make a second add in the same session
+  // miss the tab the first add just created.
+  const [quickAddOrderId, setQuickAddOrderId] = useState<string | null>(null);
+
+  const handleOpenQuickAddSnack = (group: BookingGroup) => {
+    const existingSnackRow = group.items.find((b) => b.id.startsWith("SNACK_"));
+    setQuickAddOrderId(existingSnackRow ? existingSnackRow.id.replace("SNACK_", "") : null);
+    setSnackQuickAddGroup(group);
+  };
+
+  const handleCloseQuickAddSnack = () => {
+    setSnackQuickAddGroup(null);
+    setQuickAddOrderId(null);
+  };
+
+  const handleQuickAddSnackItem = async (item: SnackItemPayload) => {
+    if (!snackQuickAddGroup) return;
+    const itemPayload = {
+      productId: item.productId,
+      productName: item.productName,
+      unitPrice: item.unitPrice,
+      quantity: item.quantity,
+      notes: item.notes,
+    };
+
+    let res: Response;
+    if (quickAddOrderId) {
+      res = await fetch(`/api/snacks/${quickAddOrderId}/items`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(itemPayload),
+      });
+    } else {
+      const sample = snackQuickAddGroup.items[0];
+      const payload: any = { ...itemPayload };
+      if (sample.userId) {
+        payload.userId = sample.userId;
+      } else {
+        payload.guestName = sample.user?.name ?? sample.guestName ?? snackQuickAddGroup.name;
+        payload.guestPhone = sample.user?.phone ?? sample.guestPhone ?? snackQuickAddGroup.phone ?? null;
+      }
+      res = await fetch("/api/snacks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+    }
+
+    if (!res.ok) {
+      const err = await res.json();
+      toast.error(err.error || "Failed to add item");
+      throw new Error(err.error || "Failed to add item");
+    }
+
+    const updatedOrder = await res.json();
+    setQuickAddOrderId(updatedOrder.id);
+    toast.success("Added to tab");
+    fetchBookings();
+  };
+
   // Math totals for checkout
   const selectedBookings = editPaymentId
     ? paymentHistory.find(p => p.paymentId === editPaymentId)?.bookings || []
@@ -413,9 +480,6 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
     setPayOnlySnacks(false);
     setEditPaymentId(null);
     setSelectedCouponCode("");
-    setNewSnackItems([]);
-    setSnackItemAmountInput("");
-    setSnackItemNotesInput("");
     setShowPayModal(true);
   };
 
@@ -430,9 +494,6 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
     setCashInput(p.totalCash ? String(p.totalCash) : "");
     setOnlineInput(p.totalOnline ? String(p.totalOnline) : "");
     setPayOnlySnacks(p.totalNegotiated === 0 && p.totalSnacks > 0);
-    setNewSnackItems([]);
-    setSnackItemAmountInput("");
-    setSnackItemNotesInput("");
     setShowPayModal(true);
   };
 
@@ -442,41 +503,15 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
     setEditPaymentId(null);
     setPayOnlySnacks(false);
     setSelectedIds(new Set());
-    setNewSnackItems([]);
-    setSnackItemAmountInput("");
-    setSnackItemNotesInput("");
-  };
-
-  // Assume newly added/removed snack items get paid today too, same as every
-  // other amount field here — staff can still override Amount Paying Now by hand.
-  const recomputeAmountPayingNow = (updatedNewSnacksTotal: number) => {
-    const updatedSnacksVal = totalActualSnacksAmount + updatedNewSnacksTotal;
-    const t = totalNegotiatedVal + updatedSnacksVal - (editPaymentId ? 0 : previouslyPaidTotal);
-    setAmountPayingNowInput(String(Math.max(0, t)));
-  };
-
-  const handleAddSnackItem = () => {
-    const amount = Number(snackItemAmountInput);
-    if (!amount || amount <= 0) return;
-    setNewSnackItems((prev) => [...prev, { amount: snackItemAmountInput, notes: snackItemNotesInput.trim() }]);
-    setSnackItemAmountInput("");
-    setSnackItemNotesInput("");
-    recomputeAmountPayingNow(newSnacksTotal + amount);
-  };
-
-  const handleRemoveSnackItem = (index: number) => {
-    const removed = Number(newSnackItems[index]?.amount) || 0;
-    setNewSnackItems((prev) => prev.filter((_, i) => i !== index));
-    recomputeAmountPayingNow(newSnacksTotal - removed);
   };
 
   // Real-time values
   const totalNegotiatedVal = payOnlySnacks ? 0 : (Number(negotiatedInput) || 0);
-  const newSnacksTotal = newSnackItems.reduce((sum, i) => sum + (Number(i.amount) || 0), 0);
-  // Edit-existing-payment mode still uses the lump-sum field; new-payment mode
-  // derives the invoice from whatever's already on the selected tab(s) plus
-  // whatever's freshly added at checkout.
-  const snacksVal = editPaymentId ? (Number(snacksInput) || 0) : (totalActualSnacksAmount + newSnacksTotal);
+  // Edit-existing-payment mode uses the lump-sum field; new-payment mode is
+  // always the sum of whatever's already on the selected tab(s) — snacks are
+  // added to a customer's tab from the Unpaid list directly, not here, so
+  // there's nothing left to type in at settle time.
+  const snacksVal = editPaymentId ? (Number(snacksInput) || 0) : totalActualSnacksAmount;
   const cashVal = Number(cashInput) || 0;
   const onlineVal = Number(onlineInput) || 0;
   const totalWithSnacks = totalNegotiatedVal + snacksVal;
@@ -518,9 +553,7 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
         : {
           bookingIds: Array.from(selectedIds),
           negotiatedAmount: totalNegotiatedVal,
-          snackItems: newSnackItems
-            .filter((i) => Number(i.amount) > 0)
-            .map((i) => ({ amount: Number(i.amount), notes: i.notes.trim() || null })),
+          snacksAmount: snacksVal,
           amountPayingNow: amountPayingNowVal,
           paymentMethod,
           cashAmount: paymentMethod === "MIXED" ? cashVal : paymentMethod === "CASH" ? amountPayingNowVal : 0,
@@ -721,13 +754,29 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
                           />
                         </td>
                         <td colSpan={6}>
-                          <div className="flex items-center justify-between gap-2 cursor-pointer" onClick={() => handleSelectGroup(group)}>
-                            <div className="flex items-center gap-2">
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2 cursor-pointer" onClick={() => handleSelectGroup(group)}>
                               <span className="font-semibold text-white text-sm">{group.name}</span>
                               {group.phone && <span className="text-xs text-zinc-500">{group.phone}</span>}
                               <span className="text-xs text-zinc-600">· {group.items.length} {group.items.length === 1 ? "item" : "items"}</span>
                             </div>
-                            <span className="text-sm font-bold text-white whitespace-nowrap">{formatCurrency(group.total)}</span>
+                            <div className="flex items-center gap-3">
+                              <button
+                                type="button"
+                                onClick={(e) => { e.stopPropagation(); handleOpenQuickAddSnack(group); }}
+                                className="flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-semibold text-amber-400 hover:text-amber-300 hover:bg-amber-500/10 border border-amber-500/20 transition-colors"
+                                title="Add a snack to this customer's tab"
+                              >
+                                <Coffee className="w-3 h-3" />
+                                Snack
+                              </button>
+                              <span
+                                className="text-sm font-bold text-white whitespace-nowrap cursor-pointer"
+                                onClick={() => handleSelectGroup(group)}
+                              >
+                                {formatCurrency(group.total)}
+                              </span>
+                            </div>
                           </div>
                         </td>
                       </tr>
@@ -1065,15 +1114,9 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
                 <span>{formatCurrency(totalActualGamesAmount)}</span>
               </div>
               <div className="flex justify-between text-xs text-zinc-400">
-                <span>Snacks Total{!editPaymentId && totalActualSnacksAmount > 0 ? " (existing tab)" : ""}</span>
+                <span>Snacks Total</span>
                 <span>{formatCurrency(totalActualSnacksAmount)}</span>
               </div>
-              {!editPaymentId && newSnacksTotal > 0 && (
-                <div className="flex justify-between text-xs text-zinc-400">
-                  <span>New Snack Items (checkout)</span>
-                  <span>{formatCurrency(newSnacksTotal)}</span>
-                </div>
-              )}
               {dynamicCouponDiscount > 0 && (
                 <div className="flex justify-between text-xs text-emerald-400 font-medium">
                   <span>Coupon Discount</span>
@@ -1088,7 +1131,7 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
               )}
               <div className="border-t border-zinc-800/60 pt-2 flex justify-between text-sm font-bold text-white">
                 <span>Total Outstanding</span>
-                <span>{formatCurrency(totalActualAmount + (editPaymentId ? 0 : newSnacksTotal) - dynamicCouponDiscount - (editPaymentId ? 0 : previouslyPaidTotal))}</span>
+                <span>{formatCurrency(totalActualAmount - dynamicCouponDiscount - (editPaymentId ? 0 : previouslyPaidTotal))}</span>
               </div>
             </div>
 
@@ -1131,73 +1174,13 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
                 ) : (
                   <div
                     className="input-field text-sm font-semibold w-full text-zinc-300 flex items-center"
-                    title="Existing open tab total. Add new items being bought right now below."
+                    title="Total from the customer's open snack tab(s) selected above. Add snacks to a tab from the Unpaid list itself."
                   >
                     {formatCurrency(snacksVal)}
                   </div>
                 )}
               </div>
             </div>
-
-            {/* Add snack items being bought right now, at checkout */}
-            {!editPaymentId && (
-              <div className="space-y-2 bg-zinc-950/40 rounded-xl p-3 border border-zinc-800/40">
-                <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider">Add Snack Item (at checkout)</p>
-                {newSnackItems.length > 0 && (
-                  <div className="space-y-1.5">
-                    {newSnackItems.map((item, idx) => (
-                      <div key={idx} className="flex items-center justify-between gap-2 text-xs bg-zinc-900/60 rounded-lg px-2.5 py-1.5">
-                        <span className="text-zinc-300 truncate">{item.notes || "Snack item"}</span>
-                        <div className="flex items-center gap-2 shrink-0">
-                          <span className="font-semibold text-white">{formatCurrency(Number(item.amount) || 0)}</span>
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveSnackItem(idx)}
-                            disabled={submittingPayment}
-                            className="text-zinc-500 hover:text-red-400 transition-colors"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                <div className="flex gap-2">
-                  <input
-                    type="number"
-                    value={snackItemAmountInput}
-                    onChange={(e) => setSnackItemAmountInput(e.target.value)}
-                    disabled={submittingPayment}
-                    placeholder="Amount"
-                    className="input-field text-xs w-24"
-                  />
-                  <input
-                    type="text"
-                    value={snackItemNotesInput}
-                    onChange={(e) => setSnackItemNotesInput(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        e.preventDefault();
-                        handleAddSnackItem();
-                      }
-                    }}
-                    disabled={submittingPayment}
-                    placeholder="What did they buy? (e.g. 2x Coke, chips)"
-                    className="input-field text-xs flex-1"
-                  />
-                  <button
-                    type="button"
-                    onClick={handleAddSnackItem}
-                    disabled={submittingPayment || !snackItemAmountInput || Number(snackItemAmountInput) <= 0}
-                    className="px-3 py-2 bg-violet-600 hover:bg-violet-500 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-lg transition-colors"
-                    title="Add item"
-                  >
-                    <Plus className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-            )}
 
             <div>
               <label className="text-[10px] uppercase tracking-wider text-emerald-400 font-bold block mb-1.5">Amount Paying Now</label>
@@ -1596,7 +1579,48 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
         </div>
       )}
 
+      {/* Quick-add snack for a customer group, no settlement involved */}
+      {snackQuickAddGroup && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-black/75 backdrop-blur-sm transition-opacity"
+            onClick={() => handleCloseQuickAddSnack()}
+          />
+          <div className="relative glass-card bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-lg overflow-hidden flex flex-col shadow-2xl z-10 p-6 space-y-4 animate-scale-in max-h-[90vh] custom-scroll overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-zinc-800/60 pb-3">
+              <div className="flex items-center gap-2">
+                <Coffee className="w-5 h-5 text-amber-400" />
+                <h3 className="text-lg font-bold text-white">Add Snack</h3>
+              </div>
+              <button onClick={() => handleCloseQuickAddSnack()} className="text-zinc-500 hover:text-white transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
 
+            <div className="p-3 rounded-xl bg-zinc-800/50 border border-zinc-700/50">
+              <p className="text-xs text-zinc-500 uppercase font-semibold mb-1">Adding to Tab For</p>
+              <p className="text-sm text-white font-medium">{snackQuickAddGroup.name}</p>
+              {snackQuickAddGroup.phone && <p className="text-xs text-zinc-400">{snackQuickAddGroup.phone}</p>}
+            </div>
+
+            <SnackProductPicker onAdd={handleQuickAddSnackItem} addLabel="Add to Tab" />
+
+            <p className="text-[11px] text-zinc-500">
+              Items land as UNPAID on this customer's tab, ready to be selected next time you settle their payment.
+            </p>
+
+            <div className="border-t border-zinc-800/60 pt-4">
+              <button
+                type="button"
+                onClick={() => handleCloseQuickAddSnack()}
+                className="w-full py-2.5 bg-zinc-800 border border-zinc-700 text-zinc-300 text-sm font-semibold rounded-xl hover:text-white hover:bg-zinc-700 transition-all"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
