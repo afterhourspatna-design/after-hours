@@ -4,6 +4,11 @@ import { prisma } from "@/lib/prisma";
 import { PaymentStatus, BookingStatus } from "@prisma/client";
 import { z } from "zod";
 
+const snackItemSchema = z.object({
+  amount: z.number().positive(),
+  notes: z.string().trim().max(300).optional().nullable(),
+});
+
 const batchPaySchema = z.object({
   bookingIds: z.array(z.string()).optional(),
   negotiatedAmount: z.number().nonnegative(),
@@ -11,7 +16,11 @@ const batchPaySchema = z.object({
   amountPayingNow: z.number().nonnegative().optional(),
   cashAmount: z.number().nonnegative().optional(),
   onlineAmount: z.number().nonnegative().optional(),
-  snacksAmount: z.number().nonnegative().optional(),
+  // New snack items being added at checkout (on top of any pre-existing
+  // unpaid snack orders referenced via bookingIds' SNACK_ entries). Replaces
+  // the old flat `snacksAmount` number so each item carries its own
+  // description instead of a single unlabeled lump sum.
+  snackItems: z.array(snackItemSchema).optional().default([]),
   userId: z.string().optional().nullable(),
   guestName: z.string().optional().nullable(),
   guestPhone: z.string().optional().nullable(),
@@ -56,20 +65,27 @@ export async function POST(req: NextRequest) {
       amountPayingNow,
       cashAmount = 0,
       onlineAmount = 0,
-      snacksAmount = 0,
+      snackItems = [],
       userId = null,
       guestName = null,
       guestPhone = null,
       couponCode = null,
     } = parsed.data;
 
+    const newSnackItemRows = snackItems.map((i) => ({
+      amount: i.amount,
+      notes: i.notes?.trim() || null,
+      addedById: (session.user as any).id,
+    }));
+    const newSnacksTotal = Number(snackItems.reduce((sum, i) => sum + i.amount, 0).toFixed(2));
+
     const actualBookingIds = allIds.filter(id => !id.startsWith("SNACK_"));
     const snackOrderIds = allIds.filter(id => id.startsWith("SNACK_")).map(id => id.replace("SNACK_", ""));
 
     // Check if standalone snacks sale (no bookings and no unpaid snacks selected)
     if (actualBookingIds.length === 0 && snackOrderIds.length === 0) {
-      if (snacksAmount <= 0) {
-        return NextResponse.json({ error: "Snacks amount must be greater than zero for snack sales" }, { status: 400 });
+      if (newSnacksTotal <= 0) {
+        return NextResponse.json({ error: "Add at least one snack item for a snack-only sale" }, { status: 400 });
       }
 
       // Auto-register guest if guestPhone is provided
@@ -90,11 +106,26 @@ export async function POST(req: NextRequest) {
         resolvedUserId = guestUser.id;
       }
 
-      const paidToday = amountPayingNow !== undefined ? amountPayingNow : snacksAmount;
-      if (paidToday > snacksAmount) {
-        return NextResponse.json({ error: "Cannot pay more than total snacks amount" }, { status: 400 });
+      // Join the customer's existing open tab (if any) instead of leaving two
+      // separate unpaid snack orders lying around for the same person.
+      const existingOrder = resolvedUserId
+        ? await prisma.snackOrder.findFirst({
+            where: { userId: resolvedUserId, paymentStatus: { in: [PaymentStatus.UNPAID, PaymentStatus.PARTIAL] } },
+            include: { allocations: true },
+          })
+        : null;
+
+      const previouslyPaidOnOrder = existingOrder
+        ? existingOrder.allocations.reduce((sum, a) => sum + Number(a.amount), 0)
+        : 0;
+      const orderTotal = Number(((existingOrder ? Number(existingOrder.amount) : 0) + newSnacksTotal).toFixed(2));
+      const outstandingNow = Number((orderTotal - previouslyPaidOnOrder).toFixed(2));
+
+      const paidToday = amountPayingNow !== undefined ? amountPayingNow : outstandingNow;
+      if (paidToday > outstandingNow + 0.01) {
+        return NextResponse.json({ error: "Cannot pay more than the outstanding snacks amount" }, { status: 400 });
       }
-      
+
       // Create Payment record
       const payment = await prisma.payment.create({
         data: {
@@ -108,27 +139,35 @@ export async function POST(req: NextRequest) {
       });
       const paymentId = payment.id;
 
-      // Create new SnackOrder
-      const newSnack = await prisma.snackOrder.create({
-        data: {
-          userId: resolvedUserId,
-          guestName: resolvedUserId ? null : guestName,
-          guestPhone: resolvedUserId ? null : guestPhone,
-          amount: snacksAmount,
-          paymentStatus: paidToday >= snacksAmount ? PaymentStatus.PAID : (paidToday > 0 ? PaymentStatus.PARTIAL : PaymentStatus.UNPAID),
-          items: {
-            create: {
-              amount: snacksAmount,
-              notes: "Initial Amount",
-              addedById: (session.user as any).id,
-            }
-          }
-        },
-      });
+      const totalPaidSoFar = Number((previouslyPaidOnOrder + paidToday).toFixed(2));
+      const newStatus: PaymentStatus =
+        totalPaidSoFar >= orderTotal - 0.01 ? PaymentStatus.PAID
+        : totalPaidSoFar > 0 ? PaymentStatus.PARTIAL
+        : PaymentStatus.UNPAID;
+
+      const snackOrder = existingOrder
+        ? await prisma.snackOrder.update({
+            where: { id: existingOrder.id },
+            data: {
+              amount: orderTotal,
+              paymentStatus: newStatus,
+              items: { createMany: { data: newSnackItemRows } },
+            },
+          })
+        : await prisma.snackOrder.create({
+            data: {
+              userId: resolvedUserId,
+              guestName: resolvedUserId ? null : guestName,
+              guestPhone: resolvedUserId ? null : guestPhone,
+              amount: newSnacksTotal,
+              paymentStatus: newStatus,
+              items: { createMany: { data: newSnackItemRows } },
+            },
+          });
 
       if (paidToday > 0) {
         await prisma.paymentAllocation.create({
-          data: { amount: paidToday, paymentId, snackOrderId: newSnack.id }
+          data: { amount: paidToday, paymentId, snackOrderId: snackOrder.id }
         });
       }
 
@@ -141,8 +180,10 @@ export async function POST(req: NextRequest) {
           entityType: "Payment",
           meta: {
             paymentId,
-            snackOrderId: newSnack.id,
-            snacksAmount,
+            snackOrderId: snackOrder.id,
+            joinedExistingOrder: !!existingOrder,
+            snackItems,
+            newSnacksTotal,
             paymentMethod,
             cashAmount,
             onlineAmount,
@@ -151,22 +192,6 @@ export async function POST(req: NextRequest) {
       });
 
       return NextResponse.json({ success: true, count: 1 });
-    }
-
-    const isOnlySnacks = negotiatedAmount === 0 && snacksAmount > 0;
-
-    // Validate MIXED payment type equation
-    const totalInvoice = Number((negotiatedAmount + snacksAmount).toFixed(2));
-    const paidToday = amountPayingNow !== undefined ? amountPayingNow : totalInvoice;
-
-    if (paymentMethod === "MIXED") {
-      const sum = Number((cashAmount + onlineAmount).toFixed(2));
-      if (Math.abs(sum - paidToday) > 0.01) {
-        return NextResponse.json(
-          { error: "Cash + Online amounts must equal the amount paying now" },
-          { status: 400 }
-        );
-      }
     }
 
     // Retrieve bookings and snack orders
@@ -184,12 +209,25 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Some items were not found" }, { status: 404 });
     }
 
+    // Total snack invoice for this payment = whatever's already on the selected
+    // pre-existing tab(s) + the new items being added right now at checkout.
     const preExistingSnacksTotal = snackOrders.reduce((sum, s) => sum + Number(s.amount), 0);
-    if (snacksAmount < preExistingSnacksTotal) {
-      return NextResponse.json(
-        { error: `Snacks amount cannot be less than pre-existing selected unpaid snacks (₹${preExistingSnacksTotal})` },
-        { status: 400 }
-      );
+    const snacksAmount = Number((preExistingSnacksTotal + newSnacksTotal).toFixed(2));
+
+    const isOnlySnacks = negotiatedAmount === 0 && snacksAmount > 0;
+
+    // Validate MIXED payment type equation
+    const totalInvoice = Number((negotiatedAmount + snacksAmount).toFixed(2));
+    const paidToday = amountPayingNow !== undefined ? amountPayingNow : totalInvoice;
+
+    if (paymentMethod === "MIXED") {
+      const sum = Number((cashAmount + onlineAmount).toFixed(2));
+      if (Math.abs(sum - paidToday) > 0.01) {
+        return NextResponse.json(
+          { error: "Cash + Online amounts must equal the amount paying now" },
+          { status: 400 }
+        );
+      }
     }
 
     // Verify bookings if we are paying for them
@@ -309,17 +347,36 @@ export async function POST(req: NextRequest) {
     });
     const paymentId = payment.id;
 
+    // If new snack items are being added at checkout AND the customer already
+    // has a pre-existing tab selected in this same payment, fold the new
+    // items into that tab instead of creating a second, disconnected order.
+    // We do this before the waterfall below so its allocation/status math
+    // (which reads `s.amount`) sees the updated total.
+    const joiningExistingSnackOrder = newSnacksTotal > 0 && snackOrders.length > 0;
+    if (joiningExistingSnackOrder) {
+      const target = snackOrders[0];
+      const updatedAmount = Number((Number(target.amount) + newSnacksTotal).toFixed(2));
+      await prisma.snackOrder.update({
+        where: { id: target.id },
+        data: {
+          amount: updatedAmount,
+          items: { createMany: { data: newSnackItemRows } },
+        },
+      });
+      target.amount = updatedAmount as any; // reflect in-memory for the waterfall below
+    }
+
     // We need to distribute paidToday using Waterfall: Snacks first, then Bookings
     const allocationsToCreate: any[] = [];
     let remainingPaidToday = paidToday;
 
-    // 1. Process Existing Snacks
+    // 1. Process Existing (and now possibly topped-up) Snacks
     if (snackOrderIds.length > 0) {
       const snackUpdatePromises = snackOrders.map(s => {
          const previouslyPaid = s.allocations.reduce((sum: number, a: any) => sum + Number(a.amount), 0);
          const amountNeeded = Number(s.amount) - previouslyPaid;
          const allocation = Math.min(amountNeeded > 0 ? amountNeeded : 0, remainingPaidToday);
-         
+
          allocationsToCreate.push({ amount: allocation, paymentId, snackOrderId: s.id });
          remainingPaidToday = Number((remainingPaidToday - allocation).toFixed(2));
 
@@ -336,12 +393,12 @@ export async function POST(req: NextRequest) {
       await prisma.$transaction(snackUpdatePromises);
     }
 
-    // 2. Process New Snacks
-    const newSnacksAmount = Math.max(0, snacksAmount - preExistingSnacksTotal);
-    if (newSnacksAmount > 0) {
-      const allocation = Math.min(newSnacksAmount, remainingPaidToday);
+    // 2. Process New Snacks that had no existing tab to join — create a fresh
+    // order carrying each item's own description (no more one fake lump line).
+    if (newSnacksTotal > 0 && !joiningExistingSnackOrder) {
+      const allocation = Math.min(newSnacksTotal, remainingPaidToday);
       let newStatus: PaymentStatus = PaymentStatus.UNPAID;
-      if (Math.abs(allocation - newSnacksAmount) < 0.01 || allocation >= newSnacksAmount) {
+      if (Math.abs(allocation - newSnacksTotal) < 0.01 || allocation >= newSnacksTotal) {
          newStatus = PaymentStatus.PAID;
       } else if (allocation > 0) {
          newStatus = PaymentStatus.PARTIAL;
@@ -349,16 +406,10 @@ export async function POST(req: NextRequest) {
 
       const newSnack = await prisma.snackOrder.create({
         data: {
-          amount: newSnacksAmount,
+          amount: newSnacksTotal,
           paymentStatus: newStatus,
           guestName: customerNamesStr || "Snack Sale",
-          items: {
-            create: {
-              amount: newSnacksAmount,
-              notes: "Added at checkout",
-              addedById: (session.user as any).id,
-            }
-          }
+          items: { createMany: { data: newSnackItemRows } },
         }
       });
 
@@ -442,6 +493,8 @@ export async function POST(req: NextRequest) {
           snackOrderIds,
           negotiatedAmount,
           snacksAmount,
+          newSnackItems: snackItems,
+          joinedExistingSnackOrder: joiningExistingSnackOrder,
           amountPayingNow,
           paymentMethod,
           cashAmount,
@@ -450,7 +503,7 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    return NextResponse.json({ success: true, count: bookings.length + snackOrders.length + (newSnacksAmount > 0 ? 1 : 0) });
+    return NextResponse.json({ success: true, count: bookings.length + snackOrders.length + (newSnacksTotal > 0 && !joiningExistingSnackOrder ? 1 : 0) });
   } catch (error: any) {
     console.error("Batch payment failed:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
