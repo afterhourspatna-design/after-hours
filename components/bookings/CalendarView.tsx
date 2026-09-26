@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState, useCallback, useRef, useLayoutEffect } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { createPortal } from "react-dom";
 import FullCalendar from "@fullcalendar/react";
 import timeGridPlugin from "@fullcalendar/timegrid";
@@ -54,7 +54,6 @@ export default function CalendarView({
   const [selectedBooking, setSelectedBooking] = useState<CalendarBooking | null>(null);
   const [activeEventEl, setActiveEventEl] = useState<HTMLElement | null>(null);
   const [popoverPos, setPopoverPos] = useState<{ top: number; left: number } | null>(null);
-  const popoverRef = useRef<HTMLDivElement>(null);
 
   const fetchBookings = useCallback(async (start: Date, end: Date) => {
     try {
@@ -126,32 +125,37 @@ export default function CalendarView({
     setPopoverPos(null);
   }
 
+  // Position the popover in viewport (not calendar-internal) coordinates,
+  // computed synchronously at click time from a fixed size estimate — not
+  // measured after mount — so there's exactly one render, at its final
+  // position, with no visible jump. (A measure-then-reposition version using
+  // getBoundingClientRect() on the popover itself technically also produces
+  // its final layout before paint via useLayoutEffect, but that guarantee
+  // doesn't hold up against React Strict Mode's double-render in dev, which
+  // did show a visible jump here — not worth chasing when a fixed estimate
+  // works fine for this popover's fairly predictable content size. The
+  // max-height + scroll below is the safety net for when the estimate is a
+  // bit short, e.g. a long notes field.
+  //
+  // Portaling to document.body with position:fixed (rather than the old
+  // approach of portaling into the clicked event element with a bumped
+  // z-index) is what actually fixes overlapping-event bookings hiding the
+  // popover: FullCalendar gives each overlapping event's own harness element
+  // an inline z-index for its own overlap-stacking, and that ancestor sits
+  // *outside* the clicked event. No z-index we set on the event itself (or a
+  // portaled descendant of it) can ever outrank a sibling booking's harness,
+  // since z-index only ever competes within a shared stacking context.
+  // Rendering at the document root sidesteps that nested stacking entirely.
   function handleEventClick(info: any) {
     const b = info.event.extendedProps.booking;
     setSelectedBooking(b);
-    setPopoverPos(null); // hide until repositioned for the newly-clicked event
-    if (info.el) {
-      setActiveEventEl(info.el);
-    }
-  }
 
-  // Position the popover in viewport (not calendar-internal) coordinates,
-  // computed after it mounts so we know its real size. This — combined with
-  // portaling to document.body with position:fixed below — is what actually
-  // fixes overlapping-event bookings hiding the popover: FullCalendar gives
-  // each overlapping event's own harness element an inline z-index for its
-  // own overlap-stacking, and that ancestor sits *outside* the clicked event
-  // element. No z-index we set on the event itself (or on a portaled
-  // descendant of it) can ever outrank a sibling booking's harness, since
-  // z-index is only ever compared within a shared stacking context.
-  // Rendering at the document root sidesteps that nested stacking entirely.
-  useLayoutEffect(() => {
-    if (!selectedBooking || !activeEventEl || !popoverRef.current) return;
+    if (!info.el) return;
+    setActiveEventEl(info.el);
 
-    const rect = activeEventEl.getBoundingClientRect();
-    const popRect = popoverRef.current.getBoundingClientRect();
-    const popoverWidth = popRect.width;
-    const popoverHeight = popRect.height;
+    const rect = info.el.getBoundingClientRect();
+    const popoverWidth = 290;
+    const popoverHeight = b.notes ? 330 : 280; // rough estimate; capped by max-height below
     const margin = 8;
     const viewportPadding = 8;
     const minLeftBoundary = 260; // clear of the left navigation sidebar
@@ -175,7 +179,7 @@ export default function CalendarView({
     top = Math.min(Math.max(top, viewportPadding), window.innerHeight - popoverHeight - viewportPadding);
 
     setPopoverPos({ top, left });
-  }, [selectedBooking, activeEventEl]);
+  }
 
   // The popover is positioned once, from a getBoundingClientRect() snapshot.
   // It can't track the anchor during scroll (FullCalendar's grid scrolls
@@ -308,9 +312,9 @@ export default function CalendarView({
       </div>
 
       {/* Booking Details Popover (portal to document.body, fixed-positioned —
-          see the useLayoutEffect above for why: any calendar-internal portal
+          see handleEventClick above for why: any calendar-internal portal
           target can end up behind a sibling event's own stacking context) */}
-      {selectedBooking && activeEventEl && (
+      {selectedBooking && activeEventEl && popoverPos && (
         createPortal(
             <>
               {/* Invisible Backdrop for click-outside dismissal */}
@@ -323,14 +327,8 @@ export default function CalendarView({
               />
 
               <div
-                ref={popoverRef}
-                style={{
-                  position: "fixed",
-                  top: popoverPos?.top ?? -9999,
-                  left: popoverPos?.left ?? -9999,
-                  visibility: popoverPos ? "visible" : "hidden",
-                }}
-                className="z-[9999] bg-zinc-950/95 border border-zinc-800 rounded-2xl p-3.5 w-[290px] shadow-2xl space-y-3 text-white backdrop-blur-md cursor-auto pointer-events-auto animate-in fade-in zoom-in-95 duration-150"
+                style={{ position: "fixed", top: popoverPos.top, left: popoverPos.left }}
+                className="z-[9999] bg-zinc-950/95 border border-zinc-800 rounded-2xl p-3.5 w-[290px] max-h-[70vh] overflow-y-auto shadow-2xl space-y-3 text-white backdrop-blur-md cursor-auto pointer-events-auto animate-in fade-in zoom-in-95 duration-150"
                 onClick={(e) => e.stopPropagation()}
               >
                 {/* Header */}
