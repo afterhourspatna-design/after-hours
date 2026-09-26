@@ -19,7 +19,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
     const body = await req.json();
-    const data: { name?: string; price?: number; isActive?: boolean } = {};
+    const data: { name?: string; price?: number; isActive?: boolean; categoryId?: string | null } = {};
 
     if (body.name !== undefined) {
       const name = String(body.name).trim();
@@ -41,7 +41,19 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       data.isActive = !!body.isActive;
     }
 
-    const updated = await prisma.snackProduct.update({ where: { id }, data });
+    if (body.categoryId !== undefined) {
+      if (body.categoryId) {
+        const category = await prisma.snackCategory.findUnique({ where: { id: body.categoryId } });
+        if (!category) return NextResponse.json({ error: "Selected category not found" }, { status: 400 });
+      }
+      data.categoryId = body.categoryId || null;
+    }
+
+    const updated = await prisma.snackProduct.update({
+      where: { id },
+      data,
+      include: { category: { select: { id: true, name: true } } },
+    });
 
     await prisma.auditLog.create({
       data: {

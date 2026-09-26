@@ -24,6 +24,7 @@ export async function GET(req: NextRequest) {
         ...(includeInactive ? {} : { isActive: true }),
         ...(search ? { name: { contains: search, mode: "insensitive" } } : {}),
       },
+      include: { category: { select: { id: true, name: true } } },
       orderBy: { name: "asc" },
     });
     return NextResponse.json(products);
@@ -49,16 +50,25 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const name = (body.name ?? "").trim();
     const price = Number(body.price);
+    const categoryId = body.categoryId || null;
 
     if (!name) return NextResponse.json({ error: "Name is required" }, { status: 400 });
     if (!price || price <= 0) return NextResponse.json({ error: "A valid price is required" }, { status: 400 });
+
+    if (categoryId) {
+      const category = await prisma.snackCategory.findUnique({ where: { id: categoryId } });
+      if (!category) return NextResponse.json({ error: "Selected category not found" }, { status: 400 });
+    }
 
     const existing = await prisma.snackProduct.findFirst({ where: { name: { equals: name, mode: "insensitive" } } });
     if (existing) {
       return NextResponse.json({ error: `"${existing.name}" is already on the menu` }, { status: 409 });
     }
 
-    const product = await prisma.snackProduct.create({ data: { name, price } });
+    const product = await prisma.snackProduct.create({
+      data: { name, price, categoryId },
+      include: { category: { select: { id: true, name: true } } },
+    });
 
     await prisma.auditLog.create({
       data: {
@@ -67,7 +77,7 @@ export async function POST(req: NextRequest) {
         action: "CREATE_SNACK_PRODUCT",
         entityType: "SnackProduct",
         entityId: product.id,
-        meta: { name: product.name, price },
+        meta: { name: product.name, price, categoryId },
       },
     });
 

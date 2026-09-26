@@ -281,17 +281,37 @@ model SnackOrderItem {
 // items snapshot their own unitPrice (see SnackOrderItem) so a later price
 // change here never rewrites what a past order was actually sold for.
 model SnackProduct {
+  id         String   @id @default(cuid())
+  name       String   @unique
+  price      Decimal  @db.Decimal(10, 2)
+  isActive   Boolean  @default(true)
+  categoryId String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  category  SnackCategory?   @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  items     SnackOrderItem[]
+
+  @@index([isActive])
+  @@index([categoryId])
+  @@map("snack_products")
+}
+
+// Purely organizational grouping for the snack menu (e.g. Packaged /
+// Non-Packaged) — admin-manageable like the products themselves, so adding
+// a new one doesn't need a deploy. Optional on a product: existing/quick-
+// added items stay "Uncategorized" until someone assigns one.
+model SnackCategory {
   id        String   @id @default(cuid())
   name      String   @unique
-  price     Decimal  @db.Decimal(10, 2)
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  items     SnackOrderItem[]
+  products  SnackProduct[]
 
   @@index([isActive])
-  @@map("snack_products")
+  @@map("snack_categories")
 }
 
 model DiscountRule {

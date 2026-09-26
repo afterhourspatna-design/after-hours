@@ -8,6 +8,7 @@ interface SnackProduct {
   id: string;
   name: string;
   price: string | number;
+  category?: { id: string; name: string } | null;
 }
 
 export interface SnackItemPayload {
@@ -136,10 +137,17 @@ export default function SnackProductPicker({ onAdd, disabled, addLabel = "Add" }
                   key={p.id}
                   type="button"
                   onClick={() => handleSelectProduct(p)}
-                  className="w-full px-4 py-2 text-left hover:bg-zinc-800 transition-colors flex items-center justify-between text-sm"
+                  className="w-full px-4 py-2 text-left hover:bg-zinc-800 transition-colors flex items-center justify-between text-sm gap-2"
                 >
-                  <span className="text-white">{p.name}</span>
-                  <span className="text-xs text-zinc-500">₹{Number(p.price)}</span>
+                  <span className="flex items-center gap-2 min-w-0">
+                    <span className="text-white truncate">{p.name}</span>
+                    {p.category && (
+                      <span className="shrink-0 text-[9px] font-bold uppercase tracking-wider text-violet-400 bg-violet-500/10 border border-violet-500/20 px-1.5 py-0.5 rounded">
+                        {p.category.name}
+                      </span>
+                    )}
+                  </span>
+                  <span className="text-xs text-zinc-500 shrink-0">₹{Number(p.price)}</span>
                 </button>
               ))}
             </div>
