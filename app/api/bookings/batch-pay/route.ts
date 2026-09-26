@@ -404,11 +404,20 @@ export async function POST(req: NextRequest) {
          newStatus = PaymentStatus.PARTIAL;
       }
 
+      // Tag the order with the primary customer (first selected booking or
+      // tab's owner) so it groups with their other items in the Unpaid tab,
+      // and so a future checkout for this same person can find and join it —
+      // not just a display string, or this new tab becomes an orphan.
+      const primaryUserId = bookings[0]?.userId ?? snackOrders[0]?.userId ?? null;
+      const primaryGuestPhone = primaryUserId ? null : (bookings[0]?.guestPhone ?? snackOrders[0]?.guestPhone ?? null);
+
       const newSnack = await prisma.snackOrder.create({
         data: {
           amount: newSnacksTotal,
           paymentStatus: newStatus,
-          guestName: customerNamesStr || "Snack Sale",
+          userId: primaryUserId,
+          guestName: primaryUserId ? null : (customerNamesStr || "Snack Sale"),
+          guestPhone: primaryGuestPhone,
           items: { createMany: { data: newSnackItemRows } },
         }
       });
