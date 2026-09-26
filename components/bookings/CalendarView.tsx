@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef, useLayoutEffect } from "react";
 import { createPortal } from "react-dom";
 import FullCalendar from "@fullcalendar/react";
 import timeGridPlugin from "@fullcalendar/timegrid";
@@ -53,6 +53,8 @@ export default function CalendarView({
   const [loading, setLoading] = useState(true);
   const [selectedBooking, setSelectedBooking] = useState<CalendarBooking | null>(null);
   const [activeEventEl, setActiveEventEl] = useState<HTMLElement | null>(null);
+  const [popoverPos, setPopoverPos] = useState<{ top: number; left: number } | null>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
 
   const fetchBookings = useCallback(async (start: Date, end: Date) => {
     try {
@@ -119,29 +121,76 @@ export default function CalendarView({
   });
 
   function closePopover() {
-    if (activeEventEl) {
-      activeEventEl.style.overflow = "";
-      activeEventEl.style.zIndex = "";
-    }
     setSelectedBooking(null);
     setActiveEventEl(null);
+    setPopoverPos(null);
   }
 
   function handleEventClick(info: any) {
-    if (activeEventEl) {
-      activeEventEl.style.overflow = "";
-      activeEventEl.style.zIndex = "";
-    }
-
     const b = info.event.extendedProps.booking;
     setSelectedBooking(b);
-
+    setPopoverPos(null); // hide until repositioned for the newly-clicked event
     if (info.el) {
-      info.el.style.overflow = "visible";
-      info.el.style.zIndex = "9999";
       setActiveEventEl(info.el);
     }
   }
+
+  // Position the popover in viewport (not calendar-internal) coordinates,
+  // computed after it mounts so we know its real size. This — combined with
+  // portaling to document.body with position:fixed below — is what actually
+  // fixes overlapping-event bookings hiding the popover: FullCalendar gives
+  // each overlapping event's own harness element an inline z-index for its
+  // own overlap-stacking, and that ancestor sits *outside* the clicked event
+  // element. No z-index we set on the event itself (or on a portaled
+  // descendant of it) can ever outrank a sibling booking's harness, since
+  // z-index is only ever compared within a shared stacking context.
+  // Rendering at the document root sidesteps that nested stacking entirely.
+  useLayoutEffect(() => {
+    if (!selectedBooking || !activeEventEl || !popoverRef.current) return;
+
+    const rect = activeEventEl.getBoundingClientRect();
+    const popRect = popoverRef.current.getBoundingClientRect();
+    const popoverWidth = popRect.width;
+    const popoverHeight = popRect.height;
+    const margin = 8;
+    const viewportPadding = 8;
+    const minLeftBoundary = 260; // clear of the left navigation sidebar
+
+    let left: number;
+    if (rect.right + popoverWidth + 16 <= window.innerWidth) {
+      left = rect.right + margin;
+    } else if (rect.left - popoverWidth - margin >= minLeftBoundary) {
+      left = rect.left - popoverWidth - margin;
+    } else {
+      left = rect.right - popoverWidth;
+    }
+    left = Math.min(Math.max(left, viewportPadding), window.innerWidth - popoverWidth - viewportPadding);
+
+    let top: number;
+    if (rect.bottom + popoverHeight > window.innerHeight && rect.top - popoverHeight >= 0) {
+      top = rect.bottom - popoverHeight;
+    } else {
+      top = rect.top;
+    }
+    top = Math.min(Math.max(top, viewportPadding), window.innerHeight - popoverHeight - viewportPadding);
+
+    setPopoverPos({ top, left });
+  }, [selectedBooking, activeEventEl]);
+
+  // The popover is positioned once, from a getBoundingClientRect() snapshot.
+  // It can't track the anchor during scroll (FullCalendar's grid scrolls
+  // internally), so close it instead of leaving it visually detached.
+  useEffect(() => {
+    if (!selectedBooking) return;
+    const handleScrollOrResize = () => closePopover();
+    window.addEventListener("scroll", handleScrollOrResize, true);
+    window.addEventListener("resize", handleScrollOrResize);
+    return () => {
+      window.removeEventListener("scroll", handleScrollOrResize, true);
+      window.removeEventListener("resize", handleScrollOrResize);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedBooking]);
 
   function handleDateSelect({ startStr }: any) {
     const dt = encodeURIComponent(startStr);
@@ -258,50 +307,30 @@ export default function CalendarView({
         />
       </div>
 
-      {/* Booking Details Popover (Portal into clicked event element) */}
+      {/* Booking Details Popover (portal to document.body, fixed-positioned —
+          see the useLayoutEffect above for why: any calendar-internal portal
+          target can end up behind a sibling event's own stacking context) */}
       {selectedBooking && activeEventEl && (
-        (() => {
-          const rect = activeEventEl.getBoundingClientRect();
-          const popoverWidth = 290;
-          const minLeftBoundary = 260; // Distance to clear left navigation sidebar
-
-          let positionClass = "";
-
-          // Horizontal positioning check
-          if (rect.right + popoverWidth + 16 <= window.innerWidth) {
-            // Room on right: place popover to the right of card
-            positionClass += " left-full ml-2";
-          } else if (rect.left - popoverWidth >= minLeftBoundary) {
-            // Room on left without hitting left sidebar: place popover to the left of card
-            positionClass += " right-full mr-2";
-          } else {
-            // Tight bounds: overlay safely aligned inside calendar grid
-            positionClass += " right-0";
-          }
-
-          // Vertical positioning check
-          if (rect.bottom + 280 > window.innerHeight && rect.top > 280) {
-            positionClass += " bottom-0";
-          } else {
-            positionClass += " top-0";
-          }
-
-          return createPortal(
+        createPortal(
             <>
               {/* Invisible Backdrop for click-outside dismissal */}
-              <div 
+              <div
                 className="fixed inset-0 z-[9998] bg-transparent cursor-default pointer-events-auto"
                 onClick={(e) => {
                   e.stopPropagation();
                   closePopover();
                 }}
               />
-              
-              <div 
-                className={cn(
-                  "absolute z-[9999] bg-zinc-950/95 border border-zinc-800 rounded-2xl p-3.5 w-[290px] shadow-2xl space-y-3 text-white backdrop-blur-md cursor-auto pointer-events-auto animate-in fade-in zoom-in-95 duration-150",
-                  positionClass
-                )}
+
+              <div
+                ref={popoverRef}
+                style={{
+                  position: "fixed",
+                  top: popoverPos?.top ?? -9999,
+                  left: popoverPos?.left ?? -9999,
+                  visibility: popoverPos ? "visible" : "hidden",
+                }}
+                className="z-[9999] bg-zinc-950/95 border border-zinc-800 rounded-2xl p-3.5 w-[290px] shadow-2xl space-y-3 text-white backdrop-blur-md cursor-auto pointer-events-auto animate-in fade-in zoom-in-95 duration-150"
                 onClick={(e) => e.stopPropagation()}
               >
                 {/* Header */}
@@ -394,9 +423,8 @@ export default function CalendarView({
                 </div>
               </div>
             </>,
-            activeEventEl
-          );
-        })()
+            document.body
+          )
       )}
     </div>
   );
