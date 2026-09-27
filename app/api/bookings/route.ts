@@ -55,13 +55,16 @@ export async function GET(req: NextRequest) {
   const dateTo = searchParams.get("to");
   const includeAdvance = searchParams.get("includeAdvance") !== "0";
   const forCalendar = searchParams.get("calendar") === "1";
+  // Payments' Unpaid tab needs staff to settle yesterday's unpaid tabs too,
+  // so it opts out of staff's usual today-only-onward visibility gate below.
+  const includePastForStaff = searchParams.get("includePastForStaff") === "1";
 
   const where: any = {
     durationMinutes: { gt: 0 } // Hide legacy dummy snack bookings
   };
 
   // Role-based visibility
-  if (role === "STAFF") {
+  if (role === "STAFF" && !includePastForStaff) {
     // Staff: today + future only in IST timezone
     const now = new Date();
     const formatter = new Intl.DateTimeFormat("en-US", {
