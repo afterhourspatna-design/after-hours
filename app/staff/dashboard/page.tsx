@@ -2,12 +2,12 @@ import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { BookingStatus } from "@prisma/client";
-import { formatCurrency, formatTimeRange, formatDate, cn } from "@/lib/utils";
-import { BookingStatusBadge, PaymentStatusBadge } from "@/components/ui/StatusBadge";
+import { formatTimeRange } from "@/lib/utils";
 import HoldAlert from "@/components/bookings/HoldAlert";
-import StatCard from "@/components/ui/StatCard";
+import StatTile from "@/components/ui/StatTile";
+import StatTable from "@/components/ui/StatTable";
 import LiveActivityList from "@/components/dashboard/LiveActivityList";
-import { BookOpen, Clock, Zap, Plus, Calendar, Search, Users, ChevronLeft, ChevronRight } from "lucide-react";
+import { BookOpen, Clock, Zap, Plus, Search, Users, Phone } from "lucide-react";
 
 function getISTStartAndEnd(date: Date) {
   const formatter = new Intl.DateTimeFormat("en-US", {
@@ -26,74 +26,27 @@ function getISTStartAndEnd(date: Date) {
   return { start, end };
 }
 
-export default async function StaffDashboard({
-  searchParams,
-}: {
-  searchParams: Promise<{ period?: string; from?: string; to?: string }>;
-}) {
+export default async function StaffDashboard() {
   const session = await auth();
   if (!session?.user) redirect("/login");
 
-  const { period = "today", from, to } = await searchParams;
   const now = new Date();
 
-  let selectedDate = new Date();
-  if (period === "custom" && from) {
-    const [y, m, d] = from.split("-").map(Number);
-    selectedDate = new Date(Date.UTC(y, m - 1, d, 12, 0, 0, 0));
-  }
-
-  const formatISTDate = (d: Date) => {
-    const formatter = new Intl.DateTimeFormat("en-US", {
-      timeZone: "Asia/Kolkata",
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-    });
-    const parts = formatter.formatToParts(d);
-    const year = parts.find(p => p.type === "year")!.value;
-    const month = parts.find(p => p.type === "month")!.value;
-    const day = parts.find(p => p.type === "day")!.value;
-    return `${year}-${month}-${day}`;
-  };
-
-  const todayISTStr = formatISTDate(now);
-  const selectedISTStr = formatISTDate(selectedDate);
-  const isToday = selectedISTStr === todayISTStr;
-
-  const prevDay = new Date(selectedDate.getTime() - 24 * 60 * 60 * 1000);
-  const nextDay = new Date(selectedDate.getTime() + 24 * 60 * 60 * 1000);
-
-  const prevDayStr = formatISTDate(prevDay);
-  const nextDayStr = formatISTDate(nextDay);
-
-  const backUrl = `/staff/dashboard?period=custom&from=${prevDayStr}&to=${prevDayStr}`;
-  const forwardUrl = `/staff/dashboard?period=custom&from=${nextDayStr}&to=${nextDayStr}`;
-
-  const currentDateLabel = isToday 
-    ? "Today" 
-    : selectedDate.toLocaleDateString("en-IN", { day: 'numeric', month: 'short', year: 'numeric' });
-
-  const bounds = getISTStartAndEnd(selectedDate);
+  const bounds = getISTStartAndEnd(now);
   const todayStart = bounds.start;
   const todayEnd = bounds.end;
   const nextWeek = new Date(todayEnd.getTime() + (7 * 24 * 60 * 60 * 1000));
 
-  const [todayBookings, upcomingBookings, activeNow, holds] = await Promise.all([
+  const [todayBookings, upcomingBookings, holds, totalActiveUnits] = await Promise.all([
     prisma.booking.findMany({
       where: { startDateTime: { gte: todayStart, lte: todayEnd }, bookingStatus: { not: BookingStatus.CANCELLED } },
-      include: { game: { select: { name: true } }, resourceUnit: { select: { unitName: true } }, user: { select: { name: true, phone: true } } },
+      include: { game: { select: { name: true, tag: true, totalUnits: true } }, resourceUnit: { select: { unitName: true } }, user: { select: { name: true, phone: true } } },
       orderBy: { startDateTime: "asc" },
     }),
     prisma.booking.findMany({
       take: 10,
       where: { startDateTime: { gt: todayEnd, lte: nextWeek }, bookingStatus: { not: BookingStatus.CANCELLED } },
-      include: { game: { select: { name: true } }, resourceUnit: { select: { unitName: true } }, user: { select: { name: true, phone: true } } },
-      orderBy: { startDateTime: "asc" },
-    }),
-    prisma.booking.findMany({
-      where: { bookingStatus: { in: [BookingStatus.CONFIRMED, BookingStatus.HOLD] }, startDateTime: { gte: todayStart, lte: todayEnd } },
-      include: { game: { select: { name: true, tag: true } }, resourceUnit: { select: { unitName: true } }, user: { select: { name: true } } },
+      include: { game: { select: { name: true, totalUnits: true } }, resourceUnit: { select: { unitName: true } }, user: { select: { name: true, phone: true } } },
       orderBy: { startDateTime: "asc" },
     }),
     prisma.booking.findMany({
@@ -101,21 +54,27 @@ export default async function StaffDashboard({
       include: { game: { select: { name: true, tag: true } }, resourceUnit: { select: { unitName: true } }, user: { select: { name: true, phone: true } } },
       orderBy: { holdExpiresAt: "asc" },
     }),
+    prisma.resourceUnit.count({ where: { isActive: true } }),
   ]);
 
-  const currentlyPlayingCount = activeNow.filter(b => {
+  const currentlyPlayingCount = todayBookings.filter(b => {
     const start = new Date(b.startDateTime).getTime();
     const end = new Date(b.endDateTime).getTime();
     const nowTime = now.getTime();
     return b.bookingStatus === BookingStatus.CONFIRMED && start <= nowTime && end >= nowTime;
   }).length;
 
-  const plainActiveNow = activeNow.map(b => ({
+  const plainTodayBookings = todayBookings.map(b => ({
     id: b.id,
     guestName: b.guestName,
+    guestPhone: b.guestPhone,
     startDateTime: b.startDateTime.toISOString(),
     endDateTime: b.endDateTime.toISOString(),
     bookingStatus: b.bookingStatus,
+    paymentStatus: b.paymentStatus,
+    finalAmount: Number(b.finalAmount),
+    negotiatedAmount: b.negotiatedAmount !== null ? Number(b.negotiatedAmount) : null,
+    usedCreditAmount: b.usedCreditAmount !== null ? Number(b.usedCreditAmount) : null,
     game: b.game,
     resourceUnit: b.resourceUnit,
     user: b.user,
@@ -131,6 +90,12 @@ export default async function StaffDashboard({
     resourceUnit: h.resourceUnit,
     user: h.user,
   }));
+
+  const staffStats = [
+    { label: "Total Bookings", value: todayBookings.length, icon: BookOpen, iconColor: "text-zinc-400" },
+    { label: "Active Sessions", value: `${currentlyPlayingCount} / ${totalActiveUnits}`, icon: Zap, iconColor: "text-emerald-400" },
+    { label: "On Hold", value: plainHolds.length, icon: Clock, iconColor: "text-amber-400" },
+  ];
 
 
   return (
@@ -156,30 +121,6 @@ export default async function StaffDashboard({
           <p className="text-sm text-zinc-500 font-medium">Welcome, {session.user.name}</p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
-          {/* Day Shifter Navigation */}
-          <div className="flex items-center gap-1 bg-zinc-900/80 p-1 rounded-xl border border-zinc-800 shadow-md">
-            <a
-              href={backUrl}
-              className="p-1.5 text-zinc-400 hover:text-white hover:bg-zinc-800 rounded-lg transition-all"
-              title="Previous Day"
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </a>
-            <span className="text-xs font-bold text-zinc-200 px-2.5 min-w-[75px] text-center select-none">
-              {currentDateLabel}
-            </span>
-            <a
-              href={forwardUrl}
-              className={cn(
-                "p-1.5 text-zinc-400 hover:text-white hover:bg-zinc-800 rounded-lg transition-all",
-                isToday && "opacity-40 pointer-events-none"
-              )}
-              title="Next Day"
-            >
-              <ChevronRight className="w-4 h-4" />
-            </a>
-          </div>
-
           <a href="/staff/bookings/new"
             className="flex items-center gap-2 px-5 py-2.5 bg-violet-600 hover:bg-violet-500 text-white text-xs font-bold rounded-xl transition-all shadow-lg shadow-violet-900/20 active:scale-95">
             <Plus className="w-4 h-4" /> New booking
@@ -187,81 +128,75 @@ export default async function StaffDashboard({
         </div>
       </div>
 
-      {/* Stat Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <StatCard title="Today's Bookings" value={todayBookings.length} icon={BookOpen} iconColor="text-violet-400" subtitle="Scheduled for today" trend={{ value: 10, label: "up" }} />
-        <StatCard title="Active Sessions" value={currentlyPlayingCount} icon={Zap} iconColor="text-emerald-400" subtitle="Playing right now" trend={{ value: 5, label: "up" }} />
-        <StatCard title="Pending Holds" value={plainHolds.length} icon={Clock} iconColor="text-amber-400" subtitle="Expiring soon" trend={{ value: 0, label: "neutral" }} />
+      {/* Stat Cards — compact table on mobile/tablet, cards from desktop up */}
+      <div className="lg:hidden">
+        <StatTable items={staffStats} />
+      </div>
+      <div className="hidden lg:grid grid-cols-3 gap-3">
+        {staffStats.map((s) => <StatTile key={s.label} {...s} />)}
       </div>
 
       {/* Hold alerts */}
       {plainHolds.length > 0 && <HoldAlert holds={plainHolds as any} />}
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-        {/* Today's Schedule */}
-        <div className="lg:col-span-8">
-          <div className="glass-card overflow-hidden border-zinc-900/50">
-            <div className="px-6 py-5 border-b border-zinc-900 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Calendar className="w-4 h-4 text-violet-400" />
-                <h2 className="text-sm font-bold text-white tracking-tight">Today's Schedule</h2>
-              </div>
-              <a href="/staff/calendar" className="text-[10px] font-black uppercase tracking-widest text-violet-400 hover:text-violet-300">View Calendar</a>
-            </div>
-            {todayBookings.length === 0 ? (
-              <p className="text-sm text-zinc-600 text-center py-16 italic font-medium">No bookings scheduled for today</p>
-            ) : (
-              <div className="divide-y divide-zinc-900">
-                {todayBookings.map(b => (
-                  <div key={b.id} className="flex items-center gap-4 px-6 py-4 hover:bg-zinc-900/40 transition-colors">
-                    <div className="text-center flex-shrink-0 w-20">
-                      <p className="text-xs font-bold text-violet-400">{formatTimeRange(b.startDateTime, b.endDateTime).split("–")[0]}</p>
-                      <p className="text-[10px] font-bold text-zinc-600">to {formatTimeRange(b.startDateTime, b.endDateTime).split("–")[1]}</p>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-bold text-white">{b.user?.name ?? (b as any).guestName ?? "Guest"}</p>
-                      <p className="text-[11px] text-zinc-500 font-medium">{b.game.name}{b.resourceUnit ? ` · ${b.resourceUnit.unitName}` : ""}</p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <BookingStatusBadge status={b.bookingStatus as any} />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Live Activity & Upcoming */}
-        <div className="lg:col-span-4 space-y-6">
-          {/* Live Activity Section */}
+      {/* Today's Schedule + Upcoming — side by side from 1400px (2/3 : 1/3), stacked below */}
+      <div className="grid grid-cols-1 min-[1400px]:grid-cols-3 gap-8 items-stretch">
+        <div className="min-[1400px]:col-span-2">
           <LiveActivityList
-            initialBookings={plainActiveNow as any}
+            initialBookings={plainTodayBookings as any}
             todayStartISO={todayStart.toISOString()}
             todayEndISO={todayEnd.toISOString()}
             role="STAFF"
+            title="Today's Schedule"
+            emptyText="No bookings scheduled for today"
           />
+        </div>
 
-          {/* Upcoming */}
-          <div className="glass-card overflow-hidden border-zinc-900/50 bg-zinc-950/30">
-            <div className="px-5 py-4 border-b border-zinc-900">
-              <h2 className="text-sm font-bold text-white tracking-tight">Upcoming</h2>
-              <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest mt-0.5">Next 7 days</p>
-            </div>
-            <div className="p-2 space-y-1">
-              {upcomingBookings.length > 0 ? upcomingBookings.map(b => (
-                <div key={b.id} className="p-3 rounded-xl hover:bg-zinc-900/50 transition-colors group">
-                  <div className="flex items-center justify-between mb-1">
-                    <p className="text-[11px] font-bold text-zinc-500">{formatDate(b.startDateTime)}</p>
-                    <BookingStatusBadge status={b.bookingStatus as any} />
+        <div className="glass-card overflow-hidden border-zinc-900/50 bg-zinc-950/30 flex flex-col">
+          <div className="px-5 py-4 border-b border-zinc-900 flex-shrink-0">
+            <h2 className="text-sm font-bold text-white tracking-tight">Upcoming</h2>
+            <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest mt-0.5">Next 7 days</p>
+          </div>
+          <div className="p-2 space-y-2 flex-1 overflow-y-auto max-h-[600px]">
+            {upcomingBookings.length > 0 ? upcomingBookings.map(b => {
+              const phone = b.user?.phone ?? (b as any).guestPhone ?? null;
+              const name = b.user?.name ?? (b as any).guestName ?? "Guest";
+              const initials = name.substring(0, 2).toUpperCase();
+              const dateLabel = new Date(b.startDateTime).toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata", weekday: "short", day: "numeric", month: "short" });
+              return (
+                <div key={b.id} className="flex items-center justify-between gap-3 p-3 rounded-xl hover:bg-zinc-900/50 transition-colors group">
+                  <div className="flex items-center gap-3.5 min-w-0 flex-1">
+                    <div className="w-11 h-11 rounded-full flex items-center justify-center text-xs font-bold border bg-violet-500/10 border-violet-500/20 text-violet-400 flex-shrink-0">
+                      {initials}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="text-sm font-bold text-white group-hover:text-violet-400 transition-colors truncate">{name}</p>
+                        {phone && (
+                          <a
+                            href={`tel:${phone}`}
+                            className="flex items-center gap-1 text-xs text-zinc-500 hover:text-violet-400 font-mono transition-colors"
+                            title="Call"
+                          >
+                            <Phone className="w-3 h-3" />
+                            {phone}
+                          </a>
+                        )}
+                      </div>
+                      <p className="text-sm text-zinc-400 font-semibold truncate">
+                        {(b.game.totalUnits ?? 1) > 1 && b.resourceUnit ? b.resourceUnit.unitName : b.game.name}
+                      </p>
+                    </div>
                   </div>
-                  <p className="text-sm font-bold text-white group-hover:text-violet-400 transition-colors">{b.user?.name ?? (b as any).guestName ?? "Guest"}</p>
-                  <p className="text-[10px] text-zinc-600 font-medium">{b.game.name}</p>
+                  <div className="text-right flex-shrink-0">
+                    <p className="text-xs font-bold text-zinc-300 whitespace-nowrap">{dateLabel}</p>
+                    <p className="text-xs text-zinc-500 font-mono whitespace-nowrap">{formatTimeRange(b.startDateTime, b.endDateTime)}</p>
+                  </div>
                 </div>
-              )) : (
-                <p className="text-center py-8 text-zinc-600 text-xs italic">No upcoming bookings</p>
-              )}
-            </div>
+              );
+            }) : (
+              <p className="text-center py-8 text-zinc-600 text-sm italic">No upcoming bookings</p>
+            )}
           </div>
         </div>
       </div>
