@@ -1,13 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Zap, Loader2, Check } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { Zap, Loader2, Check, Phone } from "lucide-react";
+import { cn, formatTimeRange } from "@/lib/utils";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
 
 interface Game {
   name: string;
   tag: string;
+  totalUnits?: number;
 }
 
 interface ResourceUnit {
@@ -16,18 +17,19 @@ interface ResourceUnit {
 
 interface User {
   name: string;
+  phone?: string | null;
 }
 
 interface Booking {
   id: string;
   guestName: string | null;
+  guestPhone?: string | null;
   startDateTime: string;
   endDateTime: string;
   bookingStatus: string;
   game: Game | null;
   resourceUnit: ResourceUnit | null;
   user: User | null;
-  usedCreditAmount?: string | number | null;
 }
 
 interface LiveActivityListProps {
@@ -35,6 +37,8 @@ interface LiveActivityListProps {
   todayStartISO: string;
   todayEndISO: string;
   role?: "ADMIN" | "STAFF";
+  title?: string;
+  emptyText?: string;
 }
 
 export default function LiveActivityList({
@@ -42,6 +46,8 @@ export default function LiveActivityList({
   todayStartISO,
   todayEndISO,
   role = "ADMIN",
+  title = "Live activity",
+  emptyText = "No active sessions",
 }: LiveActivityListProps) {
   const [bookings, setBookings] = useState<Booking[]>(initialBookings);
   const [currentTime, setCurrentTime] = useState<Date>(new Date());
@@ -108,7 +114,7 @@ export default function LiveActivityList({
   }, [todayStartISO, todayEndISO]);
 
   const activeItems = bookings
-    .filter((b) => b.bookingStatus === "CONFIRMED" || b.bookingStatus === "HOLD")
+    .filter((b) => b.bookingStatus !== "CANCELLED" && b.bookingStatus !== "COMPLETED" && b.bookingStatus !== "EXPIRED")
     .map((b) => {
       const start = new Date(b.startDateTime).getTime();
       const end = new Date(b.endDateTime).getTime();
@@ -118,7 +124,7 @@ export default function LiveActivityList({
       const startDiffMins = Math.round((start - nowTime) / 60000);
 
       let type: "overtime" | "ending-soon" | "active" | "upcoming" = "active";
-      if (b.bookingStatus === "HOLD") {
+      if (b.bookingStatus === "HOLD" || b.bookingStatus === "PENDING") {
         type = "upcoming";
       } else if (startDiffMins > 0) {
         type = "upcoming";
@@ -130,20 +136,7 @@ export default function LiveActivityList({
 
       return { b, diffMins, startDiffMins, type };
     })
-    .sort((a, b) => {
-      const typeOrder = { overtime: 0, "ending-soon": 1, active: 2, upcoming: 3 };
-      if (typeOrder[a.type] !== typeOrder[b.type]) {
-        return typeOrder[a.type] - typeOrder[b.type];
-      }
-
-      if (a.type === "overtime") {
-        // Longer overtime (more negative minutes) first
-        return a.diffMins - b.diffMins;
-      }
-
-      // Otherwise, soonest time first
-      return a.diffMins - b.diffMins;
-    });
+    .sort((a, b) => new Date(a.b.startDateTime).getTime() - new Date(b.b.startDateTime).getTime());
 
   const currentlyPlayingCount = activeItems.filter(
     (item) => item.type === "active" || item.type === "ending-soon" || item.type === "overtime"
@@ -179,30 +172,31 @@ export default function LiveActivityList({
     <div className="glass-card border-zinc-900/50 bg-zinc-950/30">
       <div className="px-5 py-4 border-b border-zinc-900 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Zap className={cn("w-4 h-4", currentlyPlayingCount > 0 ? "text-violet-400 animate-pulse" : "text-zinc-500")} />
-          <h3 className="text-sm font-bold text-white">Live activity</h3>
+          <Zap className={cn("w-5 h-5", currentlyPlayingCount > 0 ? "text-violet-400 animate-pulse" : "text-zinc-500")} />
+          <h3 className="text-base font-bold text-white">{title}</h3>
         </div>
         <div className="flex items-center gap-2">
           {overtimeItems.length > 0 && (
             <button
               onClick={handleClearAllOvertime}
               disabled={loading}
-              className="text-[10px] font-bold text-red-400 hover:text-white px-2 py-1 rounded-lg bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 transition-all flex items-center gap-1 active:scale-95 disabled:opacity-50"
+              className="text-xs font-bold text-red-400 hover:text-white px-2.5 py-1 rounded-lg bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 transition-all flex items-center gap-1 active:scale-95 disabled:opacity-50"
             >
               Clear Overtime ({overtimeItems.length})
             </button>
           )}
-          {loading && <Loader2 className="w-3.5 h-3.5 text-zinc-500 animate-spin" />}
-          <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">
+          {loading && <Loader2 className="w-4 h-4 text-zinc-500 animate-spin" />}
+          <span className="text-xs font-bold text-zinc-500 uppercase tracking-widest">
             {currentlyPlayingCount} active
           </span>
         </div>
       </div>
-      <div className="p-2 space-y-1 max-h-[480px] overflow-y-auto overflow-x-hidden scrollbar-thin scrollbar-thumb-zinc-800">
+      <div className="p-2 space-y-2 max-h-[600px] overflow-y-auto overflow-x-hidden scrollbar-thin scrollbar-thumb-zinc-800">
         {activeItems.length > 0 ? (
           activeItems.map(({ b, diffMins, startDiffMins, type }) => {
             const name = b.user?.name ?? b.guestName ?? "Guest";
             const initials = name.substring(0, 2).toUpperCase();
+            const phone = b.user?.phone ?? b.guestPhone ?? null;
 
             let badgeText = "";
             let badgeStyle = "";
@@ -211,6 +205,9 @@ export default function LiveActivityList({
             if (type === "upcoming") {
               if (b.bookingStatus === "HOLD") {
                 badgeText = "HOLD";
+                badgeStyle = "bg-amber-500/10 border-amber-500/20 text-amber-400";
+              } else if (b.bookingStatus === "PENDING") {
+                badgeText = "PENDING";
                 badgeStyle = "bg-amber-500/10 border-amber-500/20 text-amber-400";
               } else {
                 badgeText = `In ${startDiffMins}m`;
@@ -225,7 +222,8 @@ export default function LiveActivityList({
               badgeStyle = "bg-orange-500/20 border-orange-500/40 text-orange-400 animate-pulse";
               cardStyle = "border-l-2 border-l-orange-500 bg-orange-500/5";
             } else if (type === "overtime") {
-              badgeText = `OVERTIME +${Math.abs(diffMins)}m`;
+              const overtimeMins = Math.abs(diffMins);
+              badgeText = overtimeMins === 0 ? "OVERTIME" : `OVERTIME +${overtimeMins}m`;
               badgeStyle = "bg-red-500/20 border-red-500/40 text-red-400 animate-pulse border";
               cardStyle = "border-l-2 border-l-red-500 bg-red-500/5 shadow-lg shadow-red-950/10";
             }
@@ -234,14 +232,14 @@ export default function LiveActivityList({
               <div
                 key={b.id}
                 className={cn(
-                  "flex items-center justify-between p-3 rounded-xl hover:bg-zinc-900/50 hover:bg-zinc-900/80 transition-colors group border border-transparent",
+                  "flex items-center justify-between p-4 rounded-xl hover:bg-zinc-900/50 hover:bg-zinc-900/80 transition-colors group border border-transparent",
                   cardStyle
                 )}
               >
-                <div className="flex items-center gap-3 min-w-0 flex-1">
+                <div className="flex items-center gap-3.5 min-w-0 flex-1">
                   <div
                     className={cn(
-                      "w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-bold border flex-shrink-0",
+                      "w-11 h-11 rounded-full flex items-center justify-center text-xs font-bold border flex-shrink-0",
                       type === "overtime"
                         ? "bg-red-500/10 border-red-500/20 text-red-400 animate-pulse"
                         : type === "ending-soon"
@@ -251,21 +249,30 @@ export default function LiveActivityList({
                   >
                     {initials}
                   </div>
-                  <div className="min-w-0 flex-1 pr-2">
-                    <p className="text-[13px] font-bold text-zinc-200 truncate">{name}</p>
-                    <div className="flex items-center gap-1.5 overflow-hidden">
-                      <p className="text-[10px] text-zinc-500 font-medium truncate">
-                        {b.game?.name} {b.resourceUnit ? `• ${b.resourceUnit.unitName}` : ""}
-                      </p>
-                      {b.usedCreditAmount && Number(b.usedCreditAmount) > 0 && (
-                        <span className="px-1.5 py-0.5 rounded flex-shrink-0 bg-violet-500/20 text-violet-400 border border-violet-500/30 text-[8px] uppercase tracking-wider font-bold" title={`Paid ₹${Number(b.usedCreditAmount)} via credits`}>
-                          Paid via Credits
-                        </span>
+                  <div className="min-w-0 flex-1 pr-2 space-y-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="text-base font-bold text-zinc-100 truncate">{name}</p>
+                      {phone && (
+                        <a
+                          href={`tel:${phone}`}
+                          onClick={(e) => e.stopPropagation()}
+                          className="flex items-center gap-1 text-xs text-zinc-500 hover:text-violet-400 font-mono transition-colors"
+                          title="Call"
+                        >
+                          <Phone className="w-3 h-3" />
+                          {phone}
+                        </a>
                       )}
                     </div>
+                    <p className="text-sm text-zinc-400 font-semibold truncate">
+                      {(b.game?.totalUnits ?? 1) > 1 && b.resourceUnit ? b.resourceUnit.unitName : b.game?.name}
+                    </p>
+                    <p className="text-xs text-zinc-500 font-mono">
+                      {formatTimeRange(b.startDateTime, b.endDateTime)}
+                    </p>
                   </div>
                 </div>
-                <div className="flex items-center gap-2 flex-shrink-0">
+                <div className="flex items-center gap-2.5 flex-shrink-0">
                   {type !== "upcoming" && (
                     <button
                       onClick={(e) => {
@@ -273,13 +280,13 @@ export default function LiveActivityList({
                         setBookingToConfirm(b);
                         setConfirmOpen(true);
                       }}
-                      className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded-lg bg-emerald-600/20 text-emerald-400 border border-emerald-600/30 hover:bg-emerald-600/30 hover:text-white flex-shrink-0"
+                      className="opacity-0 group-hover:opacity-100 transition-opacity p-2 rounded-lg bg-emerald-600/20 text-emerald-400 border border-emerald-600/30 hover:bg-emerald-600/30 hover:text-white flex-shrink-0"
                       title="Mark Session Completed"
                     >
-                      <Check className="w-3.5 h-3.5" />
+                      <Check className="w-4 h-4" />
                     </button>
                   )}
-                  <div className={cn("text-[10px] font-mono font-bold px-2.5 py-1 rounded border flex-shrink-0", badgeStyle)}>
+                  <div className={cn("text-xs font-mono font-bold px-3 py-1.5 rounded-lg border flex-shrink-0 whitespace-nowrap", badgeStyle)}>
                     {badgeText}
                   </div>
                 </div>
@@ -287,7 +294,7 @@ export default function LiveActivityList({
             );
           })
         ) : (
-          <p className="text-center py-8 text-zinc-600 text-xs font-medium italic">No active sessions</p>
+          <p className="text-center py-8 text-zinc-600 text-sm font-medium italic">{emptyText}</p>
         )}
       </div>
       <ConfirmDialog
