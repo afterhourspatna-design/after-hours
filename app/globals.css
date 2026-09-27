@@ -100,31 +100,73 @@
   --fc-button-active-bg-color: #7c3aed;
   --fc-button-active-border-color: #7c3aed;
   font-family: 'Inter', sans-serif;
-  font-size: 13px;
+  font-size: 14px;
+  font-weight: 500;
   color: #e4e4e7;
 }
-.fc .fc-toolbar-title { font-size: 1rem; font-weight: 600; color: #f4f4f5; }
+.fc .fc-toolbar-title { font-size: 1.25rem; font-weight: 700; color: #f4f4f5; white-space: nowrap; margin: 0; }
+.fc .fc-toolbar-chunk {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: nowrap;
+}
+/* A section like "prev,title,next" renders as one plain (unstyled, block-
+   level) wrapper div around a <button>, an <h2>, and a <button> — since the
+   h2 is block-level by default it forces the arrows onto separate lines
+   above/below the date unless this wrapper is also made a flex row. */
+.fc .fc-toolbar-chunk > div {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
 .fc .fc-col-header-cell { background: hsl(240 10% 6%); }
 .fc .fc-col-header-cell-cushion {
-  font-size: 0.75rem; font-weight: 500; color: #71717a;
-  text-transform: uppercase; letter-spacing: 0.05em; padding: 8px 4px;
+  font-size: 0.85rem; font-weight: 700; color: #a1a1aa;
+  text-transform: uppercase; letter-spacing: 0.05em; padding: 10px 4px;
   text-decoration: none;
 }
-.fc .fc-timegrid-slot { height: 2rem; }
+.fc .fc-timegrid-slot { height: 2.75rem; }
 .fc .fc-timegrid-slot-label-cushion {
-  font-size: 0.7rem; color: #52525b; padding: 0 8px;
+  font-size: 0.8rem; font-weight: 600; color: #71717a; padding: 0 8px;
 }
 .fc .fc-event {
-  border-radius: 6px; border-width: 0; font-size: 0.72rem;
-  font-weight: 500; cursor: pointer;
+  border-radius: 6px; border-width: 0; font-size: 0.85rem;
+  font-weight: 700; cursor: pointer;
 }
 .fc .fc-event:hover { filter: brightness(1.15); }
-.fc .fc-button { border-radius: 8px; font-size: 0.8rem; padding: 5px 12px; font-weight: 500; }
+.fc .fc-button { border-radius: 8px; font-size: 0.9rem; padding: 6px 14px; font-weight: 600; }
 .fc .fc-scrollgrid { border-color: hsl(240 6% 14%); }
 .fc-theme-standard td, .fc-theme-standard th { border-color: hsl(240 6% 14%); }
 .fc .fc-now-indicator-line { border-color: #7c3aed; border-width: 2px; }
 .fc .fc-now-indicator-arrow { border-top-color: #7c3aed; border-bottom-color: #7c3aed; }
 .fc .fc-non-business { background: rgba(0,0,0,0.15); }
+
+/* Mobile: today + day/week share one row (opposite ends); the date chunk
+   (with its arrows) wraps onto its own centered row below, instead of all
+   three stacking as separate rows. */
+@media (max-width: 640px) {
+  .fc .fc-toolbar {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    row-gap: 0.5rem;
+  }
+  .fc .fc-toolbar-chunk:nth-child(2) {
+    order: 1;
+    flex-basis: 100%;
+    justify-content: center;
+  }
+  .fc .fc-toolbar-title { font-size: 1rem; }
+  .fc .fc-button { font-size: 0.75rem; padding: 4px 8px; }
+  .fc .fc-col-header-cell-cushion {
+    font-size: 0.7rem; padding: 6px 2px;
+  }
+  .fc .fc-timegrid-slot-label-cushion {
+    font-size: 0.65rem; padding: 0 4px;
+  }
+}
 
 /* Loading skeleton shimmer */
 .skeleton {
