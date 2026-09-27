@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { formatCurrency, cn } from "@/lib/utils";
 import {
   Landmark, Banknote, CreditCard, Wallet, ChevronLeft, ChevronRight,
-  Gamepad2, Coffee, Zap, Trophy, ArrowRight, ShieldAlert, Calendar
+  Gamepad2, Coffee, Zap, ArrowRight, ShieldAlert, Calendar
 } from "lucide-react";
 import StatCard from "@/components/ui/StatCard";
 import FundSettlementPanel from "@/components/settlement/FundSettlementPanel";
@@ -126,12 +126,6 @@ export default async function DailySettlementPage({
           description: true,
         },
       },
-      tournamentParticipants: {
-        include: {
-          tournament: { select: { title: true } },
-          user: { select: { name: true, phone: true } },
-        },
-      },
     },
     orderBy: { createdAt: "desc" },
   });
@@ -143,7 +137,6 @@ export default async function DailySettlementPage({
   let gameRevenue = 0;
   let snackRevenue = 0;
   let creditRevenue = 0;
-  let tournamentRevenue = 0;
 
   for (const p of payments) {
     totalCash += Number(p.cashAmount || 0);
@@ -159,10 +152,6 @@ export default async function DailySettlementPage({
 
     for (const tx of p.prepaidTransactions) {
       creditRevenue += Number(tx.moneyGiven || 0);
-    }
-
-    if (p.tournamentParticipants.length > 0) {
-      tournamentRevenue += Number(p.negotiatedAmount || 0);
     }
   }
 
@@ -311,7 +300,7 @@ export default async function DailySettlementPage({
           <Landmark className="w-4 h-4 text-violet-400" />
           Revenue Stream Breakdown
         </h2>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
           <div className="p-4 rounded-xl bg-zinc-900/60 border border-zinc-800/80">
             <div className="flex items-center gap-2 text-xs text-zinc-400 mb-1">
               <Gamepad2 className="w-3.5 h-3.5 text-indigo-400" />
@@ -334,14 +323,6 @@ export default async function DailySettlementPage({
               <span>Prepaid Top-ups</span>
             </div>
             <p className="text-lg font-bold text-white">{formatCurrency(creditRevenue)}</p>
-          </div>
-
-          <div className="p-4 rounded-xl bg-zinc-900/60 border border-zinc-800/80">
-            <div className="flex items-center gap-2 text-xs text-zinc-400 mb-1">
-              <Trophy className="w-3.5 h-3.5 text-rose-400" />
-              <span>Tournament Fees</span>
-            </div>
-            <p className="text-lg font-bold text-white">{formatCurrency(tournamentRevenue)}</p>
           </div>
         </div>
       </div>

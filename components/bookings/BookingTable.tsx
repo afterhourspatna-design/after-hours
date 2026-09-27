@@ -15,7 +15,7 @@ import { BookingStatusBadge, PaymentStatusBadge } from "@/components/ui/StatusBa
 import EmptyState from "@/components/ui/EmptyState";
 import { TableSkeleton } from "@/components/ui/LoadingSkeleton";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
-import { generateBookingConfirmationMessage } from "@/lib/whatsapp";
+import { generateBookingConfirmationMessage } from "@/lib/booking-message";
 
 interface Booking {
   id: string;
@@ -30,7 +30,7 @@ interface Booking {
   source: string;
   notes: string | null;
   holdExpiresAt: string | null;
-  game: { name: string; tag: string };
+  game: { name: string; tag: string; totalUnits?: number };
   resourceUnit: { unitName: string } | null;
   user: { name: string; phone: string; referredByPhone?: string | null } | null;
   negotiatedAmount: number | null;
@@ -300,6 +300,7 @@ function BookingTableInner({ role = "ADMIN" }: BookingTableProps) {
                                   guestName: customerName,
                                   guestPhone: customerPhone,
                                   gameName: b.game.name,
+                                  unitName: (b.game.totalUnits ?? 1) > 1 ? b.resourceUnit?.unitName : undefined,
                                   startDateTime: b.startDateTime,
                                   durationMinutes: b.durationMinutes,
                                   paymentStatus: b.paymentStatus,

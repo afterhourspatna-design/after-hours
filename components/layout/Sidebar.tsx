@@ -6,7 +6,7 @@ import { signOut } from "next-auth/react";
 import { cn } from "@/lib/utils";
 import {
   Gamepad2, LayoutDashboard, CalendarDays, BookOpen,
-  Users, Trophy, BarChart3, LineChart, Database, Settings, LogOut, ChevronLeft, Menu, X, Zap, Shield, MessageSquare, Tag, CreditCard, Award, Coffee, Flame, Swords, Landmark, Receipt
+  Users, Trophy, BarChart3, LineChart, Database, Settings, LogOut, ChevronLeft, Menu, X, Zap, MessageSquare, Tag, CreditCard, Award, Coffee, Flame, Landmark, Receipt
 } from "lucide-react";
 import { useState } from "react";
 
@@ -41,8 +41,7 @@ const NAV_SECTIONS: NavSection[] = [
       { label: "Daily Settlement", href: "/admin/daily-settlement", icon: Landmark, roles: ["ADMIN"] },
       { label: "Payments",   href: "/staff/payments",     icon: CreditCard,      roles: ["STAFF"] },
       { label: "Prepaid",    href: "/admin/prepaid-balances", icon: Zap,         roles: ["ADMIN"] },
-      { label: "Customers",  href: "/admin/users",        icon: Users,           roles: ["ADMIN"] },
-      { label: "Staff",      href: "/admin/staff",        icon: Shield,          roles: ["ADMIN"] },
+      { label: "Users",      href: "/admin/users",        icon: Users,           roles: ["ADMIN"] },
       { label: "Users",      href: "/staff/users",        icon: Users,           roles: ["STAFF"] },
       { label: "Referrals",  href: "/admin/referrals",    icon: Award,           roles: ["ADMIN"] },
       { label: "Referrals",  href: "/staff/referrals",    icon: Award,           roles: ["STAFF"] },
@@ -51,7 +50,6 @@ const NAV_SECTIONS: NavSection[] = [
       { label: "Coupons",    href: "/admin/coupons",      icon: Tag,             roles: ["ADMIN"] },
       { label: "Expenses",   href: "/admin/expenses",     icon: Receipt,         roles: ["ADMIN"] },
       { label: "Games",      href: "/admin/games",        icon: Trophy,          roles: ["ADMIN"] },
-      { label: "Tournaments", href: "/admin/tournaments",  icon: Swords,          roles: ["ADMIN", "STAFF"] },
       { label: "Reports",    href: "/admin/reports",      icon: BarChart3,       roles: ["ADMIN"] },
       { label: "Analytics & SQL", href: "/admin/analytics", icon: LineChart,   roles: ["ADMIN"] },
       { label: "Feedback",   href: "/admin/feedback",     icon: MessageSquare,   roles: ["ADMIN"] },

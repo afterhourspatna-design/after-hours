@@ -12,7 +12,7 @@ function LoginForm() {
   const router = useRouter();
   const callbackUrl = searchParams.get("callbackUrl") || "/";
 
-  const [email, setEmail] = useState("");
+  const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -26,14 +26,14 @@ function LoginForm() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!email || !password) {
-      toast.error("Please enter your email and password");
+    if (!identifier || !password) {
+      toast.error("Please enter your email/phone and password");
       return;
     }
     setIsLoading(true);
     try {
       const result = await signIn("credentials", {
-        email,
+        identifier,
         password,
         redirect: false,
       });
@@ -82,26 +82,31 @@ function LoginForm() {
 
           <form onSubmit={handleSubmit} className="space-y-5">
             <div className="space-y-1.5">
-              <label htmlFor="email" className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider">
-                Email Address
+              <label htmlFor="identifier" className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider">
+                Email or Phone Number
               </label>
               <input
-                id="email"
-                type="email"
-                autoComplete="email"
+                id="identifier"
+                type="text"
+                autoComplete="username"
                 autoFocus
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="Enter your email"
+                value={identifier}
+                onChange={(e) => setIdentifier(e.target.value)}
+                placeholder="Enter your email or phone number"
                 className="input-field"
                 disabled={isLoading}
               />
             </div>
 
             <div className="space-y-1.5">
-              <label htmlFor="password" className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider">
-                Password
-              </label>
+              <div className="flex items-center justify-between">
+                <label htmlFor="password" className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider">
+                  Password
+                </label>
+                <a href="/forgot-password" className="text-[11px] font-bold text-violet-400 hover:text-violet-300">
+                  Forgot password?
+                </a>
+              </div>
               <div className="relative">
                 <input
                   id="password"

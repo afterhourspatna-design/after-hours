@@ -5,16 +5,13 @@ import { PaymentStatus, BookingStatus } from "@prisma/client";
 import { z } from "zod";
 
 const batchPaySchema = z.object({
-  bookingIds: z.array(z.string()).optional(),
+  bookingIds: z.array(z.string()).min(1),
   negotiatedAmount: z.number().nonnegative(),
   paymentMethod: z.enum(["CASH", "ONLINE", "MIXED"]),
   amountPayingNow: z.number().nonnegative().optional(),
   cashAmount: z.number().nonnegative().optional(),
   onlineAmount: z.number().nonnegative().optional(),
   snacksAmount: z.number().nonnegative().optional(),
-  userId: z.string().optional().nullable(),
-  guestName: z.string().optional().nullable(),
-  guestPhone: z.string().optional().nullable(),
   couponCode: z.string().optional().nullable(),
 });
 
@@ -50,108 +47,18 @@ export async function POST(req: NextRequest) {
     }
 
     const {
-      bookingIds: allIds = [],
+      bookingIds: allIds,
       negotiatedAmount,
       paymentMethod,
       amountPayingNow,
       cashAmount = 0,
       onlineAmount = 0,
       snacksAmount = 0,
-      userId = null,
-      guestName = null,
-      guestPhone = null,
       couponCode = null,
     } = parsed.data;
 
     const actualBookingIds = allIds.filter(id => !id.startsWith("SNACK_"));
     const snackOrderIds = allIds.filter(id => id.startsWith("SNACK_")).map(id => id.replace("SNACK_", ""));
-
-    // Check if standalone snacks sale (no bookings and no unpaid snacks selected)
-    if (actualBookingIds.length === 0 && snackOrderIds.length === 0) {
-      if (snacksAmount <= 0) {
-        return NextResponse.json({ error: "Snacks amount must be greater than zero for snack sales" }, { status: 400 });
-      }
-
-      // Auto-register guest if guestPhone is provided
-      let resolvedUserId = userId ?? null;
-      if (!resolvedUserId && guestPhone) {
-        let guestUser = await prisma.appUser.findUnique({
-          where: { phone: guestPhone },
-        });
-        if (!guestUser) {
-          guestUser = await prisma.appUser.create({
-            data: {
-              name: guestName || "Guest Customer",
-              phone: guestPhone,
-              role: "CUSTOMER",
-            },
-          });
-        }
-        resolvedUserId = guestUser.id;
-      }
-
-      const paidToday = amountPayingNow !== undefined ? amountPayingNow : snacksAmount;
-      if (paidToday > snacksAmount) {
-        return NextResponse.json({ error: "Cannot pay more than total snacks amount" }, { status: 400 });
-      }
-      
-      // Create Payment record
-      const payment = await prisma.payment.create({
-        data: {
-          paymentMethod,
-          negotiatedAmount: 0,
-          cashAmount: paymentMethod === "MIXED" ? cashAmount : paymentMethod === "CASH" ? paidToday : 0,
-          onlineAmount: paymentMethod === "MIXED" ? onlineAmount : paymentMethod === "ONLINE" ? paidToday : 0,
-          userId: resolvedUserId,
-          customerNames: guestName ?? "Guest",
-        }
-      });
-      const paymentId = payment.id;
-
-      // Create new SnackOrder
-      const newSnack = await prisma.snackOrder.create({
-        data: {
-          userId: resolvedUserId,
-          guestName: resolvedUserId ? null : guestName,
-          guestPhone: resolvedUserId ? null : guestPhone,
-          amount: snacksAmount,
-          paymentStatus: paidToday >= snacksAmount ? PaymentStatus.PAID : (paidToday > 0 ? PaymentStatus.PARTIAL : PaymentStatus.UNPAID),
-          items: {
-            create: {
-              amount: snacksAmount,
-              notes: "Initial Amount",
-              addedById: (session.user as any).id,
-            }
-          }
-        },
-      });
-
-      if (paidToday > 0) {
-        await prisma.paymentAllocation.create({
-          data: { amount: paidToday, paymentId, snackOrderId: newSnack.id }
-        });
-      }
-
-      // Create Audit Log
-      await prisma.auditLog.create({
-        data: {
-          actorId: (session.user as any).id,
-          actorName: session.user.name ?? undefined,
-          action: "STANDALONE_SNACK_SALE",
-          entityType: "Payment",
-          meta: {
-            paymentId,
-            snackOrderId: newSnack.id,
-            snacksAmount,
-            paymentMethod,
-            cashAmount,
-            onlineAmount,
-          },
-        },
-      });
-
-      return NextResponse.json({ success: true, count: 1 });
-    }
 
     const isOnlySnacks = negotiatedAmount === 0 && snacksAmount > 0;
 

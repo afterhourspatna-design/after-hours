@@ -169,12 +169,12 @@ export default function SnacksDashboard() {
           }
           payload.userId = snackSelectedUser.id;
         } else {
-          if (!snackGuestName || !snackGuestPhone) {
-            toast.error("Guest name and phone are required");
+          if (!snackGuestName) {
+            toast.error("Guest name is required");
             throw new Error("Guest details missing");
           }
           payload.guestName = snackGuestName;
-          payload.guestPhone = snackGuestPhone;
+          payload.guestPhone = snackGuestPhone || null;
         }
         res = await fetch("/api/snacks", {
           method: "POST",
@@ -456,7 +456,7 @@ export default function SnacksDashboard() {
                 {snackGuestMode ? (
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="text-xs text-zinc-500 font-medium block mb-1">Guest Name (optional)</label>
+                      <label className="text-xs text-zinc-500 font-medium block mb-1">Guest Name</label>
                       <input
                         value={snackGuestName}
                         onChange={(e) => setSnackGuestName(e.target.value)}

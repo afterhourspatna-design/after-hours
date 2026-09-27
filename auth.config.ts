@@ -11,6 +11,7 @@ export const authConfig = {
         token.id = user.id;
         token.role = (user as any).role;
         token.phone = (user as any).phone;
+        token.mustChangePassword = (user as any).mustChangePassword;
       }
       return token;
     },
@@ -19,6 +20,7 @@ export const authConfig = {
         session.user.id = token.id as string;
         (session.user as any).role = token.role;
         (session.user as any).phone = token.phone;
+        (session.user as any).mustChangePassword = token.mustChangePassword;
       }
       return session;
     },

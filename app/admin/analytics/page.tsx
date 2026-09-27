@@ -6,7 +6,7 @@ import {
 } from "recharts";
 import { 
   LineChart as LineChartIcon, Play, Database, Download, RefreshCw, Users, Trophy, 
-  Clock, Zap, ArrowUpRight, ArrowDownRight, AlertTriangle, MessageSquare, Flame, 
+  Clock, Zap, ArrowUpRight, ArrowDownRight, AlertTriangle, Flame,
   Sparkles, CheckCircle2, Copy, Search, HelpCircle, ChevronRight, PieChart as PieChartIcon
 } from "lucide-react";
 import { formatCurrency, generateCSV } from "@/lib/utils";
@@ -414,12 +414,6 @@ export default function AnalyticsPage() {
     generateCSV(queryResult.rows, "sql-query-results");
   };
 
-  const sendWhatsAppOffer = (phone: string, name: string) => {
-    const cleanPhone = phone.replace(/\D/g, "");
-    const msg = encodeURIComponent(`Hi ${name}! We miss seeing you at After Hours. Enjoy 20% off your next session this week on us! Reply to book.`);
-    window.open(`https://wa.me/91${cleanPhone}?text=${msg}`, "_blank");
-  };
-
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -520,12 +514,6 @@ export default function AnalyticsPage() {
                           <p className="font-bold text-white">{user.name}</p>
                           <p className="text-[10px] text-zinc-500">{user.phone} • {user.old_bookings} past bookings</p>
                         </div>
-                        <button
-                          onClick={() => sendWhatsAppOffer(user.phone, user.name)}
-                          className="px-2.5 py-1 rounded-lg bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 border border-emerald-500/30 text-[11px] font-bold flex items-center gap-1 transition-all"
-                        >
-                          <MessageSquare className="w-3 h-3" /> WhatsApp
-                        </button>
                       </div>
                     ))}
                   </div>
