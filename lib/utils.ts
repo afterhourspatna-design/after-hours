@@ -48,7 +48,7 @@ function getPartsInTimeZone(date: Date, timeZone: string = "Asia/Kolkata") {
   }
 }
 
-function getISTDayRelative(date: Date): "today" | "tomorrow" | "yesterday" | "other" {
+export function getISTDayRelative(date: Date): "today" | "tomorrow" | "yesterday" | "other" {
   const target = getPartsInTimeZone(date);
   const now = getPartsInTimeZone(new Date());
 

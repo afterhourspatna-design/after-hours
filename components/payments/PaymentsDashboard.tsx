@@ -3,10 +3,10 @@
 import { useState, useEffect, useCallback, useMemo, Fragment } from "react";
 import { toast } from "sonner";
 import {
-  Search, Download, RefreshCw, ChevronLeft, ChevronRight, CreditCard, X, Info, Coins, CheckCircle, Plus, Coffee
+  Search, Download, RefreshCw, ChevronLeft, ChevronRight, ChevronDown, CreditCard, X, Info, Coins, CheckCircle, Plus, Coffee, Pencil
 } from "lucide-react";
 import {
-  cn, formatCurrency, formatDate, formatTimeRange, formatDuration,
+  cn, formatCurrency, formatDate, formatTimeRange, formatDuration, getISTDayRelative,
 } from "@/lib/utils";
 import { TableSkeleton } from "@/components/ui/LoadingSkeleton";
 import EmptyState from "@/components/ui/EmptyState";
@@ -74,7 +74,7 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
-  const [includeAdvanceBookings, setIncludeAdvanceBookings] = useState(true);
+  const [includeAdvanceBookings, setIncludeAdvanceBookings] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [paymentHistory, setPaymentHistory] = useState<PaymentGroup[]>([]);
   const [showPayModal, setShowPayModal] = useState(false);
@@ -90,8 +90,12 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
   const [selectedPaymentDetail, setSelectedPaymentDetail] = useState<PaymentGroup | null>(null);
   const [editPaymentId, setEditPaymentId] = useState<string | null>(null);
   const [payOnlySnacks, setPayOnlySnacks] = useState(false);
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
+  // History defaults to today's settlements only (for both admin and staff);
+  // admin can still widen/clear the range via the date filter, which is
+  // hidden for staff, so staff always sees just today's history.
+  const getTodayIST = () => new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" }).format(new Date());
+  const [startDate, setStartDate] = useState(getTodayIST);
+  const [endDate, setEndDate] = useState(getTodayIST);
   const [coupons, setCoupons] = useState<Coupon[]>([]);
   const [selectedCouponCode, setSelectedCouponCode] = useState("");
 
@@ -115,8 +119,8 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
   }, []);
 
   useEffect(() => {
-    setStartDate("");
-    setEndDate("");
+    setStartDate(getTodayIST());
+    setEndDate(getTodayIST());
     setPage(1);
   }, [activeTab]);
 
@@ -134,6 +138,11 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
           limit: "1000", // Unpaid tabs shouldn't be paginated so we can batch settle everything at once
           includeSnacks: "1",
           includeAdvance: includeAdvanceBookings ? "1" : "0",
+          // Staff's role-based visibility elsewhere in the app hides past
+          // bookings, but here they still need to settle yesterday's unpaid
+          // tabs — only Payment History (the PAID tab) is meant to stay
+          // restricted to the present day for staff.
+          includePastForStaff: "1",
           ...(search ? { q: search } : {}),
           paymentStatus: "UNPAID",
         });
@@ -281,6 +290,21 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
       next.add(id);
     }
     setSelectedIds(next);
+  };
+
+  // Per-customer groups start collapsed; their individual booking rows only
+  // render once the group's arrow is expanded.
+  const [expandedGroupKeys, setExpandedGroupKeys] = useState<Set<string>>(new Set());
+  const toggleGroupExpanded = (key: string) => {
+    setExpandedGroupKeys((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
+      return next;
+    });
   };
 
   // Group unpaid bookings/snack tabs by customer so settling one person's
@@ -588,9 +612,10 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
     <div className="space-y-6 pb-28">
       {/* Header section */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-white">Payment Management</h1>
-          <p className="text-sm text-zinc-500">Track unpaid balances, settle tabs, and review payment history.</p>
+        <div className="space-y-1">
+          <p className="text-[10px] font-bold text-zinc-500 tracking-[0.2em] uppercase">Workspace / Payments</p>
+          <h1 className="text-3xl font-bold text-white tracking-tight">Payments</h1>
+          <p className="text-sm text-zinc-500 font-medium">Track unpaid balances, settle tabs, and review payment history.</p>
         </div>
 
         {/* Tab switcher */}
@@ -622,7 +647,7 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
 
       {/* Toolbar */}
       <div className="flex flex-col gap-3">
-        <div className="flex flex-col sm:flex-row gap-3 items-center">
+        <div className="flex flex-row gap-3 items-center">
 
           <div className="relative flex-1 w-full">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
@@ -665,23 +690,23 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
           </label>
         )}
 
-        {/* Date Filter Row for History tab */}
-        {activeTab === "PAID" && (
-          <div className="flex flex-wrap items-center gap-3 bg-zinc-900/40 p-3 rounded-xl border border-zinc-800/60 animate-fade-in">
+        {/* Date Filter Row for History tab (admin only) */}
+        {activeTab === "PAID" && role === "ADMIN" && (
+          <div className="flex flex-col min-[500px]:flex-row min-[500px]:flex-wrap min-[500px]:items-center gap-2 bg-zinc-900/40 p-3 rounded-xl border border-zinc-800/60 animate-fade-in">
             <span className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Filter Date Range:</span>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-row items-center gap-1.5 w-full min-[500px]:w-auto">
               <input
                 type="date"
                 value={startDate}
                 onChange={(e) => setStartDate(e.target.value)}
-                className="input-field text-xs w-36 py-1.5 animate-fade-in"
+                className="input-field text-xs flex-1 min-w-0 min-[500px]:flex-none min-[500px]:w-36 py-1.5 animate-fade-in"
               />
-              <span className="text-xs text-zinc-500">to</span>
+              <span className="text-xs text-zinc-500 flex-shrink-0">to</span>
               <input
                 type="date"
                 value={endDate}
                 onChange={(e) => setEndDate(e.target.value)}
-                className="input-field text-xs w-36 py-1.5 animate-fade-in"
+                className="input-field text-xs flex-1 min-w-0 min-[500px]:flex-none min-[500px]:w-36 py-1.5 animate-fade-in"
                 min={startDate || undefined}
               />
             </div>
@@ -691,7 +716,7 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
                   setStartDate("");
                   setEndDate("");
                 }}
-                className="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-semibold rounded-lg border border-zinc-700 transition-all active:scale-95"
+                className="w-full min-[500px]:w-auto px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-semibold rounded-lg border border-zinc-700 transition-all active:scale-95"
               >
                 Clear Range
               </button>
@@ -716,119 +741,132 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
         ) : (
           <div className="overflow-x-auto">
             {activeTab === "UNPAID" ? (
-              <table className="w-full data-table">
-                <thead>
-                  <tr>
-                    <th className="w-10">
-                      <input
-                        type="checkbox"
-                        checked={bookings.length > 0 && selectedIds.size === bookings.length}
-                        onChange={handleSelectAll}
-                        className="rounded border-zinc-700 text-violet-600 focus:ring-violet-500 bg-zinc-900 h-4 w-4"
-                      />
-                    </th>
-                    <th>Customer</th>
-                    <th>Game / Unit</th>
-                    <th>Date & Time</th>
-                    <th>Duration</th>
-                    <th>Total / Balance Due</th>
-                    <th>Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {groupedBookings.map((group) => {
-                    const groupChecked = group.items.every((b) => selectedIds.has(b.id));
-                    const groupPartiallyChecked = !groupChecked && group.items.some((b) => selectedIds.has(b.id));
+              // A real CSS grid (not a <table>) so every "cell" is a genuine
+              // grid item under one shared column template — header and body
+              // columns are guaranteed to line up pixel-for-pixel, which a
+              // <table>/colgroup/colSpan mix kept failing to do reliably.
+              // Each logical row is a `display: contents` wrapper (so its
+              // children become direct grid items) that still works as a
+              // normal DOM node for click handling and group-hover.
+              <div className="grid grid-cols-[40px_1.8fr_1.3fr_0.8fr_1.1fr_0.8fr] w-full min-w-[720px]">
+                {/* Header */}
+                <div className="text-xs font-medium text-zinc-500 uppercase tracking-wider py-3 px-4 flex items-center justify-center">
+                  <input
+                    type="checkbox"
+                    checked={bookings.length > 0 && selectedIds.size === bookings.length}
+                    onChange={handleSelectAll}
+                    className="rounded border-zinc-700 text-violet-600 focus:ring-violet-500 bg-zinc-900 h-4 w-4"
+                  />
+                </div>
+                <div className="text-xs font-medium text-zinc-500 uppercase tracking-wider py-3 px-4 text-center">Game / Unit</div>
+                <div className="text-xs font-medium text-zinc-500 uppercase tracking-wider py-3 px-4 text-center">Date & Time</div>
+                <div className="text-xs font-medium text-zinc-500 uppercase tracking-wider py-3 px-4 text-center">Duration</div>
+                <div className="text-xs font-medium text-zinc-500 uppercase tracking-wider py-3 px-4 text-center">Total / Balance Due</div>
+                <div className="text-xs font-medium text-zinc-500 uppercase tracking-wider py-3 px-4 text-center">Status</div>
 
-                    return (
+                {groupedBookings.map((group) => {
+                  const groupChecked = group.items.every((b) => selectedIds.has(b.id));
+                  const groupPartiallyChecked = !groupChecked && group.items.some((b) => selectedIds.has(b.id));
+                  const isExpanded = expandedGroupKeys.has(group.key);
+                  const groupCell = "bg-zinc-900/60 border-t border-zinc-800/60 py-3 px-4 flex items-center justify-center";
+
+                  return (
                     <Fragment key={group.key}>
-                      <tr className="bg-zinc-900/60">
-                        <td onClick={(e) => e.stopPropagation()}>
-                          <input
-                            type="checkbox"
-                            checked={groupChecked}
-                            ref={(el) => { if (el) el.indeterminate = groupPartiallyChecked; }}
-                            onChange={() => handleSelectGroup(group)}
-                            className="rounded border-zinc-700 text-violet-600 focus:ring-violet-500 bg-zinc-900 h-4 w-4"
-                            title="Select all for this customer"
-                          />
-                        </td>
-                        <td colSpan={6}>
-                          <div className="flex items-center justify-between gap-2">
-                            <div className="flex items-center gap-2 cursor-pointer" onClick={() => handleSelectGroup(group)}>
-                              <span className="font-semibold text-white text-sm">{group.name}</span>
-                              {group.phone && <span className="text-xs text-zinc-500">{group.phone}</span>}
-                              <span className="text-xs text-zinc-600">· {group.items.length} {group.items.length === 1 ? "item" : "items"}</span>
-                            </div>
-                            <div className="flex items-center gap-3">
-                              <button
-                                type="button"
-                                onClick={(e) => { e.stopPropagation(); handleOpenQuickAddSnack(group); }}
-                                className="flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-semibold text-amber-400 hover:text-amber-300 hover:bg-amber-500/10 border border-amber-500/20 transition-colors"
-                                title="Add a snack to this customer's tab"
-                              >
-                                <Coffee className="w-3 h-3" />
-                                Snack
-                              </button>
-                              <span
-                                className="text-sm font-bold text-white whitespace-nowrap cursor-pointer"
-                                onClick={() => handleSelectGroup(group)}
-                              >
-                                {formatCurrency(group.total)}
-                              </span>
-                            </div>
-                          </div>
-                        </td>
-                      </tr>
-                      {group.items.map((b) => {
+                      {/* Group summary row */}
+                      <div className={groupCell} onClick={(e) => e.stopPropagation()}>
+                        <input
+                          type="checkbox"
+                          checked={groupChecked}
+                          ref={(el) => { if (el) el.indeterminate = groupPartiallyChecked; }}
+                          onChange={() => handleSelectGroup(group)}
+                          className="rounded border-zinc-700 text-violet-600 focus:ring-violet-500 bg-zinc-900 h-4 w-4"
+                          title="Select all for this customer"
+                        />
+                      </div>
+                      <div
+                        className={cn(groupCell, "col-span-2 justify-start gap-2 cursor-pointer overflow-hidden")}
+                        onClick={() => toggleGroupExpanded(group.key)}
+                      >
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); toggleGroupExpanded(group.key); }}
+                          className="p-0.5 rounded hover:bg-zinc-800 transition-colors flex-shrink-0"
+                          title={isExpanded ? "Hide bookings" : "Show bookings"}
+                        >
+                          <ChevronDown className={cn("w-4 h-4 text-zinc-500 transition-transform", isExpanded && "rotate-180")} />
+                        </button>
+                        <span className="font-semibold text-white text-sm truncate">{group.name}</span>
+                        {group.phone && <span className="text-xs text-zinc-500 whitespace-nowrap flex-shrink-0">{group.phone}</span>}
+                        <span className="text-xs text-zinc-600 whitespace-nowrap flex-shrink-0">· {group.items.length} {group.items.length === 1 ? "item" : "items"}</span>
+                      </div>
+                      <div className={groupCell} />
+                      <div className={groupCell}>
+                        <span
+                          className="text-sm font-black text-emerald-400 whitespace-nowrap"
+                          onClick={(e) => { e.stopPropagation(); handleSelectGroup(group); }}
+                        >
+                          {formatCurrency(group.total)}
+                        </span>
+                      </div>
+                      <div className={groupCell}>
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); handleOpenQuickAddSnack(group); }}
+                          className="flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-semibold text-amber-400 hover:text-amber-300 hover:bg-amber-500/10 border border-amber-500/20 transition-colors"
+                          title="Add a snack to this customer's tab"
+                        >
+                          <Coffee className="w-3 h-3" />
+                          Snack
+                        </button>
+                      </div>
+
+                      {/* Booking rows */}
+                      {isExpanded && group.items.map((b) => {
                         const isChecked = selectedIds.has(b.id);
+                        const cell = cn(
+                          "border-t border-zinc-800/60 py-3 px-4 flex items-center justify-center text-center",
+                          isChecked && "bg-violet-900/10"
+                        );
 
                         return (
-                          <tr
-                            key={b.id}
-                            onClick={() => handleSelectRow(b.id)}
-                            className={cn(
-                              "cursor-pointer select-none",
-                              isChecked && "bg-violet-900/10"
-                            )}
-                          >
-                            <td onClick={(e) => e.stopPropagation()}>
+                          <div key={b.id} className="contents group cursor-pointer select-none" onClick={() => handleSelectRow(b.id)}>
+                            <div className={cn(cell, "group-hover:bg-zinc-800/30")} onClick={(e) => e.stopPropagation()}>
                               <input
                                 type="checkbox"
                                 checked={isChecked}
                                 onChange={() => handleSelectRow(b.id)}
                                 className="rounded border-zinc-700 text-violet-600 focus:ring-violet-500 bg-zinc-900 h-4 w-4"
                               />
-                            </td>
-                            <td>
-                              {b.isNewUser && (
-                                <span className="bg-emerald-500/20 text-emerald-400 text-[10px] px-1.5 py-0.5 rounded font-bold uppercase tracking-wider border border-emerald-500/30">
-                                  New
-                                </span>
-                              )}
-                            </td>
-                            <td>
-                              <p className="text-sm text-zinc-200">{b.game.name}</p>
-                              {b.resourceUnit && <p className="text-xs text-zinc-600">{b.resourceUnit.unitName}</p>}
-                            </td>
-                            <td className="whitespace-nowrap">
-                              <p className="text-sm text-zinc-200">{formatDate(b.startDateTime)}</p>
-                              <p className="text-xs text-zinc-600">{formatTimeRange(b.startDateTime, b.endDateTime)}</p>
-                            </td>
-                            <td className="text-sm text-zinc-400 whitespace-nowrap">
+                            </div>
+                            <div className={cn(cell, "group-hover:bg-zinc-800/30 flex-col gap-0")}>
+                              <div className="flex items-center justify-center gap-2 w-full">
+                                <p className="text-sm text-zinc-200 truncate">{b.game.name}</p>
+                                {b.isNewUser && (
+                                  <span className="bg-emerald-500/20 text-emerald-400 text-[10px] px-1.5 py-0.5 rounded font-bold uppercase tracking-wider border border-emerald-500/30 flex-shrink-0">
+                                    New
+                                  </span>
+                                )}
+                              </div>
+                              {b.resourceUnit && <p className="text-xs text-zinc-600 truncate w-full">{b.resourceUnit.unitName}</p>}
+                            </div>
+                            <div className={cn(cell, "group-hover:bg-zinc-800/30 flex-col gap-0 whitespace-nowrap")}>
+                              <p className="text-sm text-zinc-200 w-full">{formatDate(b.startDateTime)}</p>
+                              <p className="text-xs text-zinc-600 w-full">{formatTimeRange(b.startDateTime, b.endDateTime)}</p>
+                            </div>
+                            <div className={cn(cell, "group-hover:bg-zinc-800/30 text-sm text-zinc-400 whitespace-nowrap")}>
                               {formatDuration(b.durationMinutes)}
-                            </td>
-                            <td className="text-sm font-medium text-white whitespace-nowrap">
+                            </div>
+                            <div className={cn(cell, "group-hover:bg-zinc-800/30 text-sm font-medium text-white whitespace-nowrap")}>
                               {b.paymentStatus === "PARTIAL" ? (
-                                <div className="flex flex-col">
+                                <div className="flex flex-col items-center">
                                   <span className="text-zinc-500 line-through text-xs">{formatCurrency(Number(b.finalAmount))}</span>
                                   <span className="text-amber-400 font-bold">{formatCurrency(Number(b.finalAmount) - (b.allocations?.reduce((s: any, a: any) => s + Number(a.amount), 0) || 0))}</span>
                                 </div>
                               ) : (
                                 formatCurrency(Number(b.finalAmount))
                               )}
-                            </td>
-                            <td>
+                            </div>
+                            <div className={cn(cell, "group-hover:bg-zinc-800/30")}>
                               <span className={cn(
                                 "inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold uppercase border",
                                 b.paymentStatus === "PARTIAL"
@@ -837,61 +875,76 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
                               )}>
                                 {b.paymentStatus}
                               </span>
-                            </td>
-                          </tr>
+                            </div>
+                          </div>
                         );
                       })}
                     </Fragment>
-                    );
-                  })}
-                </tbody>
-              </table>
+                  );
+                })}
+              </div>
             ) : (
-              <table className="w-full data-table">
+              <table className="w-full min-w-[1000px] data-table table-fixed">
+                <colgroup>
+                  <col className="w-[10%]" />
+                  <col className="w-[18%]" />
+                  <col className="w-[10%]" />
+                  <col className="w-[10%]" />
+                  <col className="w-[16%]" />
+                  <col className="w-[12%]" />
+                  <col className="w-[10%]" />
+                  <col className="w-[14%]" />
+                </colgroup>
                 <thead>
                   <tr>
-                    <th>Payment ID</th>
-                    <th>Customer(s)</th>
-                    <th>Bookings Count</th>
-                    <th>Actual Total</th>
-                    <th>Settled Total</th>
-                    <th>Method</th>
-                    <th>Settle Date</th>
-                    <th className="text-right">Actions</th>
+                    <th className="!text-center">Payment ID</th>
+                    <th className="!text-center">Customer(s)</th>
+                    <th className="!text-center">Bookings Count</th>
+                    <th className="!text-center">Actual Total</th>
+                    <th className="!text-center">Settled Total</th>
+                    <th className="!text-center">Method</th>
+                    <th className="!text-center">Settle Date</th>
+                    <th className="!text-center">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {paymentHistory.map((p) => {
                     const amountPaid = p.totalCash + p.totalOnline;
                     const batchTotal = p.totalNegotiated + p.totalSnacks;
+                    const updatedAtDate = new Date(p.updatedAt);
+                    const dayRelative = getISTDayRelative(updatedAtDate);
+                    const dayLabel = dayRelative === "other"
+                      ? updatedAtDate.toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata", day: "numeric", month: "short" })
+                      : dayRelative.charAt(0).toUpperCase() + dayRelative.slice(1);
+                    const timeLabel = updatedAtDate.toLocaleTimeString("en-IN", { timeZone: "Asia/Kolkata", hour: "numeric", minute: "2-digit", hour12: true });
                     return (
                       <tr
                         key={p.paymentId}
                         onClick={() => setSelectedPaymentDetail(p)}
                         className="cursor-pointer hover:bg-zinc-800/30 transition-colors"
                       >
-                        <td>
+                        <td className="text-center">
                           <p className="font-bold text-violet-400 font-mono" title={p.paymentId}>
                             {p.paymentId.startsWith("LEGACY-")
                               ? "#LEGACY"
                               : `#${p.paymentId.substring(0, 8).toUpperCase()}`}
                           </p>
                         </td>
-                        <td>
-                          <div>
-                            <p className="font-medium text-white text-sm">{p.customerNames}</p>
-                            {p.customerPhones && <p className="text-xs text-zinc-600">{p.customerPhones}</p>}
+                        <td className="text-center">
+                          <div className="min-w-0">
+                            <p className="font-medium text-white text-sm truncate" title={p.customerNames}>{p.customerNames}</p>
+                            {p.customerPhones && <p className="text-xs text-zinc-600 truncate">{p.customerPhones}</p>}
                           </div>
                         </td>
-                        <td>
+                        <td className="text-center">
                           <p className="text-sm text-zinc-300">
                             {p.bookings.length} {p.bookings.length === 1 ? "booking" : "bookings"}
                           </p>
                         </td>
-                        <td className="text-sm text-zinc-400 whitespace-nowrap">
+                        <td className="text-sm text-zinc-400 text-center whitespace-nowrap">
                           {formatCurrency(p.totalActual)}
                         </td>
-                        <td className="text-xs text-zinc-300 whitespace-nowrap">
+                        <td className="text-xs text-zinc-300 text-center whitespace-nowrap">
                           <p className="text-sm font-semibold text-emerald-400">{formatCurrency(amountPaid)}</p>
                           {Math.abs(amountPaid - batchTotal) > 0.01 && (
                             <p className="text-[10px] text-amber-500 font-medium">Invoice: {formatCurrency(batchTotal)}</p>
@@ -904,7 +957,7 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
                             <p className="text-[10px] text-zinc-500">Credits: {formatCurrency(p.totalNegotiated)}</p>
                           )}
                         </td>
-                        <td>
+                        <td className="text-center">
                           <div className="text-xs">
                             <span className="px-2 py-0.5 rounded bg-zinc-800 text-zinc-300 font-semibold border border-zinc-700 uppercase">
                               {p.paymentMethod}
@@ -916,11 +969,12 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
                             )}
                           </div>
                         </td>
-                        <td className="text-xs text-zinc-500 whitespace-nowrap">
-                          {formatDate(p.updatedAt)}
+                        <td className="text-xs text-zinc-500 text-center whitespace-nowrap">
+                          <span className="block">{dayLabel}</span>
+                          <span className="block">{timeLabel}</span>
                         </td>
-                        <td className="text-right" onClick={(e) => e.stopPropagation()}>
-                          <div className="flex gap-2 justify-end">
+                        <td className="text-center" onClick={(e) => e.stopPropagation()}>
+                          <div className="flex items-center justify-center gap-1.5">
                             <button
                               onClick={() => setSelectedPaymentDetail(p)}
                               className="px-3 py-1 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-zinc-300 text-xs font-semibold rounded-lg transition-colors"
@@ -929,9 +983,10 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
                             </button>
                             <button
                               onClick={() => handleOpenEditModal(p)}
-                              className="px-3 py-1 bg-violet-600 hover:bg-violet-500 text-white text-xs font-semibold rounded-lg transition-colors"
+                              className="p-1.5 bg-violet-600 hover:bg-violet-500 text-white rounded-lg transition-colors flex-shrink-0"
+                              title="Edit"
                             >
-                              Edit
+                              <Pencil className="w-3.5 h-3.5" />
                             </button>
                           </div>
                         </td>
@@ -973,24 +1028,26 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
       {/* Floating checkout banner for unpaid selection */}
       {activeTab === "UNPAID" && selectedIds.size > 0 && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 max-w-2xl w-full px-4 z-40 animate-slide-in-right">
-          <div className="bg-zinc-900 border border-violet-500/30 shadow-2xl rounded-2xl p-4 flex items-center justify-between gap-4 backdrop-blur-md bg-opacity-95">
-            <div>
-              <p className="text-xs text-zinc-400">Selected Bookings</p>
-              <p className="text-sm font-bold text-white">
-                {selectedIds.size} {selectedIds.size === 1 ? "booking" : "bookings"}
-              </p>
-            </div>
+          <div className="bg-zinc-900 border border-violet-500/30 shadow-2xl rounded-2xl p-4 flex flex-col sm:flex-row items-stretch sm:items-center sm:justify-between gap-3 sm:gap-4 backdrop-blur-md bg-opacity-95">
+            <div className="flex items-center justify-between sm:contents">
+              <div>
+                <p className="text-xs text-zinc-400">Selected Bookings</p>
+                <p className="text-sm font-bold text-white">
+                  {selectedIds.size} {selectedIds.size === 1 ? "booking" : "bookings"}
+                </p>
+              </div>
 
-            <div className="text-right sm:text-left">
-              <p className="text-xs text-zinc-400">Total Actual Amount</p>
-              <p className="text-base font-extrabold text-violet-400">
-                {formatCurrency(totalActualAmount)}
-              </p>
+              <div className="text-right sm:text-left">
+                <p className="text-xs text-zinc-400">Total Actual Amount</p>
+                <p className="text-base font-extrabold text-violet-400">
+                  {formatCurrency(totalActualAmount)}
+                </p>
+              </div>
             </div>
 
             <button
               onClick={handleOpenPayModal}
-              className="flex items-center gap-2 px-6 py-2.5 bg-violet-600 hover:bg-violet-500 text-white rounded-xl font-bold shadow-lg shadow-violet-900/30 hover:shadow-violet-800/40 transition-all text-sm"
+              className="flex items-center justify-center gap-2 px-6 py-2.5 w-full sm:w-auto bg-violet-600 hover:bg-violet-500 text-white rounded-xl font-bold shadow-lg shadow-violet-900/30 hover:shadow-violet-800/40 transition-all text-sm"
             >
               <CreditCard className="w-4 h-4" />
               Settle Pay ({selectedIds.size})
