@@ -8,6 +8,8 @@ import { BookingStatus, BookingSource, BookingType, PaymentStatus } from "@prism
 import { addMinutes } from "date-fns";
 import { z } from "zod";
 import { relevanceScore, scoreMatch, orderByIds } from "@/lib/search-rank";
+import { generateTempPassword } from "@/lib/password-generator";
+import bcrypt from "bcryptjs";
 
 const createBookingSchema = z.object({
   userId: z.string().optional().nullable(),
@@ -134,7 +136,7 @@ export async function GET(req: NextRequest) {
     const bookings = await prisma.booking.findMany({
       where,
       include: {
-        game: { select: { name: true, tag: true } },
+        game: { select: { name: true, tag: true, totalUnits: true } },
         resourceUnit: { select: { unitName: true } },
         user: { select: { name: true, phone: true, createdAt: true, referredByPhone: true, _count: { select: { bookings: { where: { paymentStatus: "PAID" } } } } } },
         createdBy: { select: { name: true } },
@@ -148,7 +150,7 @@ export async function GET(req: NextRequest) {
   const includeSnacks = searchParams.get("includeSnacks") === "1";
 
   const bookingInclude: Prisma.BookingInclude = {
-    game: { select: { name: true, tag: true } },
+    game: { select: { name: true, tag: true, totalUnits: true } },
     resourceUnit: { select: { unitName: true } },
     user: { select: { name: true, phone: true, createdAt: true, referredByPhone: true, _count: { select: { bookings: { where: { paymentStatus: "PAID" } } } } } },
     createdBy: { select: { name: true } },
@@ -348,6 +350,7 @@ export async function POST(req: NextRequest) {
         }
       }
 
+      const passwordHash = await bcrypt.hash(generateTempPassword(), 12);
       guestUser = await prisma.appUser.create({
         data: {
           name: data.guestName || "Guest Customer",
@@ -355,6 +358,8 @@ export async function POST(req: NextRequest) {
           role: "CUSTOMER",
           referredById,
           referredByPhone,
+          passwordHash,
+          mustChangePassword: true,
         },
       });
     }
@@ -492,7 +497,7 @@ export async function POST(req: NextRequest) {
       createdById: actorId,
     },
     include: {
-      game: { select: { name: true, tag: true } },
+      game: { select: { name: true, tag: true, totalUnits: true } },
       resourceUnit: { select: { unitName: true } },
       user: { select: { name: true, phone: true } },
     },

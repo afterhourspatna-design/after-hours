@@ -48,12 +48,6 @@ export async function GET(req: NextRequest) {
       prepaidTransactions: {
         select: { id: true, amount: true, description: true }
       },
-      tournamentParticipants: {
-        include: {
-          tournament: { select: { id: true, title: true, game: { select: { name: true } } } },
-          user: { select: { name: true, phone: true } }
-        }
-      }
     };
 
     if (!search) {

@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { format, addMinutes } from "date-fns";
 import { Loader2, User, Users, Gamepad2, Clock, IndianRupee, ChevronDown, Search, X, AlertCircle, Phone, CheckCircle2, ArrowRight, Zap } from "lucide-react";
 import { cn, formatCurrency, SOURCE_LABELS } from "@/lib/utils";
-import { generateBookingConfirmationMessage } from "@/lib/whatsapp";
+import { generateBookingConfirmationMessage } from "@/lib/booking-message";
 
 interface Game {
   id: string;
@@ -192,7 +192,6 @@ export default function BookingForm({ mode = "create", initialData, prefillDate,
   const [onlineAmount, setOnlineAmount] = useState<number | "">("");
   
   const [usePrepaidCredits, setUsePrepaidCredits] = useState(false);
-  const [sendToCustomer, setSendToCustomer] = useState(false);
 
   // Coupon states
   const [couponCode, setCouponCode] = useState(initialData?.coupon?.code ?? "");
@@ -430,21 +429,6 @@ export default function BookingForm({ mode = "create", initialData, prefillDate,
         return;
       }
 
-      // Send WhatsApp notification if staff opted in
-      if (mode === "create" && sendToCustomer && data?.id) {
-        try {
-          const notifyRes = await fetch(`/api/bookings/${data.id}/notify`, { method: "POST" });
-          if (notifyRes.ok) {
-            toast.success("Invoice sent to customer WhatsApp! 📲");
-          } else {
-            const err = await notifyRes.json();
-            toast.error(`WhatsApp: ${err.error ?? "Failed to send"}`);
-          }
-        } catch {
-          toast.error("Could not send WhatsApp notification");
-        }
-      }
-
       toast.success(mode === "edit" ? "Booking updated!" : "Booking created successfully!", {
         action: {
           label: "Copy Confirmation Msg",
@@ -453,13 +437,16 @@ export default function BookingForm({ mode = "create", initialData, prefillDate,
             let paid = 0;
             if (paymentStatus === "PAID") paid = invoiceAmt;
             else if (mode === "create" && advanceAmount !== "" && advanceAmount > 0) paid = Number(advanceAmount);
-            
+
             const customerName = selectedUser?.name || (isGuest ? guestName : "Guest");
             const customerPhone = selectedUser?.phone || (isGuest ? guestPhone : "");
             const msg = generateBookingConfirmationMessage({
               guestName: customerName,
               guestPhone: customerPhone,
               gameName: selectedGame?.name || "Game",
+              unitName: (selectedGame?.resourceUnits.length ?? 0) > 1
+                ? selectedGame?.resourceUnits.find(u => u.id === selectedUnit)?.unitName
+                : undefined,
               startDateTime: startDT,
               durationMinutes: durationMinutes,
               paymentStatus: paymentStatus,
@@ -1206,25 +1193,6 @@ export default function BookingForm({ mode = "create", initialData, prefillDate,
               </div>
             ) : (
               <p className="text-xs text-zinc-600">Select a game and time to see pricing</p>
-            )}
-
-            {/* Send to Customer WhatsApp toggle */}
-            {mode === "create" && (
-              <div className="flex items-center justify-between p-3 bg-zinc-900/60 rounded-xl border border-zinc-800">
-                <div>
-                  <p className="text-xs font-semibold text-zinc-200">Send invoice to customer WhatsApp</p>
-                  <p className="text-[10px] text-zinc-500 mt-0.5">Sends booking details after creation</p>
-                </div>
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input
-                    type="checkbox"
-                    className="sr-only peer"
-                    checked={sendToCustomer}
-                    onChange={e => setSendToCustomer(e.target.checked)}
-                  />
-                  <div className="w-9 h-5 bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-600" />
-                </label>
-              </div>
             )}
 
             {/* Submit */}

@@ -6,7 +6,7 @@ import { formatCurrency, cn } from "@/lib/utils";
 import {
   BookOpen, Users, IndianRupee, TrendingUp, Zap, Clock, AlertTriangle,
   Download, Plus, Search, Filter, SlidersHorizontal, Gamepad2, Coffee,
-  ChevronLeft, ChevronRight, Trophy
+  ChevronLeft, ChevronRight
 } from "lucide-react";
 import StatCard from "@/components/ui/StatCard";
 import HoldAlert from "@/components/bookings/HoldAlert";
@@ -140,8 +140,6 @@ async function getDashboardData(period: string = "today", from?: string, to?: st
     last7DaysStandaloneSnacks,
     periodPrepaidCredits,
     last7DaysPrepaidCredits,
-    periodTournamentPayments,
-    last7DaysTournamentPayments,
   ] = await Promise.all([
     prisma.booking.count({ where: { bookingStatus: { in: [BookingStatus.CONFIRMED, BookingStatus.COMPLETED] } } }),
     prisma.booking.count({ where: { ...whereRange, bookingStatus: { in: [BookingStatus.CONFIRMED, BookingStatus.COMPLETED] } } }),
@@ -222,26 +220,6 @@ async function getDashboardData(period: string = "today", from?: string, to?: st
       },
       select: { createdAt: true, moneyGiven: true }
     }),
-    // Tournament entry fee payments (period)
-    prisma.tournamentParticipant.findMany({
-      where: {
-        isPaid: true,
-        ...(startDate && endDate ? { createdAt: { gte: startDate, lte: endDate } } : {}),
-      },
-      include: {
-        payment: { select: { negotiatedAmount: true, createdAt: true } },
-      },
-    }),
-    // Tournament entry fee payments (last 7 days)
-    prisma.tournamentParticipant.findMany({
-      where: {
-        isPaid: true,
-        createdAt: { gte: bounds7Days.start, lte: bounds7Days.end },
-      },
-      include: {
-        payment: { select: { negotiatedAmount: true, createdAt: true } },
-      },
-    }),
   ]);
 
   let periodGameRevenue = 0;
@@ -273,12 +251,7 @@ async function getDashboardData(period: string = "today", from?: string, to?: st
     periodCreditRevenue += Number(t.moneyGiven);
   }
 
-  let periodTournamentRevenue = 0;
-  for (const tp of periodTournamentPayments) {
-    periodTournamentRevenue += Number(tp.payment?.negotiatedAmount ?? 0);
-  }
-  
-  const periodRevenue = periodGameRevenue + periodSnacksRevenue + periodCreditRevenue + periodTournamentRevenue;
+  const periodRevenue = periodGameRevenue + periodSnacksRevenue + periodCreditRevenue;
 
   const gameUtilization = Object.entries(gameMap)
     .map(([name, stats]) => ({
@@ -288,10 +261,10 @@ async function getDashboardData(period: string = "today", from?: string, to?: st
     }))
     .sort((a, b) => b.revenue - a.revenue);
 
-  const dailyMap: Record<string, { game: number; snacks: number; credits: number; tournaments: number }> = {};
+  const dailyMap: Record<string, { game: number; snacks: number; credits: number }> = {};
   for (let i = 6; i >= 0; i--) {
     const day = subDays(now, i);
-    dailyMap[formatInIST(day)] = { game: 0, snacks: 0, credits: 0, tournaments: 0 };
+    dailyMap[formatInIST(day)] = { game: 0, snacks: 0, credits: 0 };
   }
 
   for (const b of last7DaysBookings) {
@@ -317,13 +290,6 @@ async function getDashboardData(period: string = "today", from?: string, to?: st
     }
   }
 
-  for (const tp of last7DaysTournamentPayments) {
-    const dateStr = formatInIST(tp.createdAt);
-    if (dailyMap[dateStr]) {
-      dailyMap[dateStr].tournaments += Number(tp.payment?.negotiatedAmount ?? 0);
-    }
-  }
-
   const last7DaysRevenue = Object.entries(dailyMap).map(([date, data]) => {
     const dateObj = new Date(date);
     const dayName = dateObj.toLocaleDateString("en-US", { weekday: "narrow" });
@@ -333,8 +299,7 @@ async function getDashboardData(period: string = "today", from?: string, to?: st
       gameAmount: data.game,
       snacksAmount: data.snacks,
       creditsAmount: data.credits,
-      tournamentsAmount: data.tournaments,
-      amount: data.game + data.snacks + data.credits + data.tournaments,
+      amount: data.game + data.snacks + data.credits,
     };
   });
 
@@ -361,7 +326,6 @@ async function getDashboardData(period: string = "today", from?: string, to?: st
     periodGameRevenue,
     periodSnacksRevenue,
     periodCreditRevenue,
-    periodTournamentRevenue,
     gameUtilization,
     holds: holds.map(h => ({
       id: h.id,
@@ -469,13 +433,6 @@ export default async function AdminDashboard({
       icon: Zap,
       iconColor: "text-blue-400",
       subtitle: "From wallet top-ups",
-    },
-    {
-      title: "Tournament Fees",
-      value: formatCurrency(data.periodTournamentRevenue),
-      icon: Trophy,
-      iconColor: "text-rose-400",
-      subtitle: "From entry fees",
     },
     {
       title: "Total Revenue",
@@ -729,7 +686,6 @@ export default async function AdminDashboard({
                 
                 const creditsPct = d.amount > 0 ? (d.creditsAmount / d.amount) * 100 : 0;
                 const snacksPct = d.amount > 0 ? (d.snacksAmount / d.amount) * 100 : 0;
-                const tournamentsPct = d.amount > 0 ? ((d as any).tournamentsAmount / d.amount) * 100 : 0;
                 const gamePct = d.amount > 0 ? (d.gameAmount / d.amount) * 100 : 0;
 
                 const formattedAmount = d.amount >= 1000 
@@ -746,7 +702,6 @@ export default async function AdminDashboard({
                       {d.gameAmount > 0 && <span className="text-violet-400 text-[9px]">Game: ₹{d.gameAmount.toLocaleString()}</span>}
                       {d.snacksAmount > 0 && <span className="text-amber-400 text-[9px]">Snacks: ₹{d.snacksAmount.toLocaleString()}</span>}
                       {d.creditsAmount > 0 && <span className="text-cyan-400 text-[9px]">Prepaid: ₹{d.creditsAmount.toLocaleString()}</span>}
-                      {(d as any).tournamentsAmount > 0 && <span className="text-rose-400 text-[9px]">Tournaments: ₹{(d as any).tournamentsAmount.toLocaleString()}</span>}
                     </div>
                     <div className="w-full h-24 flex items-end relative z-10">
                       <div
@@ -756,17 +711,13 @@ export default async function AdminDashboard({
                         )}
                         style={{ height: `${heightPct}%` }}
                       >
-                        <div 
-                          className={cn("w-full transition-all duration-500", i === 6 ? "bg-cyan-400" : "bg-cyan-500/80 group-hover:bg-cyan-400")} 
-                          style={{ height: `${creditsPct}%` }} 
+                        <div
+                          className={cn("w-full transition-all duration-500", i === 6 ? "bg-cyan-400" : "bg-cyan-500/80 group-hover:bg-cyan-400")}
+                          style={{ height: `${creditsPct}%` }}
                         />
-                        <div 
-                          className={cn("w-full transition-all duration-500", i === 6 ? "bg-rose-400" : "bg-rose-500/80 group-hover:bg-rose-400")} 
-                          style={{ height: `${tournamentsPct}%` }} 
-                        />
-                        <div 
-                          className={cn("w-full transition-all duration-500", i === 6 ? "bg-amber-400" : "bg-amber-500/80 group-hover:bg-amber-400")} 
-                          style={{ height: `${snacksPct}%` }} 
+                        <div
+                          className={cn("w-full transition-all duration-500", i === 6 ? "bg-amber-400" : "bg-amber-500/80 group-hover:bg-amber-400")}
+                          style={{ height: `${snacksPct}%` }}
                         />
                         <div 
                           className={cn("w-full transition-all duration-500", i === 6 ? "bg-violet-500" : "bg-violet-600/80 group-hover:bg-violet-500")} 

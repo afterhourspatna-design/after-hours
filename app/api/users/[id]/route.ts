@@ -7,7 +7,11 @@ const updateSchema = z.object({
   name: z.string().min(1).optional(),
   phone: z.string().min(7).optional(),
   email: z.preprocess(
-    (val) => (typeof val === "string" ? val.trim().toLowerCase() : val),
+    (val) => {
+      if (typeof val !== "string") return val;
+      const trimmed = val.trim().toLowerCase();
+      return trimmed === "" ? null : trimmed;
+    },
     z.string().email().optional().nullable()
   ),
   notes: z.string().optional().nullable(),
@@ -57,14 +61,4 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
 
   const user = await prisma.appUser.update({ where: { id }, data: parsed.data });
   return NextResponse.json(user);
-}
-
-export async function DELETE(_: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const session = await auth();
-  if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  if ((session.user as any).role !== "ADMIN") return NextResponse.json({ error: "Admin only" }, { status: 403 });
-
-  const { id } = await params;
-  await prisma.appUser.delete({ where: { id } });
-  return NextResponse.json({ success: true });
 }

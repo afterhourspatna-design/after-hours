@@ -5,15 +5,20 @@ import { Prisma } from "@prisma/client";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
 import { relevanceScore, orderByIds } from "@/lib/search-rank";
+import { generateTempPassword } from "@/lib/password-generator";
+import { resolveReferrer } from "@/lib/referral";
 
 const createSchema = z.object({
   name: z.string().min(1),
   phone: z.string().min(7),
-  email: z.string().email().optional().nullable(),
-  password: z.string().min(6).optional().nullable(),
+  email: z.preprocess(
+    (val) => (typeof val === "string" && val.trim() === "" ? null : val),
+    z.string().email().optional().nullable()
+  ),
   notes: z.string().optional().nullable(),
   role: z.enum(["CUSTOMER", "STAFF", "ADMIN"]).default("CUSTOMER"),
   isPhoneVerified: z.boolean().optional().default(false),
+  referredBy: z.string().optional().nullable(),
 });
 
 export async function GET(req: NextRequest) {
@@ -24,11 +29,15 @@ export async function GET(req: NextRequest) {
 
   const { searchParams } = req.nextUrl;
   const q = searchParams.get("q");
-  const roleFilter = searchParams.get("role") || "CUSTOMER";
+  const requestedRole = searchParams.get("role") || "CUSTOMER";
   const page = parseInt(searchParams.get("page") ?? "1");
   const limit = parseInt(searchParams.get("limit") ?? "50");
 
-  const where: any = { role: roleFilter };
+  // Only ADMIN may browse across all roles or view Admin/Staff rows — Staff is
+  // always scoped to Customer regardless of what's requested.
+  const roleFilter = role === "ADMIN" ? requestedRole : "CUSTOMER";
+
+  const where: any = roleFilter === "ALL" ? {} : { role: roleFilter };
   if (q) {
     where.OR = [
       { name: { contains: q, mode: "insensitive" } },
@@ -110,9 +119,15 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  const passwordHash = parsed.data.password 
-    ? await bcrypt.hash(parsed.data.password, 12) 
-    : null;
+  let referrer: { id: string; phone: string } | null = null;
+  try {
+    referrer = await resolveReferrer(parsed.data.referredBy);
+  } catch (err: any) {
+    return NextResponse.json({ error: err.message }, { status: 400 });
+  }
+
+  const generatedPassword = generateTempPassword();
+  const passwordHash = await bcrypt.hash(generatedPassword, 12);
 
   const user = await prisma.appUser.create({
     data: {
@@ -121,10 +136,24 @@ export async function POST(req: NextRequest) {
       email,
       notes: parsed.data.notes ?? null,
       passwordHash,
+      mustChangePassword: true,
       role: actorRole === "ADMIN" ? parsed.data.role : "CUSTOMER",
       isPhoneVerified: parsed.data.isPhoneVerified,
+      referredById: referrer?.id ?? null,
+      referredByPhone: referrer?.phone ?? null,
     },
   });
 
-  return NextResponse.json(user, { status: 201 });
+  await prisma.auditLog.create({
+    data: {
+      actorId: (session.user as any).id,
+      actorName: session.user.name ?? undefined,
+      action: "CREATE_USER",
+      entityType: "AppUser",
+      entityId: user.id,
+      meta: { role: user.role, referredByPhone: referrer?.phone ?? null },
+    },
+  });
+
+  return NextResponse.json({ ...user, generatedPassword }, { status: 201 });
 }

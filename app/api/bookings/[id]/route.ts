@@ -6,6 +6,8 @@ import { calculateBookingPrice } from "@/lib/pricing";
 import { BookingStatus, PaymentStatus } from "@prisma/client";
 import { addMinutes } from "date-fns";
 import { z } from "zod";
+import { generateTempPassword } from "@/lib/password-generator";
+import bcrypt from "bcryptjs";
 
 const updateSchema = z.object({
   bookingStatus: z.nativeEnum(BookingStatus).optional(),
@@ -99,6 +101,7 @@ export async function PUT(
           }
         }
 
+        const passwordHash = await bcrypt.hash(generateTempPassword(), 12);
         guestUser = await prisma.appUser.create({
           data: {
             name: data.guestName || "Guest Customer",
@@ -106,6 +109,8 @@ export async function PUT(
             role: "CUSTOMER",
             referredById,
             referredByPhone,
+            passwordHash,
+            mustChangePassword: true,
           },
         });
       }

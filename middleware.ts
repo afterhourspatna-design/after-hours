@@ -5,7 +5,8 @@ const { auth } = NextAuth(authConfig);
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-const PUBLIC_PATHS = ["/login", "/signup"];
+const PUBLIC_PATHS = ["/login", "/signup", "/setup", "/forgot-password"];
+const FORCE_PASSWORD_CHANGE_PATH = "/force-password-change";
 
 const ROLE_PATHS: Record<string, string[]> = {
   ADMIN: ["/admin", "/staff", "/customer"],
@@ -33,11 +34,24 @@ export default auth(async (req: NextRequest & { auth: any }) => {
   }
 
   const role = session.user?.role as string;
+  const mustChangePassword = !!session.user?.mustChangePassword;
 
-  // Authenticated user hitting /login → redirect to their dashboard
+  // Authenticated user hitting /login or /signup → redirect to their dashboard
   // BUT: if there's an error param, let them stay on /login (likely breaking a loop)
   if (isPublic) {
+    if (pathname.startsWith("/setup")) return NextResponse.next();
     if (nextUrl.searchParams.has("error")) return NextResponse.next();
+    return NextResponse.redirect(new URL(ROLE_HOME[role] ?? "/login", nextUrl.origin));
+  }
+
+  // Forced password-change gate: an authenticated user with a temp/reset
+  // password can't reach anything else until they set their own.
+  if (mustChangePassword) {
+    if (pathname.startsWith(FORCE_PASSWORD_CHANGE_PATH)) return NextResponse.next();
+    return NextResponse.redirect(new URL(FORCE_PASSWORD_CHANGE_PATH, nextUrl.origin));
+  }
+  if (pathname.startsWith(FORCE_PASSWORD_CHANGE_PATH)) {
+    // Nothing pending — send them to their dashboard instead of the change screen.
     return NextResponse.redirect(new URL(ROLE_HOME[role] ?? "/login", nextUrl.origin));
   }
 

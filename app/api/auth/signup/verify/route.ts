@@ -4,10 +4,6 @@ const DISABLED_MESSAGE = "Self-service sign-up isn't available. Please contact a
 
 /** Self-service signup has been disabled; this route is kept only so old
  * clients get a clear error instead of a 404. */
-export async function GET() {
-  return NextResponse.json({ otpRequired: false, enabled: false });
-}
-
 export async function POST() {
   return NextResponse.json({ error: DISABLED_MESSAGE }, { status: 403 });
 }

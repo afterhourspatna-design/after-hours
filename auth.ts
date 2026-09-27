@@ -6,10 +6,7 @@ import { z } from "zod";
 import { authConfig } from "./auth.config";
 
 const credentialsSchema = z.object({
-  email: z.preprocess(
-    (val) => (typeof val === "string" ? val.trim().toLowerCase() : val),
-    z.string().email()
-  ),
+  identifier: z.string().min(1),
   password: z.string().min(1),
 });
 
@@ -21,22 +18,24 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     Credentials({
       name: "credentials",
       credentials: {
-        email: { label: "Email", type: "email" },
+        identifier: { label: "Email or Phone", type: "text" },
         password: { label: "Password", type: "password" },
       },
       async authorize(credentials) {
         const parsed = credentialsSchema.safeParse(credentials);
         if (!parsed.success) return null;
 
-        const { email, password } = parsed.data;
+        const { password } = parsed.data;
+        const identifier = parsed.data.identifier.trim();
+        const isEmail = identifier.includes("@");
+        const phoneDigits = identifier.replace(/\D/g, "").slice(-10);
+
+        if (!isEmail && phoneDigits.length !== 10) return null;
 
         const user = await prisma.appUser.findFirst({
-          where: {
-            email: {
-              equals: email,
-              mode: "insensitive",
-            },
-          },
+          where: isEmail
+            ? { email: { equals: identifier.toLowerCase(), mode: "insensitive" } }
+            : { phone: phoneDigits },
           select: {
             id: true,
             name: true,
@@ -45,6 +44,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             role: true,
             passwordHash: true,
             isActive: true,
+            mustChangePassword: true,
           },
         });
 
@@ -62,6 +62,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           email: user.email ?? "",
           phone: user.phone,
           role: user.role,
+          mustChangePassword: user.mustChangePassword,
         };
       },
     }),
