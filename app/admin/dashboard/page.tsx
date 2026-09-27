@@ -458,14 +458,7 @@ export default async function AdminDashboard({
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
-          <a
-            href="/admin/bookings/new"
-            className="flex items-center gap-2 px-5 py-2.5 bg-violet-600 hover:bg-violet-500 text-white text-xs font-bold rounded-xl transition-all shadow-lg shadow-violet-900/20 active:scale-95"
-          >
-            <Plus className="w-4 h-4" /> New booking
-          </a>
-
+        <div className="flex items-center justify-between lg:justify-start gap-3 w-full lg:w-auto">
           {isAdmin && (
           <details className="relative">
             <summary
@@ -478,13 +471,13 @@ export default async function AdminDashboard({
               {period === "today" ? "Filter" : currentPeriodLabel}
             </summary>
 
-            <div className="absolute right-0 mt-2 w-72 bg-zinc-900 border border-zinc-800 rounded-2xl shadow-2xl z-30 p-3 space-y-1">
+            <div className="absolute left-0 lg:left-auto lg:right-0 mt-2 w-80 max-w-[calc(100vw-2rem)] bg-zinc-900 border border-zinc-800 rounded-2xl shadow-2xl z-30 p-3.5 space-y-1">
               {filterOptions.map((opt) => (
                 <a
                   key={opt.id}
                   href={`/admin/dashboard?period=${opt.id}`}
                   className={cn(
-                    "flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition-all",
+                    "flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all",
                     period === opt.id
                       ? "bg-violet-600/20 text-violet-300"
                       : "text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200"
@@ -532,6 +525,13 @@ export default async function AdminDashboard({
             </div>
           </details>
           )}
+
+          <a
+            href="/admin/bookings/new"
+            className="flex items-center gap-2 px-5 py-2.5 bg-violet-600 hover:bg-violet-500 text-white text-xs font-bold rounded-xl transition-all shadow-lg shadow-violet-900/20 active:scale-95"
+          >
+            <Plus className="w-4 h-4" /> New booking
+          </a>
         </div>
       </div>
 
