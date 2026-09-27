@@ -1,7 +1,9 @@
 "use client";
 
+import { useState } from "react";
 // Dynamic import to avoid SSR issues with FullCalendar
 import dynamic from "next/dynamic";
+import GameFilterDropdown from "@/components/bookings/GameFilterDropdown";
 
 const CalendarClient = dynamic(
   () => import("@/components/bookings/CalendarView"),
@@ -19,25 +21,28 @@ const CalendarClient = dynamic(
 );
 
 export default function AdminCalendarPage() {
+  const [selectedGameTag, setSelectedGameTag] = useState<string | null>(null);
+
   return (
     <div className="space-y-5">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-bold text-white">Calendar</h1>
-          <p className="text-sm text-zinc-500 mt-0.5">
-            Click a time slot to create a booking · Click an event to edit
-          </p>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="space-y-1">
+          <p className="text-[10px] font-bold text-zinc-500 tracking-[0.2em] uppercase">Workspace / Calendar</p>
+          <h1 className="text-3xl font-bold text-white tracking-tight">Calendar</h1>
         </div>
-        <a
-          href="/admin/bookings/new"
-          className="flex items-center gap-2 px-4 py-2 bg-violet-600 hover:bg-violet-500 text-white text-sm font-medium rounded-xl transition-all"
-        >
-          + New Booking
-        </a>
+        <div className="flex items-center justify-between sm:justify-start gap-3 w-full sm:w-auto">
+          <GameFilterDropdown value={selectedGameTag} onChange={setSelectedGameTag} />
+          <a
+            href="/admin/bookings/new"
+            className="flex items-center gap-2 px-4 py-2 bg-violet-600 hover:bg-violet-500 text-white text-sm font-medium rounded-xl transition-all"
+          >
+            + New Booking
+          </a>
+        </div>
       </div>
 
       <div className="glass-card overflow-hidden p-4">
-        <CalendarClient role="ADMIN" initialView="timeGridDay" />
+        <CalendarClient role="ADMIN" initialView="timeGridDay" selectedGameTag={selectedGameTag} />
       </div>
     </div>
   );
