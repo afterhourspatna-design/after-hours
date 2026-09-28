@@ -12,6 +12,14 @@ import { TableSkeleton } from "@/components/ui/LoadingSkeleton";
 import EmptyState from "@/components/ui/EmptyState";
 import SnackProductPicker, { SnackItemPayload } from "@/components/snacks/SnackProductPicker";
 
+interface SnackLine {
+  id: string;
+  name: string;
+  note: string | null;
+  quantity: number;
+  amount: number;
+}
+
 interface Booking {
   id: string;
   userId?: string | null;
@@ -35,9 +43,11 @@ interface Booking {
   paymentId: string | null;
   snacksAmount: number | null;
   couponId: string | null;
+  couponDiscount?: number | string | null;
   allocations?: any[];
   isNewUser?: boolean;
   allocatedAmount?: number;
+  snackItems?: SnackLine[];
 }
 
 interface Coupon {
@@ -89,7 +99,6 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
   const [onlineInput, setOnlineInput] = useState("");
   const [selectedPaymentDetail, setSelectedPaymentDetail] = useState<PaymentGroup | null>(null);
   const [editPaymentId, setEditPaymentId] = useState<string | null>(null);
-  const [payOnlySnacks, setPayOnlySnacks] = useState(false);
   // History defaults to today's settlements only (for both admin and staff);
   // admin can still widen/clear the range via the date filter, which is
   // hidden for staff, so staff always sees just today's history.
@@ -127,7 +136,12 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
 
   const LIMIT = 15;
 
-
+  // Wait for a pause in typing before querying, instead of one request per keystroke.
+  const [debouncedSearch, setDebouncedSearch] = useState(search);
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(t);
+  }, [search]);
 
   const fetchBookings = useCallback(async () => {
     setLoading(true);
@@ -143,7 +157,7 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
           // tabs — only Payment History (the PAID tab) is meant to stay
           // restricted to the present day for staff.
           includePastForStaff: "1",
-          ...(search ? { q: search } : {}),
+          ...(debouncedSearch ? { q: debouncedSearch } : {}),
           paymentStatus: "UNPAID",
         });
         const res = await fetch(`/api/bookings?${params}`);
@@ -158,7 +172,7 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
         const params = new URLSearchParams({
           page: String(page),
           limit: String(LIMIT),
-          ...(search ? { q: search } : {}),
+          ...(debouncedSearch ? { q: debouncedSearch } : {}),
           ...(startDate ? { from: `${startDate}T00:00:00.000Z` } : {}),
           ...(endDate ? { to: `${endDate}T23:59:59.999Z` } : {}),
         });
@@ -265,7 +279,7 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
     } finally {
       setLoading(false);
     }
-  }, [page, search, activeTab, startDate, endDate, includeAdvanceBookings]);
+  }, [page, debouncedSearch, activeTab, startDate, endDate, includeAdvanceBookings]);
 
   useEffect(() => {
     fetchBookings();
@@ -365,7 +379,13 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
   const [quickAddOrderId, setQuickAddOrderId] = useState<string | null>(null);
 
   const handleOpenQuickAddSnack = (group: BookingGroup) => {
-    const existingSnackRow = group.items.find((b) => b.id.startsWith("SNACK_"));
+    // Only a snack tab created today (IST) is reused; if the customer has
+    // several from today, take the latest. Otherwise (none, or only older
+    // days) quickAddOrderId stays null and a new tab is created on first add.
+    const todaysSnackRows = group.items
+      .filter((b) => b.id.startsWith("SNACK_") && getISTDayRelative(new Date(b.startDateTime)) === "today")
+      .sort((a, b) => new Date(b.startDateTime).getTime() - new Date(a.startDateTime).getTime());
+    const existingSnackRow = todaysSnackRows[0];
     setQuickAddOrderId(existingSnackRow ? existingSnackRow.id.replace("SNACK_", "") : null);
     setSnackQuickAddGroup(group);
   };
@@ -425,6 +445,24 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
     ? paymentHistory.find(p => p.paymentId === editPaymentId)?.bookings || []
     : bookings.filter((b) => selectedIds.has(b.id));
 
+  // Game bookings in the settle modal grouped per customer: name, then their games.
+  const gameDetailGroups = (() => {
+    const groups = new Map<string, { key: string; name: string; total: number; bookings: Booking[] }>();
+    for (const b of selectedBookings) {
+      if (b.id.startsWith("SNACK_") || b.game?.tag === "SNACK") continue;
+      const phone = b.user?.phone || b.guestPhone || "";
+      const key = phone || `single:${b.id}`;
+      let g = groups.get(key);
+      if (!g) {
+        g = { key, name: b.user?.name ?? b.guestName ?? "Guest", total: 0, bookings: [] };
+        groups.set(key, g);
+      }
+      g.bookings.push(b);
+      g.total += Number(b.finalAmount);
+    }
+    return Array.from(groups.values());
+  })();
+
   const isCreditsPayment = selectedBookings.some((b) => b.game?.tag === "CREDITS");
 
   const totalActualAmount = selectedBookings.reduce((sum, b) => sum + Number(b.finalAmount), 0);
@@ -457,34 +495,50 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
   const eligibleBookings = selectedBookings.filter((b) => !b.couponId && !b.id.startsWith("SNACK_"));
   const eligibleBaseAmount = eligibleBookings.reduce((sum, b) => sum + Number(b.finalAmount), 0);
 
-  let dynamicCouponDiscount = 0;
-  if (!editPaymentId && selectedCouponCode && eligibleBaseAmount > 0) {
-    const coupon = coupons.find(c => c.code === selectedCouponCode);
-    if (coupon && eligibleBaseAmount >= Number(coupon.minBookingAmount)) {
-      if (coupon.discountType === "PERCENTAGE") {
-        let discount = eligibleBaseAmount * (Number(coupon.discountValue) / 100);
-        if (coupon.maxDiscountAmount) {
-          discount = Math.min(discount, Number(coupon.maxDiscountAmount));
-        }
-        dynamicCouponDiscount = discount;
-      } else {
-        dynamicCouponDiscount = Math.min(eligibleBaseAmount, Number(coupon.discountValue));
-      }
+  // The coupon's total discount on the eligible bookings: percentage (capped)
+  // or fixed, then rounded UP to a whole rupee, and never above what's owed.
+  const computeCouponDiscount = (coupon: Coupon | undefined, base: number) => {
+    if (!coupon || base <= 0 || base < Number(coupon.minBookingAmount)) return 0;
+    let discount: number;
+    if (coupon.discountType === "PERCENTAGE") {
+      discount = base * (Number(coupon.discountValue) / 100);
+      if (coupon.maxDiscountAmount) discount = Math.min(discount, Number(coupon.maxDiscountAmount));
+    } else {
+      discount = Number(coupon.discountValue);
     }
+    return Math.min(Math.ceil(discount - 1e-9), base);
+  };
+
+  const dynamicCouponDiscount =
+    !editPaymentId && selectedCouponCode
+      ? computeCouponDiscount(coupons.find((c) => c.code === selectedCouponCode), eligibleBaseAmount)
+      : 0;
+
+  // Each un-couponed game booking's share of the coupon discount, split in
+  // proportion to its amount, with the last one taking the rounding remainder
+  // so the shares add up exactly to the whole-rupee discount.
+  const couponShares = new Map<string, number>();
+  if (dynamicCouponDiscount > 0 && eligibleBaseAmount > 0) {
+    let remaining = dynamicCouponDiscount;
+    eligibleBookings.forEach((b, i) => {
+      // Whole-rupee shares: each is its ratio of the discount rounded up, and
+      // the last booking gets whatever is left.
+      const share = i === eligibleBookings.length - 1
+        ? remaining
+        : Math.min(Math.ceil((Number(b.finalAmount) / eligibleBaseAmount) * dynamicCouponDiscount - 1e-9), remaining);
+      remaining -= share;
+      couponShares.set(b.id, share);
+    });
   }
+
+  // Price before any coupon (a coupon already applied earlier is added back),
+  // and the price after it — including a coupon being previewed right now.
+  const bookingInitial = (b: Booking) => Number(b.finalAmount) + (b.couponId ? Number(b.couponDiscount ?? 0) : 0);
+  const bookingCurrent = (b: Booking) => Number(b.finalAmount) - (couponShares.get(b.id) ?? 0);
 
   const handleCouponChange = (code: string) => {
     setSelectedCouponCode(code);
-    const coupon = coupons.find(c => c.code === code);
-    let discount = 0;
-    if (coupon && eligibleBaseAmount >= Number(coupon.minBookingAmount)) {
-      if (coupon.discountType === "PERCENTAGE") {
-        discount = eligibleBaseAmount * (Number(coupon.discountValue) / 100);
-        if (coupon.maxDiscountAmount) discount = Math.min(discount, Number(coupon.maxDiscountAmount));
-      } else {
-        discount = Math.min(eligibleBaseAmount, Number(coupon.discountValue));
-      }
-    }
+    const discount = computeCouponDiscount(coupons.find((c) => c.code === code), eligibleBaseAmount);
     const newGamesAmount = Math.max(0, totalActualGamesAmount - discount);
     setNegotiatedInput(String(newGamesAmount));
 
@@ -501,7 +555,6 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
     setPaymentMethod("ONLINE");
     setCashInput("");
     setOnlineInput("");
-    setPayOnlySnacks(false);
     setEditPaymentId(null);
     setSelectedCouponCode("");
     setShowPayModal(true);
@@ -517,7 +570,6 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
     setPaymentMethod(p.paymentMethod as "CASH" | "ONLINE" | "MIXED");
     setCashInput(p.totalCash ? String(p.totalCash) : "");
     setOnlineInput(p.totalOnline ? String(p.totalOnline) : "");
-    setPayOnlySnacks(p.totalNegotiated === 0 && p.totalSnacks > 0);
     setShowPayModal(true);
   };
 
@@ -525,12 +577,11 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
   const handleClosePayModal = () => {
     setShowPayModal(false);
     setEditPaymentId(null);
-    setPayOnlySnacks(false);
     setSelectedIds(new Set());
   };
 
   // Real-time values
-  const totalNegotiatedVal = payOnlySnacks ? 0 : (Number(negotiatedInput) || 0);
+  const totalNegotiatedVal = Number(negotiatedInput) || 0;
   // Edit-existing-payment mode uses the lump-sum field; new-payment mode is
   // always the sum of whatever's already on the selected tab(s) — snacks are
   // added to a customer's tab from the Unpaid list directly, not here, so
@@ -629,7 +680,7 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
                 : "text-zinc-400 hover:text-zinc-200"
             )}
           >
-            Active / Unpaid
+            Unpaid
           </button>
           <button
             onClick={() => setActiveTab("PAID")}
@@ -640,7 +691,7 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
                 : "text-zinc-400 hover:text-zinc-200"
             )}
           >
-            History / Paid
+            Payment History
           </button>
         </div>
       </div>
@@ -862,6 +913,11 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
                                   <span className="text-zinc-500 line-through text-xs">{formatCurrency(Number(b.finalAmount))}</span>
                                   <span className="text-amber-400 font-bold">{formatCurrency(Number(b.finalAmount) - (b.allocations?.reduce((s: any, a: any) => s + Number(a.amount), 0) || 0))}</span>
                                 </div>
+                              ) : b.couponId && Number(b.couponDiscount ?? 0) > 0 ? (
+                                <div className="flex items-center justify-center gap-1.5 whitespace-nowrap">
+                                  <span className="text-zinc-500 line-through text-xs">{formatCurrency(bookingInitial(b))}</span>
+                                  <span className="text-emerald-400 font-bold">{formatCurrency(Number(b.finalAmount))}</span>
+                                </div>
                               ) : (
                                 formatCurrency(Number(b.finalAmount))
                               )}
@@ -1031,14 +1087,14 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
           <div className="bg-zinc-900 border border-violet-500/30 shadow-2xl rounded-2xl p-4 flex flex-col sm:flex-row items-stretch sm:items-center sm:justify-between gap-3 sm:gap-4 backdrop-blur-md bg-opacity-95">
             <div className="flex items-center justify-between sm:contents">
               <div>
-                <p className="text-xs text-zinc-400">Selected Bookings</p>
+                <p className="text-xs text-zinc-400">Selected</p>
                 <p className="text-sm font-bold text-white">
-                  {selectedIds.size} {selectedIds.size === 1 ? "booking" : "bookings"}
+                  {selectedIds.size} {selectedIds.size === 1 ? "item" : "items"}
                 </p>
               </div>
 
               <div className="text-right sm:text-left">
-                <p className="text-xs text-zinc-400">Total Actual Amount</p>
+                <p className="text-xs text-zinc-400">Total Amount</p>
                 <p className="text-base font-extrabold text-violet-400">
                   {formatCurrency(totalActualAmount)}
                 </p>
@@ -1050,7 +1106,7 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
               className="flex items-center justify-center gap-2 px-6 py-2.5 w-full sm:w-auto bg-violet-600 hover:bg-violet-500 text-white rounded-xl font-bold shadow-lg shadow-violet-900/30 hover:shadow-violet-800/40 transition-all text-sm"
             >
               <CreditCard className="w-4 h-4" />
-              Settle Pay ({selectedIds.size})
+              Settle Payment ({selectedIds.size})
             </button>
           </div>
         </div>
@@ -1071,7 +1127,7 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
             <div className="flex items-center justify-between border-b border-zinc-800/60 pb-3">
               <div className="flex items-center gap-2">
                 <Coins className="w-5 h-5 text-violet-400" />
-                <h3 className="text-lg font-bold text-white">{editPaymentId ? "Edit Payment History" : "Settle Batch Payment"}</h3>
+                <h3 className="text-lg font-bold text-white">{editPaymentId ? "Edit Payment" : "Settle Payment"}</h3>
               </div>
               <button
                 onClick={() => handleClosePayModal()}
@@ -1082,130 +1138,96 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
               </button>
             </div>
 
-            {/* List of bookings being paid */}
+            {/* Game Details */}
             <div className="bg-zinc-950/40 rounded-xl p-3 border border-zinc-800/40 space-y-2">
-              <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">Bookings List</p>
-              <div className="divide-y divide-zinc-800/40 max-h-32 overflow-y-auto custom-scroll pr-1">
-                {selectedBookings.map((b) => (
-                  <div key={b.id} className="py-2 flex justify-between text-xs">
-                    <div>
-                      <p className="font-semibold text-zinc-300 flex items-center gap-1">
-                        {b.user?.name ?? b.guestName ?? "Guest"} ({b.game.name})
-                        {b.couponId && <span className="bg-violet-500/20 text-violet-400 text-[9px] px-1.5 py-0.5 rounded font-bold uppercase border border-violet-500/30">Coupon</span>}
-                      </p>
-                      <p className="text-zinc-600">{formatDate(b.startDateTime)}</p>
+              <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">Game Details</p>
+              <div className="divide-y divide-zinc-800/40 max-h-40 overflow-y-auto custom-scroll pr-1">
+                {gameDetailGroups.map((g) => (
+                  <div key={g.key} className="py-2 text-xs space-y-1">
+                    <div className="flex justify-between">
+                      <p className="font-semibold text-zinc-300">{g.name}</p>
+                      {(() => {
+                        const initial = g.bookings.reduce((s, b) => s + bookingInitial(b), 0);
+                        const current = g.bookings.reduce((s, b) => s + bookingCurrent(b), 0);
+                        return initial - current > 0.009 ? (
+                          <p className="font-bold text-zinc-300 whitespace-nowrap flex-shrink-0">
+                            <span className="text-zinc-600 line-through font-normal mr-1.5">{formatCurrency(initial)}</span>
+                            <span className="text-emerald-400">{formatCurrency(current)}</span>
+                          </p>
+                        ) : (
+                          <p className="font-bold text-zinc-300">{formatCurrency(current)}</p>
+                        );
+                      })()}
                     </div>
-                    <p className="font-bold text-zinc-300">{formatCurrency(Number(b.finalAmount))}</p>
+                    <ul className="space-y-0.5 pl-2 border-l border-zinc-800">
+                      {g.bookings.map((b) => (
+                        <li key={b.id} className="flex justify-between gap-2 text-zinc-500">
+                          <span>
+                            {b.game.name}
+                            {b.resourceUnit && <span className="text-zinc-600"> ({b.resourceUnit.unitName})</span>}
+                            <span className="text-zinc-600"> · {formatDate(b.startDateTime)}</span>
+                            {b.couponId && <span className="ml-1.5 bg-violet-500/20 text-violet-400 text-[9px] px-1.5 py-0.5 rounded font-bold uppercase border border-violet-500/30">Coupon</span>}
+                          </span>
+                          {bookingInitial(b) - bookingCurrent(b) > 0.009 ? (
+                            <span className="whitespace-nowrap flex-shrink-0">
+                              <span className="text-zinc-600 line-through mr-1.5">{formatCurrency(bookingInitial(b))}</span>
+                              <span className="text-emerald-400">{formatCurrency(bookingCurrent(b))}</span>
+                            </span>
+                          ) : (
+                            <span>{formatCurrency(bookingCurrent(b))}</span>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
                   </div>
                 ))}
               </div>
             </div>
 
-            {/* Pay only for snacks option */}
-            <div className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                id="payOnlySnacks"
-                checked={payOnlySnacks}
-                onChange={(e) => {
-                  const checked = e.target.checked;
-                  setPayOnlySnacks(checked);
-                  if (checked) {
-                    setNegotiatedInput("0");
-                    const t = snacksVal - (editPaymentId ? 0 : totalPreviouslyPaidSnacks);
-                    setAmountPayingNowInput(String(Math.max(0, t)));
-                  } else {
-                    setNegotiatedInput(String(totalActualGamesAmount));
-                    const t = totalActualGamesAmount + snacksVal - (editPaymentId ? 0 : previouslyPaidTotal);
-                    setAmountPayingNowInput(String(Math.max(0, t)));
-                  }
-                }}
-                disabled={submittingPayment}
-                className="rounded border-zinc-700 text-violet-600 focus:ring-violet-500 bg-zinc-900 h-4 w-4"
-              />
-              <label htmlFor="payOnlySnacks" className="text-xs font-semibold text-zinc-300 cursor-pointer">
-                Pay only for snacks (Settle snacks amount, leave game payment pending)
-              </label>
-            </div>
-
-            {/* Coupon Code Section */}
-            {!editPaymentId && coupons.length > 0 && (
-              <div className="space-y-2">
-                <label className="text-xs text-zinc-500 font-medium block">Apply Coupon</label>
-                <select
-                  value={selectedCouponCode}
-                  onChange={(e) => handleCouponChange(e.target.value)}
-                  disabled={submittingPayment || payOnlySnacks}
-                  className="input-field text-xs w-full"
-                >
-                  <option value="">No Coupon</option>
-                  {coupons.map(c => (
-                    <option key={c.id} value={c.code}>
-                      {c.code} - {c.discountType === "PERCENTAGE" ? `${c.discountValue}% off` : `₹${c.discountValue} off`}
-                    </option>
+            {/* Snacks */}
+            {totalActualSnacksAmount > 0 && (
+              <div className="bg-zinc-950/40 rounded-xl p-3 border border-zinc-800/40 space-y-2">
+                <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">Snacks</p>
+                <div className="divide-y divide-zinc-800/40 max-h-32 overflow-y-auto custom-scroll pr-1">
+                  {selectedBookings.filter((b) => b.id.startsWith("SNACK_") || b.game?.tag === "SNACK").map((b) => (
+                    <div key={b.id} className="py-2 text-xs space-y-1">
+                      <div className="flex justify-between">
+                        <p className="font-semibold text-zinc-300">{b.user?.name ?? b.guestName ?? "Guest"}</p>
+                        <p className="font-bold text-zinc-300">{formatCurrency(Number(b.finalAmount))}</p>
+                      </div>
+                      {b.snackItems && b.snackItems.length > 0 && (
+                        <ul className="space-y-0.5 pl-2 border-l border-zinc-800">
+                          {b.snackItems.map((it) => (
+                            <li key={it.id} className="flex justify-between gap-2 text-zinc-500">
+                              <span>
+                                {it.name}{it.quantity > 1 ? ` × ${it.quantity}` : ""}
+                                {it.note && <span className="text-zinc-600"> ({it.note})</span>}
+                              </span>
+                              <span>{formatCurrency(it.amount)}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
                   ))}
-                </select>
-                {dynamicCouponDiscount > 0 && (
-                  <p className="text-[10px] text-emerald-400 font-medium mt-1 animate-fade-in">
-                    Coupon applied! Discount: ₹{dynamicCouponDiscount.toFixed(2)} (on un-couponed bookings)
-                  </p>
-                )}
-                {selectedCouponCode && dynamicCouponDiscount === 0 && eligibleBookings.length === 0 && (
-                  <p className="text-[10px] text-amber-500 font-medium mt-1 animate-fade-in">
-                    Cannot apply: All selected bookings already have coupons applied.
-                  </p>
-                )}
-                {selectedCouponCode && dynamicCouponDiscount === 0 && eligibleBookings.length > 0 && (
-                  <p className="text-[10px] text-amber-500 font-medium mt-1 animate-fade-in">
-                    Coupon not applicable (min amount not met on the un-couponed bookings).
-                  </p>
-                )}
+                </div>
               </div>
             )}
 
-            {/* Invoice Summary (Read-Only) */}
-            <div className="bg-zinc-950/40 rounded-xl p-3 border border-zinc-800/40 space-y-2">
-              <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider mb-2">Invoice Summary</p>
-              <div className="flex justify-between text-xs text-zinc-400">
-                <span>Games Total</span>
-                <span>{formatCurrency(totalActualGamesAmount)}</span>
-              </div>
-              <div className="flex justify-between text-xs text-zinc-400">
-                <span>Snacks Total</span>
-                <span>{formatCurrency(totalActualSnacksAmount)}</span>
-              </div>
-              {dynamicCouponDiscount > 0 && (
-                <div className="flex justify-between text-xs text-emerald-400 font-medium">
-                  <span>Coupon Discount</span>
-                  <span>-{formatCurrency(dynamicCouponDiscount)}</span>
-                </div>
-              )}
-              {previouslyPaidTotal > 0 && (
-                <div className="flex justify-between text-xs text-amber-400">
-                  <span>Previously Paid (Advance)</span>
-                  <span>-{formatCurrency(previouslyPaidTotal)}</span>
-                </div>
-              )}
-              <div className="border-t border-zinc-800/60 pt-2 flex justify-between text-sm font-bold text-white">
-                <span>Total Outstanding</span>
-                <span>{formatCurrency(totalActualAmount - dynamicCouponDiscount - (editPaymentId ? 0 : previouslyPaidTotal))}</span>
-              </div>
-            </div>
-
-            {/* Price section */}
+            {/* Editable price section */}
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="text-[10px] uppercase tracking-wider text-zinc-500 font-bold block mb-1.5">Final Games Price</label>
                 <input
                   type="number"
-                  value={payOnlySnacks ? "0" : negotiatedInput}
+                  value={negotiatedInput}
                   onChange={(e) => {
                     setNegotiatedInput(e.target.value);
                     const newGamesAmount = Number(e.target.value) || 0;
                     const t = newGamesAmount + snacksVal - (editPaymentId ? 0 : previouslyPaidTotal);
                     setAmountPayingNowInput(String(Math.max(0, t)));
                   }}
-                  disabled={submittingPayment || payOnlySnacks}
+                  disabled={submittingPayment}
                   placeholder="Games Price"
                   className="input-field text-sm font-semibold w-full"
                   title="Final Games Price"
@@ -1250,6 +1272,44 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
                 className="input-field text-lg font-bold text-emerald-400 bg-emerald-400/5 border-emerald-400/30 w-full py-2.5"
               />
             </div>
+
+            {/* Discount */}
+            {!editPaymentId && (
+              <div className="space-y-2">
+                <label className="text-xs text-zinc-500 font-medium block">Discount (Coupon)</label>
+                <select
+                  value={selectedCouponCode}
+                  onChange={(e) => handleCouponChange(e.target.value)}
+                  disabled={submittingPayment || coupons.length === 0}
+                  className="input-field text-xs w-full"
+                >
+                  <option value="">{coupons.length === 0 ? "No coupons available" : "No Coupon"}</option>
+                  {coupons.map(c => (
+                    <option key={c.id} value={c.code}>
+                      {c.code} - {c.discountType === "PERCENTAGE" ? `${c.discountValue}% off` : `₹${c.discountValue} off`}
+                    </option>
+                  ))}
+                </select>
+                {coupons.length === 0 && (
+                  <p className="text-[10px] text-zinc-500 mt-1">There are no active coupons yet. Add one from the Coupons page and it will show up here.</p>
+                )}
+                {dynamicCouponDiscount > 0 && (
+                  <p className="text-[10px] text-emerald-400 font-medium mt-1 animate-fade-in">
+                    Coupon applied! Discount: ₹{dynamicCouponDiscount.toFixed(2)} (on un-couponed bookings)
+                  </p>
+                )}
+                {selectedCouponCode && dynamicCouponDiscount === 0 && eligibleBookings.length === 0 && (
+                  <p className="text-[10px] text-amber-500 font-medium mt-1 animate-fade-in">
+                    Cannot apply: All selected bookings already have coupons applied.
+                  </p>
+                )}
+                {selectedCouponCode && dynamicCouponDiscount === 0 && eligibleBookings.length > 0 && (
+                  <p className="text-[10px] text-amber-500 font-medium mt-1 animate-fade-in">
+                    Coupon not applicable (min amount not met on the un-couponed bookings).
+                  </p>
+                )}
+              </div>
+            )}
 
             {/* Payment Method Selector */}
             <div className="space-y-2">
@@ -1310,8 +1370,21 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
               </div>
             )}
 
-            {/* Summary details */}
+            {/* Final Amount */}
             <div className="flex flex-col gap-1.5 bg-zinc-950/20 p-3 border border-zinc-800/60 rounded-xl">
+              <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider mb-1">Final Amount</p>
+              {dynamicCouponDiscount > 0 && (
+                <div className="flex items-center justify-between text-xs text-zinc-400">
+                  <span>Games Total:</span>
+                  <span className="font-semibold text-zinc-300">{formatCurrency(totalActualGamesAmount)}</span>
+                </div>
+              )}
+              {dynamicCouponDiscount > 0 && (
+                <div className="flex items-center justify-between text-xs text-emerald-400 font-medium">
+                  <span>Coupon Discount{selectedCouponCode ? ` (${selectedCouponCode})` : ""}:</span>
+                  <span className="font-semibold">-{formatCurrency(dynamicCouponDiscount)}</span>
+                </div>
+              )}
               <div className="flex items-center justify-between text-xs text-zinc-400">
                 <span>{isCreditsPayment ? "Credits" : "Games"} Invoice:</span>
                 <span className="font-semibold text-white">{formatCurrency(totalNegotiatedVal)}</span>
@@ -1647,7 +1720,7 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
             <div className="flex items-center justify-between border-b border-zinc-800/60 pb-3">
               <div className="flex items-center gap-2">
                 <Coffee className="w-5 h-5 text-amber-400" />
-                <h3 className="text-lg font-bold text-white">Add Snack</h3>
+                <h3 className="text-lg font-bold text-white">Add Snack to Tab</h3>
               </div>
               <button onClick={() => handleCloseQuickAddSnack()} className="text-zinc-500 hover:text-white transition-colors">
                 <X className="w-5 h-5" />

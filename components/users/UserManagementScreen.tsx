@@ -316,6 +316,8 @@ export default function UserManagementScreen({ viewerRole }: { viewerRole: "ADMI
   const [modalUser, setModalUser] = useState<AppUser | null | undefined>(undefined);
   const [deleteTarget, setDeleteTarget] = useState<AppUser | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [roleChangeTarget, setRoleChangeTarget] = useState<{ user: AppUser; newRole: Role } | null>(null);
+  const [changingRole, setChangingRole] = useState(false);
   const [resettingId, setResettingId] = useState<string | null>(null);
   const [generatedPassword, setGeneratedPassword] = useState<{ name: string; password: string } | null>(null);
   const LIMIT = 20;
@@ -356,21 +358,27 @@ export default function UserManagementScreen({ viewerRole }: { viewerRole: "ADMI
     }
   }
 
-  async function changeRole(u: AppUser, role: Role) {
+  async function handleConfirmRoleChange() {
+    if (!roleChangeTarget) return;
+    const { user: u, newRole } = roleChangeTarget;
+    setChangingRole(true);
     try {
       const res = await fetch(`/api/admin/users/${u.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ role, isActive: u.isActive }),
+        body: JSON.stringify({ role: newRole, isActive: u.isActive }),
       });
       if (res.ok) {
-        toast.success(`Role changed to ${role}`);
+        toast.success(`Role changed to ${newRole}`);
         fetchUsers();
       } else {
         toast.error("Failed to change role");
       }
     } catch {
       toast.error("Something went wrong");
+    } finally {
+      setChangingRole(false);
+      setRoleChangeTarget(null);
     }
   }
 
@@ -511,7 +519,10 @@ export default function UserManagementScreen({ viewerRole }: { viewerRole: "ADMI
                     <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
                       <select
                         value={u.role}
-                        onChange={(e) => changeRole(u, e.target.value as Role)}
+                        onChange={(e) => {
+                          const newRole = e.target.value as Role;
+                          if (newRole !== u.role) setRoleChangeTarget({ user: u, newRole });
+                        }}
                         className="text-[10px] font-bold bg-zinc-900 border border-zinc-800 rounded-lg px-1.5 py-1 text-zinc-300"
                         title="Change role"
                       >
@@ -580,6 +591,22 @@ export default function UserManagementScreen({ viewerRole }: { viewerRole: "ADMI
           onCancel={() => setDeleteTarget(null)}
           loading={deleting}
           destructive
+        />
+      )}
+
+      {isAdmin && (
+        <ConfirmDialog
+          open={!!roleChangeTarget}
+          title="Change Role"
+          description={
+            roleChangeTarget
+              ? `Change ${roleChangeTarget.user.name}'s role from ${roleChangeTarget.user.role} to ${roleChangeTarget.newRole}?`
+              : ""
+          }
+          confirmLabel="Change Role"
+          onConfirm={handleConfirmRoleChange}
+          onCancel={() => setRoleChangeTarget(null)}
+          loading={changingRole}
         />
       )}
     </div>
