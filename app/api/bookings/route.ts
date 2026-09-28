@@ -174,6 +174,12 @@ export async function GET(req: NextRequest) {
     };
   };
 
+  const snackInclude = {
+    user: { select: { name: true, phone: true, createdAt: true, referredByPhone: true, _count: { select: { bookings: { where: { paymentStatus: "PAID" as const } } } } } },
+    allocations: true,
+    items: { include: { product: { select: { name: true } } }, orderBy: { createdAt: "asc" as const } },
+  };
+
   const mapSnack = (snack: any) => ({
     id: `SNACK_${snack.id}`,
     userId: snack.userId,
@@ -198,6 +204,13 @@ export async function GET(req: NextRequest) {
     paymentId: snack.paymentId,
     snacksAmount: Number(snack.amount),
     allocations: snack.allocations ?? [],
+    snackItems: (snack.items ?? []).map((it: any) => ({
+      id: it.id,
+      name: it.product?.name ?? it.notes ?? "Snack item",
+      note: it.product?.name && it.notes ? it.notes : null,
+      quantity: it.quantity ?? 1,
+      amount: Number(it.amount),
+    })),
   });
 
   const snackWhere: Prisma.SnackOrderWhereInput = paymentStatus === "UNPAID"
@@ -240,7 +253,7 @@ export async function GET(req: NextRequest) {
           ? Promise.resolve([])
           : prisma.snackOrder.findMany({
               where: snackWhere,
-              include: { user: { select: { name: true, phone: true, createdAt: true, referredByPhone: true, _count: { select: { bookings: { where: { paymentStatus: "PAID" } } } } } }, allocations: true },
+              include: snackInclude,
               orderBy: { createdAt: "desc" },
             }),
       ]);
@@ -283,7 +296,7 @@ export async function GET(req: NextRequest) {
       (includeSnacks && !status
         ? prisma.snackOrder.findMany({
             where: snackWhere,
-            include: { user: { select: { name: true, phone: true, createdAt: true, referredByPhone: true, _count: { select: { bookings: { where: { paymentStatus: "PAID" } } } } } }, allocations: true },
+            include: snackInclude,
             orderBy: { createdAt: "desc" },
           })
         : Promise.resolve([])),

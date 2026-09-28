@@ -95,6 +95,33 @@ export async function GET(req: NextRequest) {
   const from = searchParams.get("from");
   const to = searchParams.get("to");
 
+  // Lookup of a registered customer's snack tab from today (IST) that still
+  // has a balance (unpaid or partially paid), used to offer "merge into it"
+  // before a second tab gets created. Guests are never looked up.
+  if (searchParams.get("open") === "1") {
+    const openUserId = searchParams.get("userId");
+    if (!openUserId) return NextResponse.json({ snacks: [] });
+    const parts = new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Kolkata", year: "numeric", month: "numeric", day: "numeric" }).formatToParts(new Date());
+    const y = parseInt(parts.find((p) => p.type === "year")!.value, 10);
+    const m = parseInt(parts.find((p) => p.type === "month")!.value, 10) - 1;
+    const d = parseInt(parts.find((p) => p.type === "day")!.value, 10);
+    const dayStart = new Date(Date.UTC(y, m, d, 0, 0, 0, 0) - 5.5 * 60 * 60 * 1000);
+    const dayEnd = new Date(Date.UTC(y, m, d, 23, 59, 59, 999) - 5.5 * 60 * 60 * 1000);
+    const open = await prisma.snackOrder.findFirst({
+      where: {
+        userId: openUserId,
+        paymentStatus: { in: ["UNPAID", "PARTIAL"] },
+        createdAt: { gte: dayStart, lte: dayEnd },
+      },
+      include: {
+        user: { select: { name: true, phone: true } },
+        items: { orderBy: { createdAt: "desc" }, include: { addedBy: { select: { name: true } }, product: { select: { name: true } } } },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+    return NextResponse.json({ snacks: open ? [open] : [] });
+  }
+
   const where: any = {};
   if (paymentStatus) where.paymentStatus = paymentStatus;
   

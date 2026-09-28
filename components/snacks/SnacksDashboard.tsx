@@ -1,11 +1,13 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Coins, Search, X, Trash2, ChevronLeft, ChevronRight, Info, ListPlus } from "lucide-react";
-import { cn, formatDate } from "@/lib/utils";
+import { Coins, Search, X, Trash2, ChevronLeft, ChevronRight, Info, ListPlus, Pencil } from "lucide-react";
+import { cn, formatDate, getISTDayRelative } from "@/lib/utils";
 import { toast } from "sonner";
 import SnackProductPicker, { SnackItemPayload } from "./SnackProductPicker";
 import ManageSnackProductsModal from "./ManageSnackProductsModal";
+import SnackItemEditDialog from "./SnackItemEditDialog";
+import ConfirmDialog from "@/components/ui/ConfirmDialog";
 
 export interface SnackOrderItem {
   id: string;
@@ -50,12 +52,14 @@ export default function SnacksDashboard() {
   // The order this modal session is adding items to. Null until the first
   // item is added (for a brand-new tab), or pre-filled when adding to an
   // existing open one.
-  const [workingOrder, setWorkingOrder] = useState<SnackOrder | null>(null);
   const [savingItem, setSavingItem] = useState(false);
   const [deleteConfirmationId, setDeleteConfirmationId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [historyOrder, setHistoryOrder] = useState<SnackOrder | null>(null);
+  const [editingItem, setEditingItem] = useState<SnackOrderItem | null>(null);
+  const [deleteItemTarget, setDeleteItemTarget] = useState<{ orderId: string; item: SnackOrderItem } | null>(null);
+  const [deletingItem, setDeletingItem] = useState(false);
 
   // Form states
   const [snackGuestMode, setSnackGuestMode] = useState(false);
@@ -63,7 +67,15 @@ export default function SnacksDashboard() {
   const [snackGuestPhone, setSnackGuestPhone] = useState("");
   const [snackSearchQuery, setSnackSearchQuery] = useState("");
   const [snackSelectedUser, setSnackSelectedUser] = useState<any | null>(null);
+  const [tabPrompt, setTabPrompt] = useState<{ tab: SnackOrder; item: SnackItemPayload } | null>(null);
   const [snackUserResults, setSnackUserResults] = useState<any[]>([]);
+
+  // Wait for a pause in typing before querying, instead of one request per keystroke.
+  const [debouncedSearch, setDebouncedSearch] = useState(search);
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(t);
+  }, [search]);
 
   const fetchSnacks = useCallback(async () => {
     setLoading(true);
@@ -71,7 +83,7 @@ export default function SnacksDashboard() {
       const params = new URLSearchParams({
         page: String(page),
         limit: String(LIMIT),
-        ...(search ? { q: search } : {}),
+        ...(debouncedSearch ? { q: debouncedSearch } : {}),
       });
       const res = await fetch(`/api/snacks?${params}`);
       if (res.ok) {
@@ -85,7 +97,7 @@ export default function SnacksDashboard() {
     } finally {
       setLoading(false);
     }
-  }, [page, search]);
+  }, [page, debouncedSearch]);
 
   useEffect(() => {
     fetchSnacks();
@@ -107,34 +119,17 @@ export default function SnacksDashboard() {
     return () => clearTimeout(t);
   }, [snackSearchQuery, snackGuestMode]);
 
-  const handleOpenModal = (snack?: SnackOrder) => {
-    if (snack) {
-      setWorkingOrder(snack);
-      if (snack.user) {
-        setSnackGuestMode(false);
-        setSnackSelectedUser({ id: snack.userId, name: snack.user.name, phone: snack.user.phone });
-        setSnackGuestName("");
-        setSnackGuestPhone("");
-      } else {
-        setSnackGuestMode(true);
-        setSnackGuestName(snack.guestName || "");
-        setSnackGuestPhone(snack.guestPhone || "");
-        setSnackSelectedUser(null);
-      }
-    } else {
-      setWorkingOrder(null);
-      setSnackGuestMode(false);
-      setSnackGuestName("");
-      setSnackGuestPhone("");
-      setSnackSelectedUser(null);
-    }
+  const handleOpenModal = () => {
+    setSnackGuestMode(false);
+    setSnackGuestName("");
+    setSnackGuestPhone("");
+    setSnackSelectedUser(null);
     setSnackSearchQuery("");
     setShowModal(true);
   };
 
   const handleCloseModal = () => {
     setShowModal(false);
-    setWorkingOrder(null);
     fetchSnacks();
   };
 
@@ -142,7 +137,7 @@ export default function SnacksDashboard() {
   // Throwing here — rather than just toasting — keeps the picker's own
   // fields intact on failure, so a customer-selection mistake doesn't lose
   // what was already typed into the item form.
-  const handleAddItem = async (item: SnackItemPayload) => {
+  const handleAddItem = async (item: SnackItemPayload, opts?: { target?: SnackOrder; forceNew?: boolean }) => {
     setSavingItem(true);
     try {
       const itemPayload = {
@@ -153,9 +148,10 @@ export default function SnacksDashboard() {
         notes: item.notes,
       };
 
+      const targetOrder = opts?.target;
       let res: Response;
-      if (workingOrder) {
-        res = await fetch(`/api/snacks/${workingOrder.id}/items`, {
+      if (targetOrder) {
+        res = await fetch(`/api/snacks/${targetOrder.id}/items`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(itemPayload),
@@ -168,6 +164,19 @@ export default function SnacksDashboard() {
             throw new Error("No user selected");
           }
           payload.userId = snackSelectedUser.id;
+
+          // Registered customer: if they already have a snack tab today that
+          // still has a balance, ask whether to merge into it or start a new one.
+          if (!opts?.forceNew) {
+            const lookup = await fetch(`/api/snacks?open=1&userId=${encodeURIComponent(snackSelectedUser.id)}`);
+            if (lookup.ok) {
+              const found = (await lookup.json()).snacks?.[0];
+              if (found) {
+                setTabPrompt({ tab: found, item });
+                return;
+              }
+            }
+          }
         } else {
           if (!snackGuestName) {
             toast.error("Guest name is required");
@@ -190,16 +199,78 @@ export default function SnacksDashboard() {
       }
 
       const updated = await res.json();
-      setWorkingOrder(updated);
+      // Whether merged into an existing tab or a brand-new one was created,
+      // land on the same Snack Tab (info) popup, where more items can be added.
+      setShowModal(false);
+      setHistoryOrder(updated);
+      setShowHistoryModal(true);
+      fetchSnacks();
     } finally {
       setSavingItem(false);
     }
   };
 
-  const handleDeleteItem = async (orderId: string, itemId: string) => {
-    if (!confirm("Are you sure you want to delete this item?")) return;
+  // Adds a line to the tab shown in the Snack Tab popup. Throws on failure so
+  // the picker keeps what was typed.
+  const handleAddItemToOpenTab = async (item: SnackItemPayload) => {
+    if (!historyOrder) return;
+    const res = await fetch(`/api/snacks/${historyOrder.id}/items`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        productId: item.productId,
+        productName: item.productName,
+        unitPrice: item.unitPrice,
+        quantity: item.quantity,
+        notes: item.notes,
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      toast.error(data.error || "Failed to add item");
+      throw new Error(data.error || "Failed to add item");
+    }
+    setHistoryOrder(data);
+    fetchSnacks();
+  };
+
+  // Saves the edit dialog. Errors stay in the dialog (toast + it remains open).
+  const saveEditItem = async (
+    orderId: string,
+    itemId: string,
+    values: { quantity: number; unitPrice: number; notes: string | null }
+  ) => {
     try {
-      const res = await fetch(`/api/snacks/${orderId}/items/${itemId}`, { method: "DELETE" });
+      const res = await fetch(`/api/snacks/${orderId}/items/${itemId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(values),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        toast.success("Item updated");
+        setHistoryOrder(data);
+        setEditingItem(null);
+        fetchSnacks();
+      } else {
+        toast.error(data.error || "Failed to update item");
+      }
+    } catch {
+      toast.error("Network error");
+    }
+  };
+
+  // Asks for confirmation in a popup first; the actual delete is below.
+  const handleDeleteItem = (orderId: string, item: SnackOrderItem) => {
+    setDeleteItemTarget({ orderId, item });
+  };
+
+  const confirmDeleteItem = async () => {
+    if (!deleteItemTarget) return;
+    const { orderId, item } = deleteItemTarget;
+    setDeletingItem(true);
+    try {
+      const res = await fetch(`/api/snacks/${orderId}/items/${item.id}`, { method: "DELETE" });
       if (res.ok) {
         toast.success("Item deleted");
         fetchSnacks();
@@ -212,6 +283,9 @@ export default function SnacksDashboard() {
       }
     } catch (e) {
       toast.error("Network error");
+    } finally {
+      setDeletingItem(false);
+      setDeleteItemTarget(null);
     }
   };
 
@@ -225,8 +299,10 @@ export default function SnacksDashboard() {
     try {
       const res = await fetch(`/api/snacks/${deleteConfirmationId}`, { method: "DELETE" });
       if (res.ok) {
-        toast.success("Snack order deleted");
+        toast.success("Snack tab deleted");
         setDeleteConfirmationId(null);
+        setShowHistoryModal(false);
+        setHistoryOrder(null);
         fetchSnacks();
       } else {
         const data = await res.json();
@@ -240,6 +316,20 @@ export default function SnacksDashboard() {
     }
   };
 
+  // The tab the delete popup is asking about, so its message can be specific.
+  const tabToDelete = deleteConfirmationId ? snacks.find((s) => s.id === deleteConfirmationId) ?? null : null;
+
+  // "Yesterday" / "Today" / "Tomorrow" or "27 Sep", plus the time, for the list.
+  const dayAndTime = (iso: string) => {
+    const d = new Date(iso);
+    const rel = getISTDayRelative(d);
+    const day = rel === "other"
+      ? d.toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata", day: "numeric", month: "short" })
+      : rel.charAt(0).toUpperCase() + rel.slice(1);
+    const time = d.toLocaleTimeString("en-IN", { timeZone: "Asia/Kolkata", hour: "numeric", minute: "2-digit", hour12: true });
+    return { day, time };
+  };
+
   const formatCurrency = (val: number) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', minimumFractionDigits: 0 }).format(val);
   const totalPages = Math.ceil(total / LIMIT);
 
@@ -247,9 +337,10 @@ export default function SnacksDashboard() {
     <div className="p-6 max-w-7xl mx-auto space-y-6">
       {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-white tracking-tight">Snacks Orders</h1>
-          <p className="text-sm text-zinc-400 mt-1">Manage standalone snack sales</p>
+        <div className="space-y-1">
+          <p className="text-[10px] font-bold text-zinc-500 tracking-[0.2em] uppercase">Workspace / Snacks</p>
+          <h1 className="text-3xl font-bold text-white tracking-tight">Snacks</h1>
+          <p className="text-sm text-zinc-500 font-medium">Customer snack tabs — record sales, edit items and track what's unpaid.</p>
         </div>
         <div className="flex items-center gap-3 w-full md:w-auto">
           <div className="relative w-full md:w-64">
@@ -291,66 +382,68 @@ export default function SnacksDashboard() {
             <div className="w-16 h-16 bg-zinc-800/50 rounded-full flex items-center justify-center mb-4">
               <Coins className="w-8 h-8 text-zinc-600" />
             </div>
-            <h3 className="text-zinc-200 font-bold mb-1">No snack orders found</h3>
-            <p className="text-sm text-zinc-500">There are no snack orders matching your criteria.</p>
+            <h3 className="text-zinc-200 font-bold mb-1">No snack tabs found</h3>
+            <p className="text-sm text-zinc-500">No snack tabs match your search. Use "Record Snack" to start one.</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm text-zinc-300">
+            <table className="w-full min-w-[680px] table-fixed text-center text-sm text-zinc-300">
+              <colgroup>
+                <col className="w-[30%]" />
+                <col className="w-[20%]" />
+                <col className="w-[16%]" />
+                <col className="w-[16%]" />
+                <col className="w-[18%]" />
+              </colgroup>
               <thead className="bg-zinc-900/50 text-xs uppercase text-zinc-500 font-semibold tracking-wider">
                 <tr>
-                  <th className="px-4 py-4">Customer</th>
-                  <th className="px-4 py-4">Date & Time</th>
-                  <th className="px-4 py-4">Amount</th>
-                  <th className="px-4 py-4">Status</th>
-                  <th className="px-4 py-4 text-right">Actions</th>
+                  <th className="px-4 py-4 text-center">Customer</th>
+                  <th className="px-4 py-4 text-center">Date & Time</th>
+                  <th className="px-4 py-4 text-center">Amount</th>
+                  <th className="px-4 py-4 text-center">Status</th>
+                  <th className="px-4 py-4 text-center">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-800/50">
-                {snacks.map((snack) => (
-                  <tr key={snack.id} className="hover:bg-zinc-800/20 transition-colors group">
-                    <td className="px-4 py-4">
-                      <p className="font-semibold text-white">{snack.user?.name ?? snack.guestName ?? "Guest"}</p>
-                      {(snack.user?.phone || snack.guestPhone) && (
-                        <p className="text-xs text-zinc-500">{snack.user?.phone ?? snack.guestPhone}</p>
-                      )}
-                    </td>
-                    <td className="px-4 py-4 text-zinc-400 whitespace-nowrap">
-                      {formatDate(snack.createdAt)}
-                    </td>
-                    <td className="px-4 py-4 text-emerald-400 font-medium">
-                      {formatCurrency(Number(snack.amount))}
-                    </td>
-                    <td className="px-4 py-4">
-                      {snack.paymentStatus === "PAID" ? (
-                        <span className="px-2.5 py-1 bg-emerald-500/10 text-emerald-400 text-[10px] font-bold rounded uppercase tracking-wider">PAID</span>
-                      ) : snack.paymentStatus === "PARTIAL" ? (
-                        <span className="px-2.5 py-1 bg-amber-500/10 text-amber-400 text-[10px] font-bold rounded uppercase tracking-wider">PARTIAL</span>
-                      ) : (
-                        <span className="px-2.5 py-1 bg-red-500/10 text-red-400 text-[10px] font-bold rounded uppercase tracking-wider">UNPAID</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-4 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <button
-                          onClick={() => {
-                            setHistoryOrder(snack);
-                            setShowHistoryModal(true);
-                          }}
-                          className="p-1.5 text-blue-400 hover:text-blue-300 hover:bg-blue-950/30 rounded-lg transition-colors"
-                          title="History"
-                        >
-                          <Info className="w-4 h-4" />
-                        </button>
-                        {snack.paymentStatus !== "PAID" && (
-                          <>
-                            <button
-                              onClick={() => handleOpenModal(snack)}
-                              className="p-1.5 text-zinc-400 hover:text-white hover:bg-zinc-700 rounded-lg transition-colors"
-                              title="Add Items"
-                            >
-                              <Coins className="w-4 h-4" />
-                            </button>
+                {snacks.map((snack) => {
+                  const { day, time } = dayAndTime(snack.createdAt);
+                  return (
+                    <tr key={snack.id} className="hover:bg-zinc-800/20 transition-colors group">
+                      <td className="px-4 py-4 text-center align-middle">
+                        <p className="font-semibold text-white truncate">{snack.user?.name ?? snack.guestName ?? "Guest"}</p>
+                        {(snack.user?.phone || snack.guestPhone) && (
+                          <p className="text-xs text-zinc-500 truncate">{snack.user?.phone ?? snack.guestPhone}</p>
+                        )}
+                      </td>
+                      <td className="px-4 py-4 text-center align-middle whitespace-nowrap">
+                        <p className="text-zinc-300">{day}</p>
+                        <p className="text-xs text-zinc-500">{time}</p>
+                      </td>
+                      <td className="px-4 py-4 text-center align-middle text-emerald-400 font-semibold whitespace-nowrap">
+                        {formatCurrency(Number(snack.amount))}
+                      </td>
+                      <td className="px-4 py-4 text-center align-middle">
+                        {snack.paymentStatus === "PAID" ? (
+                          <span className="inline-block min-w-[72px] px-2.5 py-1 bg-emerald-500/10 text-emerald-400 text-[10px] font-bold rounded uppercase tracking-wider">PAID</span>
+                        ) : snack.paymentStatus === "PARTIAL" ? (
+                          <span className="inline-block min-w-[72px] px-2.5 py-1 bg-amber-500/10 text-amber-400 text-[10px] font-bold rounded uppercase tracking-wider">PARTIAL</span>
+                        ) : (
+                          <span className="inline-block min-w-[72px] px-2.5 py-1 bg-red-500/10 text-red-400 text-[10px] font-bold rounded uppercase tracking-wider">UNPAID</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-4 text-center align-middle">
+                        <div className="flex items-center justify-center gap-2">
+                          <button
+                            onClick={() => {
+                              setHistoryOrder(snack);
+                              setShowHistoryModal(true);
+                            }}
+                            className="p-1.5 text-blue-400 hover:text-blue-300 hover:bg-blue-950/30 rounded-lg transition-colors"
+                            title="Info"
+                          >
+                            <Info className="w-4 h-4" />
+                          </button>
+                          {snack.paymentStatus !== "PAID" ? (
                             <button
                               onClick={() => handleDelete(snack.id)}
                               className="p-1.5 text-red-400 hover:text-red-300 hover:bg-red-950/30 rounded-lg transition-colors"
@@ -358,12 +451,14 @@ export default function SnacksDashboard() {
                             >
                               <Trash2 className="w-4 h-4" />
                             </button>
-                          </>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                          ) : (
+                            <span className="w-[28px]" aria-hidden="true" />
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -408,7 +503,7 @@ export default function SnacksDashboard() {
             <div className="flex items-center justify-between border-b border-zinc-800/60 pb-3">
               <div className="flex items-center gap-2">
                 <Coins className="w-5 h-5 text-violet-400" />
-                <h3 className="text-lg font-bold text-white">{workingOrder ? "Add to Open Tab" : "Record Snack Sale"}</h3>
+                <h3 className="text-lg font-bold text-white">Record Snack Sale</h3>
               </div>
               <button
                 onClick={handleCloseModal}
@@ -418,14 +513,8 @@ export default function SnacksDashboard() {
               </button>
             </div>
 
-            {workingOrder ? (
-              <div className="p-3 rounded-xl bg-zinc-800/50 border border-zinc-700/50">
-                <p className="text-xs text-zinc-500 uppercase font-semibold mb-1">Adding to Tab For</p>
-                <p className="text-sm text-white font-medium">{workingOrder.user?.name ?? workingOrder.guestName ?? "Guest"}</p>
-                <p className="text-xs text-zinc-400">{workingOrder.user?.phone ?? workingOrder.guestPhone}</p>
-              </div>
-            ) : (
-              /* Customer Toggle — only shown before the first item is added */
+            {(
+              /* Customer Toggle */
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <label className="text-xs text-zinc-400 font-semibold uppercase tracking-wider">Customer Type</label>
@@ -535,22 +624,6 @@ export default function SnacksDashboard() {
               </div>
             )}
 
-            {/* Items added so far, in this tab */}
-            {workingOrder && workingOrder.items && workingOrder.items.length > 0 && (
-              <div className="space-y-1.5">
-                <label className="text-xs text-zinc-400 font-semibold uppercase tracking-wider block">On This Tab</label>
-                {workingOrder.items.map((item) => (
-                  <div key={item.id} className="flex items-center justify-between gap-2 text-xs bg-zinc-800/40 rounded-lg px-3 py-2">
-                    <span className="text-zinc-200">
-                      {item.product?.name ?? item.notes ?? "Item"}
-                      {item.quantity && item.quantity > 1 && <span className="text-zinc-500"> × {item.quantity}</span>}
-                    </span>
-                    <span className="font-semibold text-white">{formatCurrency(Number(item.amount))}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-
             {/* Item picker */}
             <div>
               <label className="text-xs text-zinc-400 font-semibold uppercase tracking-wider block mb-1.5">Add Item</label>
@@ -592,11 +665,25 @@ export default function SnacksDashboard() {
             <div className="flex items-center justify-between border-b border-zinc-800/60 pb-4 mb-4 flex-shrink-0">
               <div>
                 <h3 className="text-xl font-bold text-white flex items-center gap-2">
-                  <Info className="w-5 h-5 text-blue-400" />
-                  Order History
+                  <Info className="w-5 h-5 text-blue-400 flex-shrink-0" />
+                  <span className="truncate">{historyOrder.user?.name ?? historyOrder.guestName ?? "Guest"}</span>
                 </h3>
-                <p className="text-sm text-zinc-400 mt-1">
-                  Tab for: <span className="text-white font-medium">{historyOrder.user?.name ?? historyOrder.guestName ?? "Guest"}</span>
+                <p className="text-sm text-zinc-400 mt-1 flex items-center flex-wrap gap-x-2">
+                  {(historyOrder.user?.phone ?? historyOrder.guestPhone) && (
+                    <>
+                      <span>{historyOrder.user?.phone ?? historyOrder.guestPhone}</span>
+                      <span>•</span>
+                    </>
+                  )}
+                  <span>Snack tab from {dayAndTime(historyOrder.createdAt).day}, {dayAndTime(historyOrder.createdAt).time}</span>
+                  <span>•</span>
+                  <span className={
+                    historyOrder.paymentStatus === "PAID" ? "text-emerald-400 font-semibold"
+                    : historyOrder.paymentStatus === "PARTIAL" ? "text-amber-400 font-semibold"
+                    : "text-red-400 font-semibold"
+                  }>
+                    {historyOrder.paymentStatus === "PAID" ? "Paid" : historyOrder.paymentStatus === "PARTIAL" ? "Partly paid" : "Unpaid"}
+                  </span>
                 </p>
               </div>
               <div className="flex items-center gap-4">
@@ -612,6 +699,13 @@ export default function SnacksDashboard() {
                 </button>
               </div>
             </div>
+
+            {historyOrder.paymentStatus !== "PAID" && (
+              <div className="mb-4 flex-shrink-0">
+                <p className="text-[10px] uppercase tracking-wider text-zinc-500 font-bold mb-2">Add new item</p>
+                <SnackProductPicker onAdd={handleAddItemToOpenTab} addLabel="Add" />
+              </div>
+            )}
 
             <div className="overflow-y-auto custom-scroll pr-2 space-y-3">
               {historyOrder.items && historyOrder.items.length > 0 ? (
@@ -640,18 +734,29 @@ export default function SnacksDashboard() {
                         </div>
                       </div>
                     </div>
-                    <div className="flex items-center gap-4">
-                      <p className="text-lg font-bold text-emerald-400">{formatCurrency(Number(item.amount))}</p>
-                      {historyOrder.paymentStatus === "UNPAID" && (
-                        <button
-                          onClick={() => handleDeleteItem(historyOrder.id, item.id)}
-                          className="p-1.5 text-zinc-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
-                          title="Delete line item"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      )}
-                    </div>
+                    {(
+                      <div className="flex items-center gap-2 sm:gap-4 flex-shrink-0">
+                        <p className="text-lg font-bold text-emerald-400">{formatCurrency(Number(item.amount))}</p>
+                        {historyOrder.paymentStatus !== "PAID" && (
+                          <>
+                            <button
+                              onClick={() => setEditingItem(item)}
+                              className="p-1.5 text-zinc-400 hover:text-violet-400 hover:bg-violet-500/10 rounded-lg transition-colors"
+                              title="Edit quantity / price"
+                            >
+                              <Pencil className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteItem(historyOrder.id, item)}
+                              className="p-1.5 text-zinc-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
+                              title="Delete line item"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    )}
                   </div>
                 ))
               ) : (
@@ -660,6 +765,18 @@ export default function SnacksDashboard() {
                   <p>No item history available for this order.</p>
                 </div>
               )}
+            </div>
+
+            <div className="flex items-center justify-end gap-3 border-t border-zinc-800/60 pt-4 mt-4 flex-shrink-0">
+              <button
+                onClick={() => {
+                  setShowHistoryModal(false);
+                  fetchSnacks();
+                }}
+                className="px-6 py-2.5 bg-violet-600 hover:bg-violet-500 text-white text-sm font-bold rounded-xl transition-all"
+              >
+                Save
+              </button>
             </div>
           </div>
         </div>
@@ -680,8 +797,24 @@ export default function SnacksDashboard() {
                 <Trash2 className="w-6 h-6 text-red-500" />
               </div>
               <div>
-                <h3 className="text-lg font-bold text-white mb-1">Delete Snack Order</h3>
-                <p className="text-sm text-zinc-400">Are you sure you want to delete this snack order? This action cannot be undone.</p>
+                <h3 className="text-lg font-bold text-white mb-1">
+                  Delete {tabToDelete ? `${tabToDelete.user?.name ?? tabToDelete.guestName ?? "Guest"}'s` : "this"} snack tab?
+                </h3>
+                <p className="text-sm text-zinc-400">
+                  {tabToDelete ? (
+                    <>
+                      This removes the whole tab
+                      {tabToDelete.items && tabToDelete.items.length > 0
+                        ? ` — ${tabToDelete.items.length} item${tabToDelete.items.length === 1 ? "" : "s"}, ${formatCurrency(Number(tabToDelete.amount))} in total`
+                        : ` (${formatCurrency(Number(tabToDelete.amount))})`}
+                      . It won't be counted as owed any more and can't be brought back.
+                      {tabToDelete.paymentStatus === "PARTIAL" && " Part of it has already been paid, so check the payment records afterwards."}
+                    </>
+                  ) : (
+                    "This removes the whole tab and all its items, and can't be brought back."
+                  )}
+                </p>
+                <p className="text-xs text-zinc-500 mt-2">To remove just one item, open Info and delete that item instead.</p>
               </div>
             </div>
 
@@ -703,7 +836,7 @@ export default function SnacksDashboard() {
                 {deleting ? (
                   <span className="w-5 h-5 border-2 border-white/20 border-t-white rounded-full animate-spin" />
                 ) : (
-                  "Delete"
+                  "Delete Tab"
                 )}
               </button>
             </div>
@@ -713,6 +846,92 @@ export default function SnacksDashboard() {
 
       {showManageProducts && (
         <ManageSnackProductsModal onClose={() => setShowManageProducts(false)} />
+      )}
+
+      <ConfirmDialog
+        open={!!deleteItemTarget}
+        title="Delete Item"
+        description={
+          deleteItemTarget
+            ? `Remove ${deleteItemTarget.item.product?.name ?? deleteItemTarget.item.notes ?? "this item"}${
+                deleteItemTarget.item.quantity && deleteItemTarget.item.quantity > 1 ? ` × ${deleteItemTarget.item.quantity}` : ""
+              } (${formatCurrency(Number(deleteItemTarget.item.amount))}) from this tab? The tab total will go down by that amount.`
+            : ""
+        }
+        confirmLabel="Delete Item"
+        onConfirm={confirmDeleteItem}
+        onCancel={() => !deletingItem && setDeleteItemTarget(null)}
+        loading={deletingItem}
+        destructive
+      />
+
+      {editingItem && historyOrder && (
+        <SnackItemEditDialog
+          itemName={editingItem.product?.name ?? editingItem.notes ?? "Item"}
+          initialQuantity={editingItem.quantity ?? 1}
+          initialUnitPrice={
+            editingItem.unitPrice != null
+              ? Number(editingItem.unitPrice)
+              : Number(editingItem.amount) / (editingItem.quantity ?? 1)
+          }
+          initialNotes={editingItem.notes}
+          onSave={(values) => saveEditItem(historyOrder.id, editingItem.id, values)}
+          onClose={() => setEditingItem(null)}
+        />
+      )}
+
+      {tabPrompt && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={() => setTabPrompt(null)} />
+          <div className="relative glass-card bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-sm p-6 space-y-4 shadow-2xl animate-scale-in">
+            <div>
+              <h3 className="text-base font-bold text-white">Unpaid snacks already exist</h3>
+              <p className="text-sm text-zinc-500 mt-1">
+                {tabPrompt.tab.user?.name ?? "This customer"} already has a {tabPrompt.tab.paymentStatus === "PARTIAL" ? "partly paid" : "unpaid"} snack tab from today
+                ({Number(tabPrompt.tab.amount).toLocaleString("en-IN", { style: "currency", currency: "INR" })}
+                {tabPrompt.tab.items?.length ? `, ${tabPrompt.tab.items.length} item${tabPrompt.tab.items.length === 1 ? "" : "s"}` : ""}).
+              </p>
+            </div>
+            <div className="bg-zinc-950/40 border border-zinc-800/60 rounded-xl p-3 text-xs">
+              <p className="text-zinc-500 uppercase tracking-wider text-[10px] font-semibold mb-1">Adding</p>
+              <p className="text-zinc-200 font-semibold">
+                {tabPrompt.item.productName}{tabPrompt.item.quantity > 1 ? ` × ${tabPrompt.item.quantity}` : ""}
+                <span className="text-zinc-500 font-normal"> — ₹{(tabPrompt.item.unitPrice * tabPrompt.item.quantity).toFixed(2)}</span>
+              </p>
+            </div>
+            <div className="flex flex-col gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  const p = tabPrompt;
+                  setTabPrompt(null);
+                  handleAddItem(p.item, { target: p.tab });
+                }}
+                className="w-full py-2.5 bg-violet-600 hover:bg-violet-500 text-white text-sm font-bold rounded-xl transition-all"
+              >
+                Merge into existing tab
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const p = tabPrompt;
+                  setTabPrompt(null);
+                  handleAddItem(p.item, { forceNew: true });
+                }}
+                className="w-full py-2.5 bg-zinc-800 border border-zinc-700 text-zinc-200 text-sm font-semibold rounded-xl hover:bg-zinc-700 transition-all"
+              >
+                Create new tab
+              </button>
+              <button
+                type="button"
+                onClick={() => setTabPrompt(null)}
+                className="w-full py-2 text-zinc-500 hover:text-zinc-300 text-xs font-medium transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
