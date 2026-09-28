@@ -25,6 +25,30 @@ const editBatchPaySchema = z.object({
   onlineAmount: z.number().nonnegative().optional(),
 });
 
+/** Spreads `available` money over bookings that still owe `neededList`.
+ * If it covers everything owed, every booking is cleared. If it's only part
+ * of it (an advance), no single booking is settled ahead of the others: each
+ * gets its price-ratio share rounded UP to a whole rupee and the last booking
+ * takes whatever is left. */
+function spreadPaymentOverBookings(neededList: number[], available: number): number[] {
+  const totalNeeded = neededList.reduce((s, n) => s + n, 0);
+  const isPartial = available < totalNeeded - 0.009;
+  let rem = available;
+  return neededList.map((n, i) => {
+    let a: number;
+    if (!isPartial) {
+      a = Math.min(n, rem);
+    } else if (i === neededList.length - 1) {
+      a = Math.min(rem, n);
+    } else {
+      a = Math.min(Math.ceil((n / totalNeeded) * available - 1e-9), n, rem);
+    }
+    a = Number(a.toFixed(2));
+    rem = Number((rem - a).toFixed(2));
+    return a;
+  });
+}
+
 export async function POST(req: NextRequest) {
   const session = await auth();
   if (!session?.user) {
@@ -144,32 +168,37 @@ export async function POST(req: NextRequest) {
         
         if (eligibleBasePriceSum >= Number(coupon.minBookingAmount)) {
           let totalDiscount = 0;
+          // Round the coupon's discount UP to a whole rupee (never above what's
+          // owed); it's then split across bookings in proportion to price below.
+          let rawDiscount: number;
           if (coupon.discountType === "PERCENTAGE") {
-            let discount = eligibleBasePriceSum * (Number(coupon.discountValue) / 100);
+            rawDiscount = eligibleBasePriceSum * (Number(coupon.discountValue) / 100);
             if (coupon.maxDiscountAmount) {
-              discount = Math.min(discount, Number(coupon.maxDiscountAmount));
+              rawDiscount = Math.min(rawDiscount, Number(coupon.maxDiscountAmount));
             }
-            totalDiscount = Math.round(discount * 100) / 100;
           } else {
-            totalDiscount = Math.min(eligibleBasePriceSum, Math.round(Number(coupon.discountValue) * 100) / 100);
+            rawDiscount = Number(coupon.discountValue);
           }
+          totalDiscount = Math.min(Math.ceil(rawDiscount - 1e-9), eligibleBasePriceSum);
 
           let usedCountIncremented = false;
 
-          // Distribute discount proportionally
+          // Distribute discount in whole rupees: each booking (except the last)
+          // gets its price-ratio share rounded up; the last gets what's left.
+          let remainingDiscount = totalDiscount;
           for (let i = 0; i < eligibleBookings.length; i++) {
             const b = eligibleBookings[i];
             let bDiscount = 0;
-            
+
             if (i === eligibleBookings.length - 1) {
-              // Last item gets remainder to avoid rounding issues
-              const sumOfOthers = eligibleBookings.slice(0, -1).reduce((sum, b2) => {
-                return sum + Math.round((Number(b2.basePrice) / eligibleBasePriceSum) * totalDiscount * 100) / 100;
-              }, 0);
-              bDiscount = Number((totalDiscount - sumOfOthers).toFixed(2));
+              bDiscount = remainingDiscount;
             } else {
-              bDiscount = Math.round((Number(b.basePrice) / eligibleBasePriceSum) * totalDiscount * 100) / 100;
+              bDiscount = Math.min(
+                Math.ceil((Number(b.basePrice) / eligibleBasePriceSum) * totalDiscount - 1e-9),
+                remainingDiscount
+              );
             }
+            remainingDiscount = Number((remainingDiscount - bDiscount).toFixed(2));
 
             b.couponId = coupon.id;
             b.couponDiscount = bDiscount as any;
@@ -274,24 +303,36 @@ export async function POST(req: NextRequest) {
     }
 
     // 3. Process Bookings
+    // Each booking's share of the negotiated total, in proportion to its price.
     let sumOfBNegotiated = 0;
-    const updatePromises = bookings.map((b, index) => {
-      let bNegotiated = 0;
+    const bNegotiatedList: number[] = bookings.map((b, index) => {
       if (index === bookings.length - 1) {
-        bNegotiated = Number((negotiatedAmount - sumOfBNegotiated).toFixed(2));
-      } else {
-        let ratio = 1 / (bookings.length || 1);
-        if (totalFinalAmount > 0) {
-          ratio = Number(b.finalAmount) / totalFinalAmount;
-        }
-        bNegotiated = Math.round(negotiatedAmount * ratio * 100) / 100;
-        sumOfBNegotiated += bNegotiated;
+        return Number((negotiatedAmount - sumOfBNegotiated).toFixed(2));
       }
-      
-      const previouslyPaid = b.allocations.reduce((s: number, a: any) => s + Number(a.amount), 0);
-      const amountNeeded = bNegotiated - previouslyPaid;
-      const allocation = Math.min(amountNeeded > 0 ? amountNeeded : 0, remainingPaidToday);
-      
+      let ratio = 1 / (bookings.length || 1);
+      if (totalFinalAmount > 0) {
+        ratio = Number(b.finalAmount) / totalFinalAmount;
+      }
+      const v = Math.round(negotiatedAmount * ratio * 100) / 100;
+      sumOfBNegotiated += v;
+      return v;
+    });
+
+    const previouslyPaidList: number[] = bookings.map((b) =>
+      b.allocations.reduce((s: number, a: any) => s + Number(a.amount), 0)
+    );
+    const neededList: number[] = bookings.map((_, i) =>
+      Math.max(0, Number((bNegotiatedList[i] - previouslyPaidList[i]).toFixed(2)))
+    );
+
+    // How today's money is spread over the bookings (see helper above).
+    const allocationList = spreadPaymentOverBookings(neededList, remainingPaidToday);
+
+    const updatePromises = bookings.map((b, index) => {
+      const bNegotiated = bNegotiatedList[index];
+      const previouslyPaid = previouslyPaidList[index];
+      const allocation = allocationList[index];
+
       allocationsToCreate.push({ amount: allocation, paymentId, bookingId: b.id });
       remainingPaidToday = Number((remainingPaidToday - allocation).toFixed(2));
 
@@ -473,20 +514,28 @@ export async function PUT(req: NextRequest) {
 
     // 4. Process Bookings
     let sumOfBNegotiated = 0;
-    const updatePromises = activeBookings.map((b, index) => {
-      let bNegotiated = 0;
+    const bNegotiatedList: number[] = activeBookings.map((b, index) => {
       if (index === activeBookings.length - 1) {
-        bNegotiated = Number((negotiatedAmount - sumOfBNegotiated).toFixed(2));
-      } else {
-        let ratio = 1 / (activeBookings.length || 1);
-        if (totalFinalAmount > 0) ratio = Number(b.finalAmount) / totalFinalAmount;
-        bNegotiated = Math.round(negotiatedAmount * ratio * 100) / 100;
-        sumOfBNegotiated += bNegotiated;
+        return Number((negotiatedAmount - sumOfBNegotiated).toFixed(2));
       }
-      
-      const previouslyPaid = b.allocations.reduce((s: number, a: any) => s + Number(a.amount), 0);
-      const amountNeeded = bNegotiated - previouslyPaid;
-      const allocation = Math.min(amountNeeded > 0 ? amountNeeded : 0, remainingPaidToday);
+      let ratio = 1 / (activeBookings.length || 1);
+      if (totalFinalAmount > 0) ratio = Number(b.finalAmount) / totalFinalAmount;
+      const v = Math.round(negotiatedAmount * ratio * 100) / 100;
+      sumOfBNegotiated += v;
+      return v;
+    });
+    const previouslyPaidList: number[] = activeBookings.map((b) =>
+      b.allocations.reduce((s: number, a: any) => s + Number(a.amount), 0)
+    );
+    const neededList: number[] = activeBookings.map((_, i) =>
+      Math.max(0, Number((bNegotiatedList[i] - previouslyPaidList[i]).toFixed(2)))
+    );
+    const allocationList = spreadPaymentOverBookings(neededList, remainingPaidToday);
+
+    const updatePromises = activeBookings.map((b, index) => {
+      const bNegotiated = bNegotiatedList[index];
+      const previouslyPaid = previouslyPaidList[index];
+      const allocation = allocationList[index];
 
       allocationsToCreate.push({ amount: allocation, paymentId, bookingId: b.id });
       remainingPaidToday = Number((remainingPaidToday - allocation).toFixed(2));
