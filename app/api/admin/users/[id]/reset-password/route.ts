@@ -16,7 +16,7 @@ export async function POST(
 
   const { id } = await params;
 
-  const user = await prisma.appUser.findUnique({ where: { id } });
+  const user = await prisma.appUser.findUnique({ where: { id }, select: { id: true } });
   if (!user) return NextResponse.json({ error: "User not found" }, { status: 404 });
 
   const generatedPassword = generateTempPassword();
