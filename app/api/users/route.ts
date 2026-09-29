@@ -108,12 +108,12 @@ export async function POST(req: NextRequest) {
   const parsed = createSchema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: "Validation failed", details: parsed.error.flatten() }, { status: 400 });
 
-  const existing = await prisma.appUser.findUnique({ where: { phone: parsed.data.phone } });
-  if (existing) return NextResponse.json({ error: "A user with this phone number already exists", existing }, { status: 409 });
+  const existing = await prisma.appUser.findUnique({ where: { phone: parsed.data.phone }, select: { id: true } });
+  if (existing) return NextResponse.json({ error: "A user with this phone number already exists" }, { status: 409 });
 
   const email = parsed.data.email ? parsed.data.email.trim().toLowerCase() : null;
   if (email) {
-    const existingEmail = await prisma.appUser.findUnique({ where: { email } });
+    const existingEmail = await prisma.appUser.findUnique({ where: { email }, select: { id: true } });
     if (existingEmail) {
       return NextResponse.json({ error: "A user with this email already exists" }, { status: 409 });
     }
@@ -142,6 +142,10 @@ export async function POST(req: NextRequest) {
       referredById: referrer?.id ?? null,
       referredByPhone: referrer?.phone ?? null,
     },
+    // Never return passwordHash — this response already carries the
+    // plaintext generatedPassword below, which would otherwise hand back
+    // both the temp password and its own hash in one payload.
+    select: { id: true, name: true, phone: true, email: true, role: true, createdAt: true },
   });
 
   await prisma.auditLog.create({
