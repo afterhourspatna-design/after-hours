@@ -65,7 +65,9 @@ export async function GET(req: NextRequest) {
 
   // Role-based visibility
   if (role === "STAFF" && !includePastForStaff) {
-    // Staff: today + future only in IST timezone
+    // Staff: today + future, PLUS any older booking that's still unpaid or
+    // partially paid (so they can see and chase what's owed, not just what's
+    // scheduled) — in IST timezone.
     const now = new Date();
     const formatter = new Intl.DateTimeFormat("en-US", {
       timeZone: "Asia/Kolkata",
@@ -78,7 +80,14 @@ export async function GET(req: NextRequest) {
     const month = parseInt(parts.find(p => p.type === "month")!.value, 10) - 1;
     const day = parseInt(parts.find(p => p.type === "day")!.value, 10);
     const todayStartIST = new Date(Date.UTC(year, month, day, 0, 0, 0, 0) - (5.5 * 60 * 60 * 1000));
-    where.startDateTime = { gte: todayStartIST };
+    where.AND = [
+      {
+        OR: [
+          { startDateTime: { gte: todayStartIST } },
+          { paymentStatus: { in: ["UNPAID", "PARTIAL"] } },
+        ],
+      },
+    ];
   } else if (role === "CUSTOMER") {
     // Customer: own bookings only
     where.userId = userId;

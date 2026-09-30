@@ -47,6 +47,7 @@ interface BookingFormProps {
   mode?: "create" | "edit";
   initialData?: any;
   prefillDate?: string;
+  prefillUserId?: string;
   role?: "ADMIN" | "STAFF" | "CUSTOMER";
   currentUser?: AppUser | null;
 }
@@ -85,7 +86,7 @@ function getNextTimeSlot(): string {
   return `${targetHours.toString().padStart(2, "0")}:${targetMins.toString().padStart(2, "0")}`;
 }
 
-export default function BookingForm({ mode = "create", initialData, prefillDate, role = "ADMIN", currentUser }: BookingFormProps) {
+export default function BookingForm({ mode = "create", initialData, prefillDate, prefillUserId, role = "ADMIN", currentUser }: BookingFormProps) {
   const router = useRouter();
 
   // Mode toggle: registered user vs guest
@@ -235,6 +236,21 @@ export default function BookingForm({ mode = "create", initialData, prefillDate,
       })
       .catch(console.error);
   }, []);
+
+  // Preselect a customer passed in via ?userId= (e.g. "Book Now" from the Users page)
+  useEffect(() => {
+    if (!prefillUserId || mode !== "create" || role === "CUSTOMER") return;
+    fetch(`/api/users/${prefillUserId}`)
+      .then(res => res.ok ? res.json() : null)
+      .then(user => {
+        if (user) {
+          setSelectedUser(user);
+          setIsGuest(false);
+        }
+      })
+      .catch(console.error);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prefillUserId]);
 
   // User search debounce
   useEffect(() => {

@@ -153,29 +153,29 @@ export default async function StaffDashboard() {
         </div>
 
         <div className="glass-card overflow-hidden border-zinc-900/50 bg-zinc-950/30 flex flex-col">
-          <div className="px-5 py-4 border-b border-zinc-900 flex-shrink-0">
-            <h2 className="text-sm font-bold text-white tracking-tight">Upcoming</h2>
-            <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest mt-0.5">Next 7 days</p>
+          <div className="px-3 sm:px-5 py-3 sm:py-4 border-b border-zinc-900 flex-shrink-0">
+            <h2 className="text-xs sm:text-sm font-bold text-white tracking-tight">Upcoming</h2>
+            <p className="text-[9px] sm:text-[10px] text-zinc-500 font-bold uppercase tracking-widest mt-0.5">Next 7 days</p>
           </div>
-          <div className="p-2 space-y-2 flex-1 overflow-y-auto max-h-[600px]">
+          <div className="p-1.5 sm:p-2 space-y-1.5 sm:space-y-2 flex-1 overflow-y-auto max-h-[600px]">
             {upcomingBookings.length > 0 ? upcomingBookings.map(b => {
               const phone = b.user?.phone ?? (b as any).guestPhone ?? null;
               const name = b.user?.name ?? (b as any).guestName ?? "Guest";
               const initials = name.substring(0, 2).toUpperCase();
               const dateLabel = new Date(b.startDateTime).toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata", weekday: "short", day: "numeric", month: "short" });
               return (
-                <div key={b.id} className="flex items-center justify-between gap-3 p-3 rounded-xl hover:bg-zinc-900/50 transition-colors group">
-                  <div className="flex items-center gap-3.5 min-w-0 flex-1">
-                    <div className="w-11 h-11 rounded-full flex items-center justify-center text-xs font-bold border bg-violet-500/10 border-violet-500/20 text-violet-400 flex-shrink-0">
+                <div key={b.id} className="flex items-center justify-between gap-2 sm:gap-3 p-2 sm:p-3 rounded-xl hover:bg-zinc-900/50 transition-colors group">
+                  <div className="flex items-center gap-2.5 sm:gap-3.5 min-w-0 flex-1">
+                    <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-full flex items-center justify-center text-[11px] sm:text-xs font-bold border bg-violet-500/10 border-violet-500/20 text-violet-400 flex-shrink-0">
                       {initials}
                     </div>
                     <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <p className="text-sm font-bold text-white group-hover:text-violet-400 transition-colors truncate">{name}</p>
+                      <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+                        <p className="text-xs sm:text-sm font-bold text-white group-hover:text-violet-400 transition-colors truncate">{name}</p>
                         {phone && (
                           <a
                             href={`tel:${phone}`}
-                            className="flex items-center gap-1 text-xs text-zinc-500 hover:text-violet-400 font-mono transition-colors"
+                            className="flex items-center gap-1 text-[11px] sm:text-xs text-zinc-500 hover:text-violet-400 font-mono transition-colors"
                             title="Call"
                           >
                             <Phone className="w-3 h-3" />
@@ -183,14 +183,14 @@ export default async function StaffDashboard() {
                           </a>
                         )}
                       </div>
-                      <p className="text-sm text-zinc-400 font-semibold truncate">
+                      <p className="text-xs sm:text-sm text-zinc-400 font-semibold truncate">
                         {(b.game.totalUnits ?? 1) > 1 && b.resourceUnit ? b.resourceUnit.unitName : b.game.name}
                       </p>
                     </div>
                   </div>
                   <div className="text-right flex-shrink-0">
-                    <p className="text-xs font-bold text-zinc-300 whitespace-nowrap">{dateLabel}</p>
-                    <p className="text-xs text-zinc-500 font-mono whitespace-nowrap">{formatTimeRange(b.startDateTime, b.endDateTime)}</p>
+                    <p className="text-[11px] sm:text-xs font-bold text-zinc-300 whitespace-nowrap">{dateLabel}</p>
+                    <p className="text-[11px] sm:text-xs text-zinc-500 font-mono whitespace-nowrap">{formatTimeRange(b.startDateTime, b.endDateTime)}</p>
                   </div>
                 </div>
               );

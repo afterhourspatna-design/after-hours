@@ -7,7 +7,7 @@ export const metadata: Metadata = { title: "New Booking" };
 export default async function NewBookingPage({
   searchParams,
 }: {
-  searchParams: Promise<{ start?: string }>;
+  searchParams: Promise<{ start?: string; userId?: string }>;
 }) {
   const params = await searchParams;
   return (
@@ -26,6 +26,7 @@ export default async function NewBookingPage({
         mode="create"
         role="ADMIN"
         prefillDate={params.start ? decodeURIComponent(params.start) : undefined}
+        prefillUserId={params.userId}
       />
     </div>
   );

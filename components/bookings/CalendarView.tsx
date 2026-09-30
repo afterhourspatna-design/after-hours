@@ -183,17 +183,17 @@ export default function CalendarView({
               />
 
               <div
-                className="fixed inset-0 z-[9999] flex items-center justify-center p-4 pointer-events-none"
+                className="fixed inset-0 z-[9999] flex items-center justify-center p-2 sm:p-4 pointer-events-none"
               >
               <div
-                className="bg-zinc-950/95 border border-zinc-800 rounded-2xl p-5 w-full max-w-sm sm:max-w-md max-h-[85vh] overflow-y-auto shadow-2xl space-y-4 text-white backdrop-blur-md cursor-auto pointer-events-auto animate-in fade-in zoom-in-95 duration-150"
+                className="bg-zinc-950/95 border border-zinc-800 rounded-2xl p-3 sm:p-5 w-full max-w-sm sm:max-w-md max-h-[85vh] overflow-y-auto shadow-2xl space-y-3 sm:space-y-4 text-white backdrop-blur-md cursor-auto pointer-events-auto animate-in fade-in zoom-in-95 duration-150"
                 onClick={(e) => e.stopPropagation()}
               >
                 {/* Header */}
-                <div className="flex items-start justify-between border-b border-zinc-900 pb-3">
+                <div className="flex items-start justify-between border-b border-zinc-900 pb-2 sm:pb-3">
                   <div>
                     <div className="flex items-center gap-2">
-                      <h3 className="text-lg font-bold text-white tracking-tight leading-none">
+                      <h3 className="text-base sm:text-lg font-bold text-white tracking-tight leading-none">
                         {selectedBooking.user?.name ?? selectedBooking.guestName ?? "Guest"}
                       </h3>
                       <span className={cn(

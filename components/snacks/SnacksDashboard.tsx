@@ -334,7 +334,7 @@ export default function SnacksDashboard() {
   const totalPages = Math.ceil(total / LIMIT);
 
   return (
-    <div className="p-6 max-w-7xl mx-auto space-y-6">
+    <div className="max-w-7xl mx-auto space-y-6">
       {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div className="space-y-1">
@@ -342,7 +342,7 @@ export default function SnacksDashboard() {
           <h1 className="text-3xl font-bold text-white tracking-tight">Snacks</h1>
           <p className="text-sm text-zinc-500 font-medium">Customer snack tabs — record sales, edit items and track what's unpaid.</p>
         </div>
-        <div className="flex items-center gap-3 w-full md:w-auto">
+        <div className="flex flex-col gap-3 w-full md:flex-row md:items-center md:w-auto">
           <div className="relative w-full md:w-64">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
             <input
@@ -356,20 +356,22 @@ export default function SnacksDashboard() {
               className="w-full bg-zinc-900 border border-zinc-800 rounded-xl pl-9 pr-4 py-2 text-sm text-white placeholder-zinc-500 focus:border-violet-500 focus:ring-1 focus:ring-violet-500 transition-all"
             />
           </div>
-          <button
-            onClick={() => setShowManageProducts(true)}
-            className="flex-shrink-0 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-zinc-200 px-4 py-2 rounded-xl text-sm font-semibold transition-all flex items-center gap-2 active:scale-95"
-          >
-            <ListPlus className="w-4 h-4" />
-            <span>Menu</span>
-          </button>
-          <button
-            onClick={() => handleOpenModal()}
-            className="flex-shrink-0 bg-violet-600 hover:bg-violet-500 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-lg shadow-violet-900/20 transition-all flex items-center gap-2 active:scale-95"
-          >
-            <Coins className="w-4 h-4" />
-            <span>Record Snack</span>
-          </button>
+          <div className="flex items-center gap-2 w-full md:w-auto">
+            <button
+              onClick={() => setShowManageProducts(true)}
+              className="flex-1 md:flex-none justify-center bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-zinc-200 px-4 py-2 rounded-xl text-sm font-semibold transition-all flex items-center gap-2 active:scale-95"
+            >
+              <ListPlus className="w-4 h-4" />
+              <span>Menu</span>
+            </button>
+            <button
+              onClick={() => handleOpenModal()}
+              className="flex-1 md:flex-none justify-center bg-violet-600 hover:bg-violet-500 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-lg shadow-violet-900/20 transition-all flex items-center gap-2 active:scale-95"
+            >
+              <Coins className="w-4 h-4" />
+              <span>Record Snack</span>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -387,7 +389,7 @@ export default function SnacksDashboard() {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[680px] table-fixed text-center text-sm text-zinc-300">
+            <table className="w-full min-w-[420px] sm:min-w-[680px] table-fixed text-center text-xs sm:text-sm text-zinc-300">
               <colgroup>
                 <col className="w-[30%]" />
                 <col className="w-[20%]" />
@@ -395,13 +397,13 @@ export default function SnacksDashboard() {
                 <col className="w-[16%]" />
                 <col className="w-[18%]" />
               </colgroup>
-              <thead className="bg-zinc-900/50 text-xs uppercase text-zinc-500 font-semibold tracking-wider">
+              <thead className="bg-zinc-900/50 text-[10px] sm:text-xs uppercase text-zinc-500 font-semibold tracking-wider">
                 <tr>
-                  <th className="px-4 py-4 text-center">Customer</th>
-                  <th className="px-4 py-4 text-center">Date & Time</th>
-                  <th className="px-4 py-4 text-center">Amount</th>
-                  <th className="px-4 py-4 text-center">Status</th>
-                  <th className="px-4 py-4 text-center">Actions</th>
+                  <th className="px-2 py-3 sm:px-4 sm:py-4 text-center">Customer</th>
+                  <th className="px-2 py-3 sm:px-4 sm:py-4 text-center">Date & Time</th>
+                  <th className="px-2 py-3 sm:px-4 sm:py-4 text-center">Amount</th>
+                  <th className="px-2 py-3 sm:px-4 sm:py-4 text-center">Status</th>
+                  <th className="px-2 py-3 sm:px-4 sm:py-4 text-center">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-800/50">
@@ -409,30 +411,30 @@ export default function SnacksDashboard() {
                   const { day, time } = dayAndTime(snack.createdAt);
                   return (
                     <tr key={snack.id} className="hover:bg-zinc-800/20 transition-colors group">
-                      <td className="px-4 py-4 text-center align-middle">
+                      <td className="px-2 py-3 sm:px-4 sm:py-4 text-center align-middle">
                         <p className="font-semibold text-white truncate">{snack.user?.name ?? snack.guestName ?? "Guest"}</p>
                         {(snack.user?.phone || snack.guestPhone) && (
-                          <p className="text-xs text-zinc-500 truncate">{snack.user?.phone ?? snack.guestPhone}</p>
+                          <p className="text-[10px] sm:text-xs text-zinc-500 truncate">{snack.user?.phone ?? snack.guestPhone}</p>
                         )}
                       </td>
-                      <td className="px-4 py-4 text-center align-middle whitespace-nowrap">
+                      <td className="px-2 py-3 sm:px-4 sm:py-4 text-center align-middle whitespace-nowrap">
                         <p className="text-zinc-300">{day}</p>
-                        <p className="text-xs text-zinc-500">{time}</p>
+                        <p className="text-[10px] sm:text-xs text-zinc-500">{time}</p>
                       </td>
-                      <td className="px-4 py-4 text-center align-middle text-emerald-400 font-semibold whitespace-nowrap">
+                      <td className="px-2 py-3 sm:px-4 sm:py-4 text-center align-middle text-emerald-400 font-semibold whitespace-nowrap">
                         {formatCurrency(Number(snack.amount))}
                       </td>
-                      <td className="px-4 py-4 text-center align-middle">
+                      <td className="px-2 py-3 sm:px-4 sm:py-4 text-center align-middle">
                         {snack.paymentStatus === "PAID" ? (
-                          <span className="inline-block min-w-[72px] px-2.5 py-1 bg-emerald-500/10 text-emerald-400 text-[10px] font-bold rounded uppercase tracking-wider">PAID</span>
+                          <span className="inline-block min-w-[56px] sm:min-w-[72px] px-1.5 sm:px-2.5 py-1 bg-emerald-500/10 text-emerald-400 text-[9px] sm:text-[10px] font-bold rounded uppercase tracking-wider">PAID</span>
                         ) : snack.paymentStatus === "PARTIAL" ? (
-                          <span className="inline-block min-w-[72px] px-2.5 py-1 bg-amber-500/10 text-amber-400 text-[10px] font-bold rounded uppercase tracking-wider">PARTIAL</span>
+                          <span className="inline-block min-w-[56px] sm:min-w-[72px] px-1.5 sm:px-2.5 py-1 bg-amber-500/10 text-amber-400 text-[9px] sm:text-[10px] font-bold rounded uppercase tracking-wider">PARTIAL</span>
                         ) : (
-                          <span className="inline-block min-w-[72px] px-2.5 py-1 bg-red-500/10 text-red-400 text-[10px] font-bold rounded uppercase tracking-wider">UNPAID</span>
+                          <span className="inline-block min-w-[56px] sm:min-w-[72px] px-1.5 sm:px-2.5 py-1 bg-red-500/10 text-red-400 text-[9px] sm:text-[10px] font-bold rounded uppercase tracking-wider">UNPAID</span>
                         )}
                       </td>
-                      <td className="px-4 py-4 text-center align-middle">
-                        <div className="flex items-center justify-center gap-2">
+                      <td className="px-2 py-3 sm:px-4 sm:py-4 text-center align-middle">
+                        <div className="flex items-center justify-center gap-1 sm:gap-2">
                           <button
                             onClick={() => {
                               setHistoryOrder(snack);
@@ -492,38 +494,38 @@ export default function SnacksDashboard() {
 
       {/* Snack Sale / Add-to-Tab Modal */}
       {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4">
           <div
             className="absolute inset-0 bg-black/75 backdrop-blur-sm transition-opacity"
             onClick={() => !savingItem && handleCloseModal()}
           />
 
-          <div className="relative glass-card bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-lg overflow-hidden flex flex-col shadow-2xl z-10 p-6 space-y-5 animate-scale-in max-h-[90vh] custom-scroll overflow-y-auto">
+          <div className="relative glass-card bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-lg overflow-hidden flex flex-col shadow-2xl z-10 p-3 sm:p-6 space-y-3 sm:space-y-5 animate-scale-in max-h-[90vh] custom-scroll overflow-y-auto">
             {/* Header */}
-            <div className="flex items-center justify-between border-b border-zinc-800/60 pb-3">
-              <div className="flex items-center gap-2">
-                <Coins className="w-5 h-5 text-violet-400" />
-                <h3 className="text-lg font-bold text-white">Record Snack Sale</h3>
+            <div className="flex items-center justify-between border-b border-zinc-800/60 pb-2 sm:pb-3">
+              <div className="flex items-center gap-1.5 sm:gap-2">
+                <Coins className="w-4 h-4 sm:w-5 sm:h-5 text-violet-400" />
+                <h3 className="text-sm sm:text-lg font-bold text-white">Record Snack Sale</h3>
               </div>
               <button
                 onClick={handleCloseModal}
                 className="text-zinc-500 hover:text-white transition-colors"
               >
-                <X className="w-5 h-5" />
+                <X className="w-4 h-4 sm:w-5 sm:h-5" />
               </button>
             </div>
 
             {(
               /* Customer Toggle */
-              <div className="space-y-2">
+              <div className="space-y-1.5 sm:space-y-2">
                 <div className="flex items-center justify-between">
-                  <label className="text-xs text-zinc-400 font-semibold uppercase tracking-wider">Customer Type</label>
-                  <div className="flex items-center gap-2 bg-zinc-800/60 rounded-xl p-1">
+                  <label className="text-[11px] sm:text-xs text-zinc-400 font-semibold uppercase tracking-wider">Customer Type</label>
+                  <div className="flex items-center gap-1 sm:gap-2 bg-zinc-800/60 rounded-xl p-1">
                     <button
                       type="button"
                       onClick={() => setSnackGuestMode(false)}
                       className={cn(
-                        "px-3 py-1.5 rounded-lg text-xs font-medium transition-all",
+                        "px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-lg text-[11px] sm:text-xs font-medium transition-all",
                         !snackGuestMode ? "bg-violet-600 text-white" : "text-zinc-400 hover:text-zinc-200"
                       )}
                     >
@@ -533,7 +535,7 @@ export default function SnacksDashboard() {
                       type="button"
                       onClick={() => setSnackGuestMode(true)}
                       className={cn(
-                        "px-3 py-1.5 rounded-lg text-xs font-medium transition-all",
+                        "px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-lg text-[11px] sm:text-xs font-medium transition-all",
                         snackGuestMode ? "bg-violet-600 text-white" : "text-zinc-400 hover:text-zinc-200"
                       )}
                     >
@@ -543,9 +545,9 @@ export default function SnacksDashboard() {
                 </div>
 
                 {snackGuestMode ? (
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
-                      <label className="text-xs text-zinc-500 font-medium block mb-1">Guest Name</label>
+                      <label className="text-[11px] sm:text-xs text-zinc-500 font-medium block mb-1">Guest Name</label>
                       <input
                         value={snackGuestName}
                         onChange={(e) => setSnackGuestName(e.target.value)}
@@ -554,7 +556,7 @@ export default function SnacksDashboard() {
                       />
                     </div>
                     <div>
-                      <label className="text-xs text-zinc-500 font-medium block mb-1">Mobile Number (optional)</label>
+                      <label className="text-[11px] sm:text-xs text-zinc-500 font-medium block mb-1">Mobile Number (optional)</label>
                       <div className="relative">
                         <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-zinc-500 font-bold">+91</span>
                         <input
@@ -573,13 +575,13 @@ export default function SnacksDashboard() {
                   </div>
                 ) : (
                   <div className="relative">
-                    <label className="text-xs text-zinc-500 font-medium block mb-1">Search Registered User</label>
+                    <label className="text-[11px] sm:text-xs text-zinc-500 font-medium block mb-1">Search Registered User</label>
                     <div className="relative">
                       <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
                       {snackSelectedUser ? (
                         <div className="input-field pl-9 flex items-center justify-between">
-                          <span className="text-sm text-white">
-                            {snackSelectedUser.name} <span className="text-zinc-500 text-xs">· {snackSelectedUser.phone}</span>
+                          <span className="text-xs sm:text-sm text-white truncate">
+                            {snackSelectedUser.name} <span className="text-zinc-500 text-[11px] sm:text-xs">· {snackSelectedUser.phone}</span>
                           </span>
                           <button
                             type="button"
@@ -588,7 +590,7 @@ export default function SnacksDashboard() {
                               setSnackSearchQuery("");
                             }}
                           >
-                            <X className="w-4 h-4 text-zinc-500 hover:text-white" />
+                            <X className="w-4 h-4 text-zinc-500 hover:text-white flex-shrink-0" />
                           </button>
                         </div>
                       ) : (
@@ -611,10 +613,10 @@ export default function SnacksDashboard() {
                               setSnackSearchQuery("");
                               setSnackUserResults([]);
                             }}
-                            className="w-full px-4 py-2 text-left hover:bg-zinc-800 transition-colors flex items-center justify-between text-sm"
+                            className="w-full px-3 sm:px-4 py-1.5 sm:py-2 text-left hover:bg-zinc-800 transition-colors flex items-center justify-between text-xs sm:text-sm"
                           >
                             <span className="text-white">{u.name}</span>
-                            <span className="text-xs text-zinc-500">{u.phone}</span>
+                            <span className="text-[11px] sm:text-xs text-zinc-500">{u.phone}</span>
                           </button>
                         ))}
                       </div>
@@ -626,24 +628,24 @@ export default function SnacksDashboard() {
 
             {/* Item picker */}
             <div>
-              <label className="text-xs text-zinc-400 font-semibold uppercase tracking-wider block mb-1.5">Add Item</label>
+              <label className="text-[11px] sm:text-xs text-zinc-400 font-semibold uppercase tracking-wider block mb-1 sm:mb-1.5">Add Item</label>
               <SnackProductPicker onAdd={handleAddItem} disabled={savingItem} />
             </div>
 
-            <div className="bg-blue-500/10 border border-blue-500/20 p-3 rounded-xl flex gap-3 text-blue-400 mt-2">
-              <Info className="w-5 h-5 flex-shrink-0" />
-              <div className="text-xs leading-relaxed">
+            <div className="bg-blue-500/10 border border-blue-500/20 p-2.5 sm:p-3 rounded-xl flex gap-2 sm:gap-3 text-blue-400 mt-1 sm:mt-2">
+              <Info className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />
+              <div className="text-[11px] sm:text-xs leading-relaxed">
                 <p className="font-semibold mb-0.5">Note on Payments</p>
                 Items land in the customer's open tab as UNPAID. You can settle it via the Payments page when they check out.
               </div>
             </div>
 
             {/* Actions */}
-            <div className="border-t border-zinc-800/60 pt-4 mt-2">
+            <div className="border-t border-zinc-800/60 pt-3 sm:pt-4 mt-1.5 sm:mt-2">
               <button
                 type="button"
                 onClick={handleCloseModal}
-                className="w-full py-2.5 bg-zinc-800 border border-zinc-700 text-zinc-300 text-sm font-semibold rounded-xl hover:text-white hover:bg-zinc-700 transition-all"
+                className="w-full py-2 sm:py-2.5 bg-zinc-800 border border-zinc-700 text-zinc-300 text-xs sm:text-sm font-semibold rounded-xl hover:text-white hover:bg-zinc-700 transition-all"
               >
                 Done
               </button>
@@ -655,20 +657,20 @@ export default function SnacksDashboard() {
       
       {/* History Modal */}
       {showHistoryModal && historyOrder && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4">
           <div
             className="absolute inset-0 bg-black/75 backdrop-blur-sm transition-opacity"
             onClick={() => setShowHistoryModal(false)}
           />
 
-          <div className="relative glass-card bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-2xl overflow-hidden flex flex-col shadow-2xl z-10 p-6 animate-scale-in max-h-[90vh] flex flex-col">
-            <div className="flex items-center justify-between border-b border-zinc-800/60 pb-4 mb-4 flex-shrink-0">
-              <div>
-                <h3 className="text-xl font-bold text-white flex items-center gap-2">
-                  <Info className="w-5 h-5 text-blue-400 flex-shrink-0" />
+          <div className="relative glass-card bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-2xl overflow-hidden flex flex-col shadow-2xl z-10 p-3 sm:p-6 animate-scale-in max-h-[90vh] flex flex-col">
+            <div className="flex items-start justify-between gap-2 sm:gap-3 border-b border-zinc-800/60 pb-2.5 sm:pb-4 mb-2.5 sm:mb-4 flex-shrink-0">
+              <div className="min-w-0 flex-1">
+                <h3 className="text-sm sm:text-xl font-bold text-white flex items-center gap-1.5 sm:gap-2">
+                  <Info className="w-4 h-4 sm:w-5 sm:h-5 text-blue-400 flex-shrink-0" />
                   <span className="truncate">{historyOrder.user?.name ?? historyOrder.guestName ?? "Guest"}</span>
                 </h3>
-                <p className="text-sm text-zinc-400 mt-1 flex items-center flex-wrap gap-x-2">
+                <p className="text-[11px] sm:text-sm text-zinc-400 mt-0.5 sm:mt-1 flex items-center flex-wrap gap-x-1.5 sm:gap-x-2">
                   {(historyOrder.user?.phone ?? historyOrder.guestPhone) && (
                     <>
                       <span>{historyOrder.user?.phone ?? historyOrder.guestPhone}</span>
@@ -686,72 +688,72 @@ export default function SnacksDashboard() {
                   </span>
                 </p>
               </div>
-              <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2 sm:gap-4 flex-shrink-0">
                 <div className="text-right">
-                  <p className="text-xs text-zinc-500 uppercase font-bold tracking-wider mb-0.5">Total Amount</p>
-                  <p className="text-xl font-bold text-emerald-400">{formatCurrency(Number(historyOrder.amount))}</p>
+                  <p className="text-[9px] sm:text-xs text-zinc-500 uppercase font-bold tracking-wider mb-0.5">Total Amount</p>
+                  <p className="text-sm sm:text-xl font-bold text-emerald-400">{formatCurrency(Number(historyOrder.amount))}</p>
                 </div>
                 <button
                   onClick={() => setShowHistoryModal(false)}
-                  className="p-2 text-zinc-500 hover:text-white hover:bg-zinc-800 rounded-xl transition-all"
+                  className="p-1.5 sm:p-2 text-zinc-500 hover:text-white hover:bg-zinc-800 rounded-xl transition-all"
                 >
-                  <X className="w-5 h-5" />
+                  <X className="w-4 h-4 sm:w-5 sm:h-5" />
                 </button>
               </div>
             </div>
 
             {historyOrder.paymentStatus !== "PAID" && (
-              <div className="mb-4 flex-shrink-0">
-                <p className="text-[10px] uppercase tracking-wider text-zinc-500 font-bold mb-2">Add new item</p>
+              <div className="mb-2.5 sm:mb-4 flex-shrink-0">
+                <p className="text-[9px] sm:text-[10px] uppercase tracking-wider text-zinc-500 font-bold mb-1 sm:mb-2">Add new item</p>
                 <SnackProductPicker onAdd={handleAddItemToOpenTab} addLabel="Add" />
               </div>
             )}
 
-            <div className="overflow-y-auto custom-scroll pr-2 space-y-3">
+            <div className="overflow-y-auto custom-scroll pr-2 space-y-2 sm:space-y-3">
               {historyOrder.items && historyOrder.items.length > 0 ? (
                 historyOrder.items.map((item, idx) => (
-                  <div key={item.id} className="p-4 rounded-xl bg-zinc-800/30 border border-zinc-700/50 flex items-center justify-between group">
-                    <div className="flex items-start gap-4">
-                      <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center text-xs font-bold text-zinc-400">
+                  <div key={item.id} className="p-2 sm:p-4 rounded-xl bg-zinc-800/30 border border-zinc-700/50 flex items-center justify-between gap-2 sm:gap-3 group">
+                    <div className="flex items-start gap-2 sm:gap-4 min-w-0 flex-1">
+                      <div className="hidden sm:flex w-8 h-8 rounded-full bg-zinc-800 items-center justify-center text-xs font-bold text-zinc-400 flex-shrink-0">
                         {historyOrder.items!.length - idx}
                       </div>
-                      <div>
-                        <p className="text-sm font-medium text-white mb-0.5">
+                      <div className="min-w-0">
+                        <p className="text-xs sm:text-sm font-medium text-white mb-0.5 truncate">
                           {item.product?.name ?? item.notes ?? "Added items"}
                           {item.quantity && item.quantity > 1 && <span className="text-zinc-500"> × {item.quantity}</span>}
                         </p>
                         {item.product?.name && item.notes && (
-                          <p className="text-xs text-zinc-500 mb-0.5">{item.notes}</p>
+                          <p className="text-[10px] sm:text-xs text-zinc-500 mb-0.5 truncate">{item.notes}</p>
                         )}
-                        <div className="flex items-center gap-2 text-xs text-zinc-500">
+                        <div className="flex items-center gap-1.5 sm:gap-2 text-[10px] sm:text-xs text-zinc-500 flex-wrap">
                           <span>{formatDate(item.createdAt)}</span>
                           {item.addedBy && (
                             <>
                               <span>•</span>
-                              <span>Added by {item.addedBy.name}</span>
+                              <span className="truncate">Added by {item.addedBy.name}</span>
                             </>
                           )}
                         </div>
                       </div>
                     </div>
                     {(
-                      <div className="flex items-center gap-2 sm:gap-4 flex-shrink-0">
-                        <p className="text-lg font-bold text-emerald-400">{formatCurrency(Number(item.amount))}</p>
+                      <div className="flex items-center gap-1 sm:gap-4 flex-shrink-0">
+                        <p className="text-sm sm:text-lg font-bold text-emerald-400 whitespace-nowrap">{formatCurrency(Number(item.amount))}</p>
                         {historyOrder.paymentStatus !== "PAID" && (
                           <>
                             <button
                               onClick={() => setEditingItem(item)}
-                              className="p-1.5 text-zinc-400 hover:text-violet-400 hover:bg-violet-500/10 rounded-lg transition-colors"
+                              className="p-1 sm:p-1.5 text-zinc-400 hover:text-violet-400 hover:bg-violet-500/10 rounded-lg transition-colors"
                               title="Edit quantity / price"
                             >
-                              <Pencil className="w-4 h-4" />
+                              <Pencil className="w-3.5 h-3.5" />
                             </button>
                             <button
                               onClick={() => handleDeleteItem(historyOrder.id, item)}
-                              className="p-1.5 text-zinc-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
+                              className="p-1 sm:p-1.5 text-zinc-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
                               title="Delete line item"
                             >
-                              <Trash2 className="w-4 h-4" />
+                              <Trash2 className="w-3.5 h-3.5" />
                             </button>
                           </>
                         )}

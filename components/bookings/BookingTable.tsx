@@ -1,11 +1,11 @@
 "use client";
 
 import { Suspense } from "react";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import {
-  Plus, Search, Download, Edit2, XCircle, Trash2, RefreshCw, ChevronLeft, ChevronRight, Copy,
+  Plus, Search, Download, Edit2, XCircle, Trash2, RefreshCw, ChevronLeft, ChevronRight, Copy, ChevronDown,
 } from "lucide-react";
 import {
   cn, formatCurrency, formatDate, formatTimeRange, formatDuration,
@@ -54,22 +54,45 @@ function BookingTableInner({ role = "ADMIN" }: BookingTableProps) {
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState(searchParams.get("q") ?? "");
   const [statusFilter, setStatusFilter] = useState(searchParams.get("status") ?? "ALL");
-  const [includeAdvanceBookings, setIncludeAdvanceBookings] = useState(true);
+  const [includeAdvanceBookings, setIncludeAdvanceBookings] = useState(false);
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [statusDropdownOpen, setStatusDropdownOpen] = useState(false);
+  const statusDropdownRef = useRef<HTMLDivElement>(null);
 
-  const LIMIT = 20;
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (statusDropdownRef.current && !statusDropdownRef.current.contains(e.target as Node)) {
+        setStatusDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  // Staff's dataset is naturally bounded (today + future only, gated
+  // server-side), so it's shown in one page with no pagination controls.
+  // Admin browses full history, so it keeps real pagination.
+  const LIMIT = role === "ADMIN" ? 20 : 200;
 
   const fetchBookings = useCallback(async () => {
     setLoading(true);
     try {
+      // An explicit date range is a more specific request than the default
+      // "hide future" cap, so it overrides that cap rather than being
+      // clipped by it.
+      const hasDateFilter = role === "ADMIN" && (dateFrom || dateTo);
       const params = new URLSearchParams({
         page: String(page),
         limit: String(LIMIT),
         ...(search ? { q: search } : {}),
         ...(statusFilter !== "ALL" ? { status: statusFilter } : {}),
-        includeAdvance: includeAdvanceBookings ? "1" : "0",
+        includeAdvance: (includeAdvanceBookings || hasDateFilter) ? "1" : "0",
+        ...(role === "ADMIN" && dateFrom ? { from: new Date(dateFrom).toISOString() } : {}),
+        ...(role === "ADMIN" && dateTo ? { to: new Date(`${dateTo}T23:59:59.999`).toISOString() } : {}),
       });
       const res = await fetch(`/api/bookings?${params}`);
       if (res.ok) {
@@ -80,7 +103,7 @@ function BookingTableInner({ role = "ADMIN" }: BookingTableProps) {
     } finally {
       setLoading(false);
     }
-  }, [page, search, statusFilter, includeAdvanceBookings]);
+  }, [page, search, statusFilter, includeAdvanceBookings, dateFrom, dateTo, role, LIMIT]);
 
   useEffect(() => { fetchBookings(); }, [fetchBookings]);
 
@@ -143,8 +166,8 @@ function BookingTableInner({ role = "ADMIN" }: BookingTableProps) {
   return (
     <div className="space-y-4">
       {/* Toolbar */}
-      <div className="flex flex-col sm:flex-row gap-3">
-        <div className="relative flex-1">
+      <div className="flex flex-col sm:flex-row sm:flex-wrap gap-3">
+        <div className="relative flex-1 min-w-[200px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
           <input
             value={search}
@@ -154,22 +177,63 @@ function BookingTableInner({ role = "ADMIN" }: BookingTableProps) {
           />
         </div>
 
-        <div className="flex gap-1.5 flex-wrap">
-          {STATUS_FILTERS.map((s) => (
-            <button
-              key={s}
-              onClick={() => { setStatusFilter(s); setPage(1); }}
-              className={cn(
-                "px-3 py-1.5 rounded-xl text-xs font-medium border transition-all",
-                statusFilter === s
-                  ? "bg-violet-600 border-violet-600 text-white"
-                  : "bg-zinc-900 border-zinc-800 text-zinc-400 hover:border-zinc-700"
-              )}
-            >
-              {s === "ALL" ? "All" : BOOKING_STATUS_CONFIG[s as keyof typeof BOOKING_STATUS_CONFIG]?.label ?? s}
-            </button>
-          ))}
+        <div className="relative min-w-[160px]" ref={statusDropdownRef}>
+          <button
+            type="button"
+            onClick={() => setStatusDropdownOpen(o => !o)}
+            className="input-field flex items-center justify-between text-xs font-medium cursor-pointer"
+          >
+            {statusFilter === "ALL" ? "All Statuses" : BOOKING_STATUS_CONFIG[statusFilter as keyof typeof BOOKING_STATUS_CONFIG]?.label ?? statusFilter}
+            <ChevronDown className={cn("w-4 h-4 text-zinc-500 transition-transform flex-shrink-0", statusDropdownOpen && "rotate-180")} />
+          </button>
+          {statusDropdownOpen && (
+            <div className="absolute z-10 mt-1 w-full bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden shadow-xl">
+              {STATUS_FILTERS.map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => { setStatusFilter(s); setPage(1); setStatusDropdownOpen(false); }}
+                  className={cn(
+                    "w-full text-left px-3.5 py-2.5 text-xs font-medium transition-colors",
+                    statusFilter === s ? "bg-violet-600 text-white" : "text-zinc-300 hover:bg-zinc-800"
+                  )}
+                >
+                  {s === "ALL" ? "All Statuses" : BOOKING_STATUS_CONFIG[s as keyof typeof BOOKING_STATUS_CONFIG]?.label ?? s}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
+
+        {role === "ADMIN" && (
+          <div className="flex items-center gap-1.5 flex-shrink-0">
+            <input
+              type="date"
+              value={dateFrom}
+              onChange={(e) => { setDateFrom(e.target.value); setPage(1); }}
+              className="input-field text-xs py-2 w-[130px]"
+              title="From date"
+            />
+            <span className="text-zinc-600 text-xs">–</span>
+            <input
+              type="date"
+              value={dateTo}
+              onChange={(e) => { setDateTo(e.target.value); setPage(1); }}
+              className="input-field text-xs py-2 w-[130px]"
+              title="To date"
+            />
+            {(dateFrom || dateTo) && (
+              <button
+                type="button"
+                onClick={() => { setDateFrom(""); setDateTo(""); setPage(1); }}
+                className="p-2 rounded-xl text-zinc-500 hover:text-white hover:bg-zinc-800 transition-all"
+                title="Clear date filter"
+              >
+                <XCircle className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+        )}
 
         <label className={cn(
           "inline-flex items-center gap-2 px-3 py-2 rounded-xl border text-xs whitespace-nowrap transition-colors",
@@ -186,7 +250,7 @@ function BookingTableInner({ role = "ADMIN" }: BookingTableProps) {
             }}
             className="rounded border-zinc-700 text-cyan-500 focus:ring-cyan-500 bg-zinc-900 h-4 w-4"
           />
-          Include advance bookings
+          Include future bookings
         </label>
 
         <div className="flex gap-2 flex-shrink-0">
@@ -363,7 +427,7 @@ function BookingTableInner({ role = "ADMIN" }: BookingTableProps) {
           </div>
         )}
 
-        {totalPages > 1 && (
+        {role === "ADMIN" && totalPages > 1 && (
           <div className="flex items-center justify-between px-4 py-3 border-t border-zinc-800/60">
             <p className="text-xs text-zinc-500">
               {total} total · page {page} of {totalPages}

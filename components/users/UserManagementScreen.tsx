@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { toast } from "sonner";
 import {
-  Plus, Search, Edit2, Trash2, RefreshCw, ChevronLeft, ChevronRight, Phone, Mail, User,
-  AlertCircle, Loader2, Shield, KeyRound, Copy, Check, X, Power,
+  Plus, Search, Edit2, Trash2, RefreshCw, ChevronLeft, ChevronRight, ChevronDown, Phone, Mail, User,
+  AlertCircle, Loader2, Shield, KeyRound, Copy, Check, X, Power, Info,
 } from "lucide-react";
 import { cn, formatRelative, getInitials } from "@/lib/utils";
 import EmptyState from "@/components/ui/EmptyState";
@@ -73,9 +73,12 @@ interface UserModalProps {
   isAdmin: boolean;
   onClose: () => void;
   onSaved: (created?: { name: string; generatedPassword: string }) => void;
+  onToggleActive?: (u: AppUser) => Promise<void>;
+  onResetPassword?: (u: AppUser) => Promise<void>;
+  resettingId?: string | null;
 }
 
-function UserModal({ user, isAdmin, onClose, onSaved }: UserModalProps) {
+function UserModal({ user, isAdmin, onClose, onSaved, onToggleActive, onResetPassword, resettingId }: UserModalProps) {
   const [name, setName] = useState(user?.name ?? "");
   const [phone, setPhone] = useState(user?.phone ?? "");
   const [email, setEmail] = useState(user?.email ?? "");
@@ -86,7 +89,11 @@ function UserModal({ user, isAdmin, onClose, onSaved }: UserModalProps) {
 
   const [referrerQuery, setReferrerQuery] = useState("");
   const [referrerResults, setReferrerResults] = useState<{ id: string; name: string; phone: string }[]>([]);
-  const [referrerSelected, setReferrerSelected] = useState<{ id: string; name: string; phone: string } | null>(null);
+  const [referrerSelected, setReferrerSelected] = useState<{ id: string; name: string; phone: string } | null>(
+    user?.referredByPhone ? { id: "", name: user.referredBy?.name ?? "", phone: user.referredByPhone } : null
+  );
+
+  const showReferredBy = user ? user.role === "CUSTOMER" : role === "CUSTOMER";
 
   useEffect(() => {
     if (referrerSelected || referrerQuery.length < 2) {
@@ -102,6 +109,40 @@ function UserModal({ user, isAdmin, onClose, onSaved }: UserModalProps) {
     }, 300);
     return () => clearTimeout(t);
   }, [referrerQuery, referrerSelected]);
+
+  const [deactivating, setDeactivating] = useState(false);
+  const [confirmAction, setConfirmAction] = useState<"deactivate" | "reset" | null>(null);
+  const [roleDropdownOpen, setRoleDropdownOpen] = useState(false);
+  const roleDropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (roleDropdownRef.current && !roleDropdownRef.current.contains(e.target as Node)) {
+        setRoleDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  async function handleToggleActive() {
+    if (!user || !onToggleActive) return;
+    setDeactivating(true);
+    try {
+      await onToggleActive(user);
+      setConfirmAction(null);
+      onClose();
+    } finally {
+      setDeactivating(false);
+    }
+  }
+
+  async function handleResetPassword() {
+    if (!user || !onResetPassword) return;
+    await onResetPassword(user);
+    setConfirmAction(null);
+    onClose();
+  }
 
   const validate = () => {
     const newErrors: Record<string, string> = {};
@@ -124,11 +165,16 @@ function UserModal({ user, isAdmin, onClose, onSaved }: UserModalProps) {
         const res = await fetch(`/api/users/${user.id}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name, phone, email: email || null, notes: notes || null }),
+          body: JSON.stringify({
+            name, phone, email: email || null, notes: notes || null,
+            ...(showReferredBy ? { referredBy: referrerSelected?.phone ?? null } : {}),
+          }),
         });
         const data = await res.json();
         if (!res.ok) {
-          if (data.error?.includes("phone")) {
+          if (data.error?.toLowerCase().includes("referrer")) {
+            setErrors({ referredBy: data.error });
+          } else if (data.error?.includes("phone")) {
             setErrors({ phone: "This phone number is already registered" });
           } else {
             toast.error(data.error ?? "Failed to update user");
@@ -171,31 +217,84 @@ function UserModal({ user, isAdmin, onClose, onSaved }: UserModalProps) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative glass-card p-6 w-full max-w-md animate-scale-in">
-        <h2 className="text-lg font-bold text-white mb-6 flex items-center gap-2">
-          {user ? <Edit2 className="w-5 h-5 text-violet-400" /> : <Plus className="w-5 h-5 text-violet-400" />}
+      <div className="relative glass-card p-4 sm:p-6 w-full max-w-md animate-scale-in max-h-[90vh] overflow-y-auto">
+        <h2 className="text-base sm:text-lg font-bold text-white mb-4 sm:mb-6 flex items-center gap-2">
+          {user ? <Edit2 className="w-4 h-4 sm:w-5 sm:h-5 text-violet-400" /> : <Plus className="w-4 h-4 sm:w-5 sm:h-5 text-violet-400" />}
           {user ? "Edit User" : "Add New User"}
         </h2>
-        <form onSubmit={handleSubmit} className="space-y-5">
+
+        {isAdmin && user && (
+          <div className="flex gap-1.5 sm:gap-2 mb-4 sm:mb-5">
+            <button
+              type="button"
+              onClick={() => user.isActive ? setConfirmAction("deactivate") : handleToggleActive()}
+              disabled={deactivating}
+              className="flex-1 flex items-center justify-center gap-1.5 py-2 sm:py-2.5 rounded-xl border border-zinc-800 text-[11px] sm:text-xs font-bold text-zinc-400 hover:text-amber-400 hover:border-amber-500/30 hover:bg-amber-500/10 transition-all disabled:opacity-50"
+            >
+              {deactivating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Power className="w-3.5 h-3.5" />}
+              {user.isActive ? "Deactivate" : "Reactivate"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setConfirmAction("reset")}
+              disabled={resettingId === user.id}
+              className="flex-1 flex items-center justify-center gap-1.5 py-2 sm:py-2.5 rounded-xl border border-zinc-800 text-[11px] sm:text-xs font-bold text-zinc-400 hover:text-sky-400 hover:border-sky-500/30 hover:bg-sky-500/10 transition-all disabled:opacity-50"
+            >
+              {resettingId === user.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <KeyRound className="w-3.5 h-3.5" />}
+              Reset Password
+            </button>
+          </div>
+        )}
+
+        {user && (
+          <ConfirmDialog
+            open={confirmAction !== null}
+            title={confirmAction === "reset" ? "Reset Password" : "Deactivate User"}
+            description={
+              confirmAction === "reset"
+                ? `This generates a new temporary password for ${user.name} and signs them out of their current one. Share the new password with them directly.`
+                : `${user.name} will no longer be able to log in until reactivated.`
+            }
+            confirmLabel={confirmAction === "reset" ? "Reset Password" : "Deactivate"}
+            onConfirm={confirmAction === "reset" ? handleResetPassword : handleToggleActive}
+            onCancel={() => setConfirmAction(null)}
+            loading={confirmAction === "reset" ? resettingId === user.id : deactivating}
+            destructive={confirmAction === "deactivate"}
+          />
+        )}
+
+        <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-5">
               {isAdmin && !user && (
                 <div>
                   <label className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider mb-1.5 block">Role</label>
-                  <div className="flex gap-2">
-                    {(["CUSTOMER", "STAFF", "ADMIN"] as Role[]).map((r) => (
-                      <button
-                        key={r}
-                        type="button"
-                        onClick={() => setRole(r)}
-                        className={cn(
-                          "flex-1 py-2 rounded-xl text-xs font-bold uppercase tracking-tight transition-all border",
-                          role === r ? "bg-violet-600 border-violet-500 text-white" : "bg-zinc-900 border-zinc-800 text-zinc-500 hover:text-white"
-                        )}
-                      >
-                        {r}
-                      </button>
-                    ))}
+                  <div className="relative" ref={roleDropdownRef}>
+                    <button
+                      type="button"
+                      onClick={() => setRoleDropdownOpen(o => !o)}
+                      className="input-field flex items-center justify-between text-xs sm:text-sm font-bold uppercase tracking-tight cursor-pointer"
+                    >
+                      {role}
+                      <ChevronDown className={cn("w-4 h-4 text-zinc-500 transition-transform flex-shrink-0", roleDropdownOpen && "rotate-180")} />
+                    </button>
+                    {roleDropdownOpen && (
+                      <div className="absolute z-10 mt-1 w-full bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden shadow-xl">
+                        {(["CUSTOMER", "STAFF", "ADMIN"] as Role[]).map((r) => (
+                          <button
+                            key={r}
+                            type="button"
+                            onClick={() => { setRole(r); setRoleDropdownOpen(false); }}
+                            className={cn(
+                              "w-full text-left px-3.5 py-2.5 text-xs sm:text-sm font-bold uppercase tracking-tight transition-colors",
+                              role === r ? "bg-violet-600 text-white" : "text-zinc-300 hover:bg-zinc-800"
+                            )}
+                          >
+                            {r}
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
@@ -239,12 +338,15 @@ function UserModal({ user, isAdmin, onClose, onSaved }: UserModalProps) {
                 {errors.email && <p className="text-[10px] text-red-400 font-bold mt-1.5 flex items-center gap-1"><AlertCircle className="w-3 h-3" /> {errors.email}</p>}
               </div>
 
-              {!user && (
+              {showReferredBy && (
                 <div className="relative">
                   <label className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider mb-1.5 block">Referred By (Optional)</label>
                   {referrerSelected ? (
                     <div className="flex items-center justify-between input-field">
-                      <span className="text-sm text-white">{referrerSelected.name} <span className="text-zinc-500">({referrerSelected.phone})</span></span>
+                      <span className="text-sm text-white">
+                        {referrerSelected.name || referrerSelected.phone}
+                        {referrerSelected.name && <span className="text-zinc-500"> ({referrerSelected.phone})</span>}
+                      </span>
                       <button type="button" onClick={() => { setReferrerSelected(null); setReferrerQuery(""); }} className="text-zinc-500 hover:text-white">
                         <X className="w-4 h-4" />
                       </button>
@@ -292,10 +394,10 @@ function UserModal({ user, isAdmin, onClose, onSaved }: UserModalProps) {
                 </p>
               )}
 
-              <div className="flex gap-3 pt-4">
-                <button type="button" onClick={onClose} className="flex-1 py-3 rounded-xl border border-zinc-800 text-zinc-400 text-sm font-bold hover:bg-zinc-900 transition-all">Cancel</button>
+              <div className="flex gap-2 sm:gap-3 pt-2 sm:pt-4">
+                <button type="button" onClick={onClose} className="flex-1 py-2.5 sm:py-3 rounded-xl border border-zinc-800 text-zinc-400 text-xs sm:text-sm font-bold hover:bg-zinc-900 transition-all">Cancel</button>
                 <button type="submit" disabled={loading}
-                  className="flex-1 py-3 rounded-xl bg-violet-600 hover:bg-violet-500 text-white text-sm font-bold transition-all shadow-lg shadow-violet-900/20 active:scale-95 disabled:opacity-50">
+                  className="flex-1 py-2.5 sm:py-3 rounded-xl bg-violet-600 hover:bg-violet-500 text-white text-xs sm:text-sm font-bold transition-all shadow-lg shadow-violet-900/20 active:scale-95 disabled:opacity-50">
                   {loading ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : user ? "Update" : "Add User"}
                 </button>
               </div>
@@ -316,8 +418,6 @@ export default function UserManagementScreen({ viewerRole }: { viewerRole: "ADMI
   const [modalUser, setModalUser] = useState<AppUser | null | undefined>(undefined);
   const [deleteTarget, setDeleteTarget] = useState<AppUser | null>(null);
   const [deleting, setDeleting] = useState(false);
-  const [roleChangeTarget, setRoleChangeTarget] = useState<{ user: AppUser; newRole: Role } | null>(null);
-  const [changingRole, setChangingRole] = useState(false);
   const [resettingId, setResettingId] = useState<string | null>(null);
   const [generatedPassword, setGeneratedPassword] = useState<{ name: string; password: string } | null>(null);
   const LIMIT = 20;
@@ -355,30 +455,6 @@ export default function UserManagementScreen({ viewerRole }: { viewerRole: "ADMI
       }
     } catch {
       toast.error("Something went wrong");
-    }
-  }
-
-  async function handleConfirmRoleChange() {
-    if (!roleChangeTarget) return;
-    const { user: u, newRole } = roleChangeTarget;
-    setChangingRole(true);
-    try {
-      const res = await fetch(`/api/admin/users/${u.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ role: newRole, isActive: u.isActive }),
-      });
-      if (res.ok) {
-        toast.success(`Role changed to ${newRole}`);
-        fetchUsers();
-      } else {
-        toast.error("Failed to change role");
-      }
-    } catch {
-      toast.error("Something went wrong");
-    } finally {
-      setChangingRole(false);
-      setRoleChangeTarget(null);
     }
   }
 
@@ -422,26 +498,45 @@ export default function UserManagementScreen({ viewerRole }: { viewerRole: "ADMI
   const totalPages = Math.ceil(total / LIMIT);
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h1 className="text-xl font-bold text-white tracking-tight">Users</h1>
-          <p className="text-sm text-zinc-500 mt-0.5 font-medium">{total} {roleTab === "ALL" ? "" : roleTab.toLowerCase() + " "}account{total === 1 ? "" : "s"}</p>
+    <div className="max-w-7xl mx-auto space-y-6">
+      {/* Header */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div className="space-y-1">
+          <p className="text-[10px] font-bold text-zinc-500 tracking-[0.2em] uppercase">Workspace / Users</p>
+          <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-tight">Users</h1>
+          <p className="text-xs sm:text-sm text-zinc-500 font-medium">
+            {total} {roleTab === "ALL" ? "" : roleTab.toLowerCase() + " "}account{total === 1 ? "" : "s"}
+            {isAdmin ? " — manage accounts, roles and access" : " — browse customers and start a booking"}
+          </p>
         </div>
-        <button onClick={() => setModalUser(null)}
-          className="flex items-center gap-2 px-4 py-2 bg-violet-600 hover:bg-violet-500 text-white text-sm font-bold rounded-xl transition-all shadow-lg shadow-violet-900/20 active:scale-95">
-          <Plus className="w-4 h-4" /> Add User
-        </button>
+        <div className="flex flex-col gap-3 w-full md:flex-row md:items-center md:w-auto">
+          <div className="relative w-full md:w-64 group">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500 group-hover:text-zinc-400 transition-colors" />
+            <input value={search} onChange={e => { setSearch(e.target.value); setPage(1); }}
+              placeholder="Search by name or phone…"
+              className="w-full bg-zinc-900 border border-zinc-800 rounded-xl pl-9 pr-4 py-2 text-sm text-white placeholder-zinc-500 focus:border-violet-500 focus:ring-1 focus:ring-violet-500 transition-all" />
+          </div>
+          <div className="flex items-center gap-2 w-full md:w-auto">
+            <button onClick={fetchUsers}
+              className="p-2.5 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-500 hover:text-white hover:border-zinc-700 transition-all active:rotate-180 duration-500 flex-shrink-0">
+              <RefreshCw className="w-4 h-4" />
+            </button>
+            <button onClick={() => setModalUser(null)}
+              className="flex-1 md:flex-none justify-center bg-violet-600 hover:bg-violet-500 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-lg shadow-violet-900/20 transition-all flex items-center gap-2 active:scale-95">
+              <Plus className="w-4 h-4" /> Add User
+            </button>
+          </div>
+        </div>
       </div>
 
       {isAdmin && (
-        <div className="flex gap-2">
+        <div className="flex gap-1.5 sm:gap-2 overflow-x-auto">
           {ROLE_TABS.map((t) => (
             <button
               key={t.value}
               onClick={() => { setRoleTab(t.value); setPage(1); }}
               className={cn(
-                "px-3 py-1.5 rounded-lg text-xs font-bold transition-all border",
+                "px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-lg text-[11px] sm:text-xs font-bold transition-all border flex-shrink-0",
                 roleTab === t.value ? "bg-violet-600 border-violet-500 text-white" : "bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-800"
               )}
             >
@@ -451,17 +546,6 @@ export default function UserManagementScreen({ viewerRole }: { viewerRole: "ADMI
         </div>
       )}
 
-      <div className="flex gap-3">
-        <div className="relative flex-1 max-w-sm group">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-600 group-hover:text-zinc-400 transition-colors" />
-          <input value={search} onChange={e => { setSearch(e.target.value); setPage(1); }}
-            placeholder="Search by name or phone…" className="input-field pl-10" />
-        </div>
-        <button onClick={fetchUsers} className="p-2.5 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-500 hover:text-white hover:border-zinc-700 transition-all active:rotate-180 duration-500">
-          <RefreshCw className="w-4 h-4" />
-        </button>
-      </div>
-
       <div className="glass-card overflow-hidden border-zinc-900/50 shadow-2xl">
         {loading ? <TableSkeleton rows={8} /> : users.length === 0 ? (
           <EmptyState icon={User} title="No users found"
@@ -470,16 +554,28 @@ export default function UserManagementScreen({ viewerRole }: { viewerRole: "ADMI
         ) : (
           <div className="divide-y divide-zinc-900">
             {users.map(u => (
-              <div key={u.id} className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 px-4 sm:px-6 py-4 hover:bg-zinc-900/40 transition-colors group">
-                <div className="flex items-center gap-3 w-full sm:w-auto">
+              <div key={u.id} className={cn(
+                "flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 px-3 sm:px-6 py-2.5 sm:py-4 transition-colors group",
+                u.isActive ? "hover:bg-zinc-900/40" : "bg-red-950/20 hover:bg-red-950/30"
+              )}>
+                <div className="flex items-center gap-2.5 sm:gap-3 w-full sm:w-auto">
                   <div className={cn(
-                    "w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 border transition-all duration-300",
+                    "w-8 h-8 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center flex-shrink-0 border transition-all duration-300",
                     u.role === "ADMIN" ? "bg-violet-600/10 border-violet-500/10" : u.role === "STAFF" ? "bg-blue-600/10 border-blue-500/10" : "bg-emerald-600/10 border-emerald-500/10"
                   )}>
-                    {u.role === "CUSTOMER" ? <span className="text-sm font-bold text-emerald-400">{getInitials(u.name)}</span> : <Shield className={cn("w-4 h-4", u.role === "ADMIN" ? "text-violet-400" : "text-blue-400")} />}
+                    {u.role === "CUSTOMER" ? <span className="text-xs sm:text-sm font-bold text-emerald-400">{getInitials(u.name)}</span> : <Shield className={cn("w-3.5 h-3.5 sm:w-4 sm:h-4", u.role === "ADMIN" ? "text-violet-400" : "text-blue-400")} />}
                   </div>
-                  <div className="flex-1 sm:hidden">
-                    <p className="text-sm font-bold text-white">{u.name}</p>
+                  <div className="flex-1 sm:hidden min-w-0">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <p className="text-xs font-bold text-white truncate">{u.name}</p>
+                      {isAdmin && (
+                        <span className={cn(
+                          "text-[9px] font-bold uppercase tracking-tighter px-1.5 py-0.5 rounded flex-shrink-0",
+                          u.role === "ADMIN" ? "text-violet-400 bg-violet-500/10" : u.role === "STAFF" ? "text-blue-400 bg-blue-500/10" : "text-emerald-400 bg-emerald-500/10"
+                        )}>{u.role}</span>
+                      )}
+                      {!u.isActive && <span className="text-[9px] font-bold uppercase tracking-tighter px-1.5 py-0.5 rounded text-red-400 bg-red-500/10 flex-shrink-0">Inactive</span>}
+                    </div>
                   </div>
                 </div>
 
@@ -492,69 +588,57 @@ export default function UserManagementScreen({ viewerRole }: { viewerRole: "ADMI
                         u.role === "ADMIN" ? "text-violet-400 bg-violet-500/10" : u.role === "STAFF" ? "text-blue-400 bg-blue-500/10" : "text-emerald-400 bg-emerald-500/10"
                       )}>{u.role}</span>
                     )}
-                    {!u.isActive && <span className="text-[9px] font-bold uppercase tracking-tighter px-1.5 py-0.5 rounded text-zinc-500 bg-zinc-800">Inactive</span>}
+                    {!u.isActive && <span className="text-[9px] font-bold uppercase tracking-tighter px-1.5 py-0.5 rounded text-red-400 bg-red-500/10">Inactive</span>}
                   </div>
-                  <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 mt-1">
-                    <div className="flex items-center gap-4">
-                      <span className="flex items-center gap-1.5 text-xs text-zinc-400 font-medium"><Phone className="w-3 h-3 text-zinc-600" /> +91 {u.phone}</span>
-                      {u.email && <span className="flex items-center gap-1.5 text-xs text-zinc-500 font-medium"><Mail className="w-3 h-3 text-zinc-600" /> {u.email}</span>}
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4 mt-0.5 sm:mt-1">
+                    <div className="flex items-center justify-between gap-2 sm:contents">
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4 min-w-0">
+                        <span className="flex items-center gap-1.5 text-[11px] sm:text-xs text-zinc-400 font-medium"><Phone className="w-3 h-3 text-zinc-600 flex-shrink-0" /> +91 {u.phone}</span>
+                        {u.email && <span className="flex items-center gap-1.5 text-[11px] sm:text-xs text-zinc-500 font-medium truncate"><Mail className="w-3 h-3 text-zinc-600 flex-shrink-0" /> {u.email}</span>}
+                      </div>
+                      <a href={`/${isAdmin ? "admin" : "staff"}/bookings/new?userId=${u.id}`}
+                        className="sm:hidden text-[11px] font-bold px-3 py-1.5 rounded-xl bg-violet-600/10 text-violet-400 border border-violet-500/10 hover:bg-violet-600 hover:text-white transition-all duration-300 flex-shrink-0">
+                        Book Now
+                      </a>
                     </div>
                     {u.referredByPhone && (
-                      <span className="inline-flex w-fit items-center gap-1.5 text-[11px] text-emerald-500/80 font-medium bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/10">
+                      <span className="inline-flex w-fit items-center gap-1.5 text-[10px] sm:text-[11px] text-emerald-500/80 font-medium bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/10">
                         Referred by: {u.referredBy?.name ? `${u.referredBy.name} (${u.referredByPhone})` : u.referredByPhone}
                       </span>
                     )}
                   </div>
                 </div>
 
-                <div className="flex items-center justify-between sm:justify-end gap-3 pl-0 mt-1 sm:mt-0">
-                  <p className="text-[10px] font-bold text-zinc-600 uppercase tracking-widest flex-shrink-0">{formatRelative(u.createdAt)}</p>
+                <div className="flex items-center justify-between sm:justify-end gap-2 sm:gap-3 pl-0 mt-0.5 sm:mt-0">
+                  <p className="text-[9px] sm:text-[10px] font-bold text-zinc-600 uppercase tracking-widest flex-shrink-0">{formatRelative(u.createdAt)}</p>
 
-                  {!isAdmin ? (
-                    <a href={`/staff/bookings/new?userId=${u.id}`}
-                      className="text-xs font-bold px-4 py-2 rounded-xl bg-violet-600/10 text-violet-400 border border-violet-500/10 hover:bg-violet-600 hover:text-white transition-all duration-300 flex-shrink-0">
+                  <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
+                    <a href={`/${isAdmin ? "admin" : "staff"}/bookings/new?userId=${u.id}`}
+                      className="hidden sm:inline-flex text-xs font-bold px-4 py-2 rounded-xl bg-violet-600/10 text-violet-400 border border-violet-500/10 hover:bg-violet-600 hover:text-white transition-all duration-300 flex-shrink-0">
                       Book Now
                     </a>
-                  ) : (
-                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
-                      <select
-                        value={u.role}
-                        onChange={(e) => {
-                          const newRole = e.target.value as Role;
-                          if (newRole !== u.role) setRoleChangeTarget({ user: u, newRole });
-                        }}
-                        className="text-[10px] font-bold bg-zinc-900 border border-zinc-800 rounded-lg px-1.5 py-1 text-zinc-300"
-                        title="Change role"
-                      >
-                        <option value="CUSTOMER">CUSTOMER</option>
-                        <option value="STAFF">STAFF</option>
-                        <option value="ADMIN">ADMIN</option>
-                      </select>
-                      <button onClick={() => toggleActive(u)} className="p-2 rounded-lg text-zinc-500 hover:text-amber-400 hover:bg-amber-500/10 transition-all" title={u.isActive ? "Deactivate" : "Reactivate"}>
-                        <Power className="w-3.5 h-3.5" />
-                      </button>
-                      <button onClick={() => resetPassword(u)} disabled={resettingId === u.id} className="p-2 rounded-lg text-zinc-500 hover:text-sky-400 hover:bg-sky-500/10 transition-all" title="Reset Password">
-                        {resettingId === u.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <KeyRound className="w-3.5 h-3.5" />}
-                      </button>
-                      <button onClick={() => setModalUser(u)} className="p-2 rounded-lg text-zinc-500 hover:text-zinc-200 hover:bg-zinc-900 transition-all" title="Edit">
-                        <Edit2 className="w-3.5 h-3.5" />
-                      </button>
-                      <button onClick={() => setDeleteTarget(u)} className="p-2 rounded-lg text-zinc-500 hover:text-red-400 hover:bg-red-500/10 transition-all" title="Delete">
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  )}
+                    {isAdmin && (
+                      <div className="flex gap-1 flex-shrink-0">
+                        <button onClick={() => setModalUser(u)} className="p-1.5 sm:p-2 rounded-lg text-zinc-500 hover:text-zinc-200 hover:bg-zinc-900 transition-all" title="Info">
+                          <Info className="w-3.5 h-3.5" />
+                        </button>
+                        <button onClick={() => setDeleteTarget(u)} className="p-1.5 sm:p-2 rounded-lg text-zinc-500 hover:text-red-400 hover:bg-red-500/10 transition-all" title="Delete">
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             ))}
           </div>
         )}
         {totalPages > 1 && (
-          <div className="flex items-center justify-between px-6 py-4 border-t border-zinc-900 bg-zinc-950/20">
-            <p className="text-[10px] font-bold text-zinc-600 uppercase tracking-widest">{total} total · page {page} of {totalPages}</p>
+          <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 border-t border-zinc-900 bg-zinc-950/20">
+            <p className="text-[9px] sm:text-[10px] font-bold text-zinc-600 uppercase tracking-widest">{total} total · page {page} of {totalPages}</p>
             <div className="flex gap-2">
-              <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className="p-2 rounded-lg text-zinc-500 hover:text-white disabled:opacity-20 hover:bg-zinc-900 transition-all"><ChevronLeft className="w-4 h-4" /></button>
-              <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages} className="p-2 rounded-lg text-zinc-500 hover:text-white disabled:opacity-20 hover:bg-zinc-900 transition-all"><ChevronRight className="w-4 h-4" /></button>
+              <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className="p-1.5 sm:p-2 rounded-lg text-zinc-500 hover:text-white disabled:opacity-20 hover:bg-zinc-900 transition-all"><ChevronLeft className="w-3.5 h-3.5 sm:w-4 sm:h-4" /></button>
+              <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages} className="p-1.5 sm:p-2 rounded-lg text-zinc-500 hover:text-white disabled:opacity-20 hover:bg-zinc-900 transition-all"><ChevronRight className="w-3.5 h-3.5 sm:w-4 sm:h-4" /></button>
             </div>
           </div>
         )}
@@ -570,6 +654,9 @@ export default function UserManagementScreen({ viewerRole }: { viewerRole: "ADMI
             fetchUsers();
             if (created) setGeneratedPassword({ name: created.name, password: created.generatedPassword });
           }}
+          onToggleActive={toggleActive}
+          onResetPassword={resetPassword}
+          resettingId={resettingId}
         />
       )}
 
@@ -594,21 +681,6 @@ export default function UserManagementScreen({ viewerRole }: { viewerRole: "ADMI
         />
       )}
 
-      {isAdmin && (
-        <ConfirmDialog
-          open={!!roleChangeTarget}
-          title="Change Role"
-          description={
-            roleChangeTarget
-              ? `Change ${roleChangeTarget.user.name}'s role from ${roleChangeTarget.user.role} to ${roleChangeTarget.newRole}?`
-              : ""
-          }
-          confirmLabel="Change Role"
-          onConfirm={handleConfirmRoleChange}
-          onCancel={() => setRoleChangeTarget(null)}
-          loading={changingRole}
-        />
-      )}
     </div>
   );
 }

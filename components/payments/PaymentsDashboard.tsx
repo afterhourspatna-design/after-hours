@@ -11,6 +11,11 @@ import {
 import { TableSkeleton } from "@/components/ui/LoadingSkeleton";
 import EmptyState from "@/components/ui/EmptyState";
 import SnackProductPicker, { SnackItemPayload } from "@/components/snacks/SnackProductPicker";
+import SnackTabModal from "@/components/snacks/SnackTabModal";
+
+function formatDateOnly(date: Date | string) {
+  return new Date(date).toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata", day: "numeric", month: "short", year: "numeric" });
+}
 
 interface SnackLine {
   id: string;
@@ -379,9 +384,11 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
   const [quickAddOrderId, setQuickAddOrderId] = useState<string | null>(null);
 
   const handleOpenQuickAddSnack = (group: BookingGroup) => {
-    // Only a snack tab created today (IST) is reused; if the customer has
-    // several from today, take the latest. Otherwise (none, or only older
-    // days) quickAddOrderId stays null and a new tab is created on first add.
+    // Only a snack tab created today (IST) is reused — opened as the same
+    // Snack Tab view (with its item list, edit and delete) as the Snacks
+    // page's Info button. If the customer has several from today, take the
+    // latest. Otherwise (none, or only older days) quickAddOrderId stays
+    // null and a brand-new tab is created on first add.
     const todaysSnackRows = group.items
       .filter((b) => b.id.startsWith("SNACK_") && getISTDayRelative(new Date(b.startDateTime)) === "today")
       .sort((a, b) => new Date(b.startDateTime).getTime() - new Date(a.startDateTime).getTime());
@@ -1114,7 +1121,7 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
 
       {/* Pay Modal (bg page dim) */}
       {showPayModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4">
           {/* Backdrop dim */}
           <div
             className="absolute inset-0 bg-black/75 backdrop-blur-sm transition-opacity"
@@ -1122,30 +1129,30 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
           />
 
           {/* Modal Container */}
-          <div className="relative glass-card bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-lg overflow-hidden flex flex-col shadow-2xl z-10 p-6 space-y-5 animate-scale-in max-h-[90vh] custom-scroll overflow-y-auto">
+          <div className="relative glass-card bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-lg overflow-hidden flex flex-col shadow-2xl z-10 p-3 sm:p-6 space-y-3 sm:space-y-5 animate-scale-in max-h-[90vh] custom-scroll overflow-y-auto">
             {/* Header */}
-            <div className="flex items-center justify-between border-b border-zinc-800/60 pb-3">
-              <div className="flex items-center gap-2">
-                <Coins className="w-5 h-5 text-violet-400" />
-                <h3 className="text-lg font-bold text-white">{editPaymentId ? "Edit Payment" : "Settle Payment"}</h3>
+            <div className="flex items-center justify-between border-b border-zinc-800/60 pb-2 sm:pb-3">
+              <div className="flex items-center gap-1.5 sm:gap-2">
+                <Coins className="w-4 h-4 sm:w-5 sm:h-5 text-violet-400" />
+                <h3 className="text-sm sm:text-lg font-bold text-white">{editPaymentId ? "Edit Payment" : "Settle Payment"}</h3>
               </div>
               <button
                 onClick={() => handleClosePayModal()}
                 disabled={submittingPayment}
                 className="text-zinc-500 hover:text-white transition-colors"
               >
-                <X className="w-5 h-5" />
+                <X className="w-4 h-4 sm:w-5 sm:h-5" />
               </button>
             </div>
 
             {/* Game Details */}
-            <div className="bg-zinc-950/40 rounded-xl p-3 border border-zinc-800/40 space-y-2">
-              <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">Game Details</p>
+            <div className="bg-zinc-950/40 rounded-xl p-2.5 sm:p-3 border border-zinc-800/40 space-y-1.5 sm:space-y-2">
+              <p className="text-[11px] sm:text-xs font-semibold text-zinc-500 uppercase tracking-wider">Game Details</p>
               <div className="divide-y divide-zinc-800/40 max-h-40 overflow-y-auto custom-scroll pr-1">
                 {gameDetailGroups.map((g) => (
-                  <div key={g.key} className="py-2 text-xs space-y-1">
-                    <div className="flex justify-between">
-                      <p className="font-semibold text-zinc-300">{g.name}</p>
+                  <div key={g.key} className="py-1.5 sm:py-2 text-[11px] sm:text-xs space-y-1">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="font-semibold text-zinc-300 truncate min-w-0">{g.name}</p>
                       {(() => {
                         const initial = g.bookings.reduce((s, b) => s + bookingInitial(b), 0);
                         const current = g.bookings.reduce((s, b) => s + bookingCurrent(b), 0);
@@ -1159,23 +1166,27 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
                         );
                       })()}
                     </div>
-                    <ul className="space-y-0.5 pl-2 border-l border-zinc-800">
+                    <ul className="space-y-1 pl-2 border-l border-zinc-800">
                       {g.bookings.map((b) => (
-                        <li key={b.id} className="flex justify-between gap-2 text-zinc-500">
-                          <span>
-                            {b.game.name}
-                            {b.resourceUnit && <span className="text-zinc-600"> ({b.resourceUnit.unitName})</span>}
-                            <span className="text-zinc-600"> · {formatDate(b.startDateTime)}</span>
-                            {b.couponId && <span className="ml-1.5 bg-violet-500/20 text-violet-400 text-[9px] px-1.5 py-0.5 rounded font-bold uppercase border border-violet-500/30">Coupon</span>}
-                          </span>
-                          {bookingInitial(b) - bookingCurrent(b) > 0.009 ? (
-                            <span className="whitespace-nowrap flex-shrink-0">
-                              <span className="text-zinc-600 line-through mr-1.5">{formatCurrency(bookingInitial(b))}</span>
-                              <span className="text-emerald-400">{formatCurrency(bookingCurrent(b))}</span>
+                        <li key={b.id} className="text-zinc-500">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="flex items-center gap-1 min-w-0">
+                              <span className="truncate text-zinc-400">
+                                {b.game.name}
+                                {b.resourceUnit && <span className="text-zinc-600"> ({b.resourceUnit.unitName})</span>}
+                              </span>
+                              {b.couponId && <span className="flex-shrink-0 bg-violet-500/20 text-violet-400 text-[9px] px-1.5 py-0.5 rounded font-bold uppercase border border-violet-500/30">Coupon</span>}
                             </span>
-                          ) : (
-                            <span>{formatCurrency(bookingCurrent(b))}</span>
-                          )}
+                            {bookingInitial(b) - bookingCurrent(b) > 0.009 ? (
+                              <span className="whitespace-nowrap flex-shrink-0">
+                                <span className="text-zinc-600 line-through mr-1.5">{formatCurrency(bookingInitial(b))}</span>
+                                <span className="text-emerald-400">{formatCurrency(bookingCurrent(b))}</span>
+                              </span>
+                            ) : (
+                              <span className="flex-shrink-0">{formatCurrency(bookingCurrent(b))}</span>
+                            )}
+                          </div>
+                          <p className="text-zinc-600">{formatDate(b.startDateTime)}</p>
                         </li>
                       ))}
                     </ul>
@@ -1186,13 +1197,16 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
 
             {/* Snacks */}
             {totalActualSnacksAmount > 0 && (
-              <div className="bg-zinc-950/40 rounded-xl p-3 border border-zinc-800/40 space-y-2">
-                <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">Snacks</p>
+              <div className="bg-zinc-950/40 rounded-xl p-2.5 sm:p-3 border border-zinc-800/40 space-y-1.5 sm:space-y-2">
+                <p className="text-[11px] sm:text-xs font-semibold text-zinc-500 uppercase tracking-wider">Snacks</p>
                 <div className="divide-y divide-zinc-800/40 max-h-32 overflow-y-auto custom-scroll pr-1">
                   {selectedBookings.filter((b) => b.id.startsWith("SNACK_") || b.game?.tag === "SNACK").map((b) => (
-                    <div key={b.id} className="py-2 text-xs space-y-1">
-                      <div className="flex justify-between">
-                        <p className="font-semibold text-zinc-300">{b.user?.name ?? b.guestName ?? "Guest"}</p>
+                    <div key={b.id} className="py-1.5 sm:py-2 text-[11px] sm:text-xs space-y-1">
+                      <div className="flex justify-between items-start gap-2">
+                        <div>
+                          <p className="font-semibold text-zinc-300">{b.user?.name ?? b.guestName ?? "Guest"}</p>
+                          <p className="text-[10px] text-zinc-600">{formatDateOnly(b.startDateTime)}</p>
+                        </div>
                         <p className="font-bold text-zinc-300">{formatCurrency(Number(b.finalAmount))}</p>
                       </div>
                       {b.snackItems && b.snackItems.length > 0 && (
@@ -1215,9 +1229,9 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
             )}
 
             {/* Editable price section */}
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-2.5 sm:gap-4">
               <div>
-                <label className="text-[10px] uppercase tracking-wider text-zinc-500 font-bold block mb-1.5">Final Games Price</label>
+                <label className="text-[9px] sm:text-[10px] uppercase tracking-wider text-zinc-500 font-bold block mb-1 sm:mb-1.5">Final Games Price</label>
                 <input
                   type="number"
                   value={negotiatedInput}
@@ -1229,12 +1243,12 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
                   }}
                   disabled={submittingPayment}
                   placeholder="Games Price"
-                  className="input-field text-sm font-semibold w-full"
+                  className="input-field text-xs sm:text-sm font-semibold w-full"
                   title="Final Games Price"
                 />
               </div>
               <div>
-                <label className="text-[10px] uppercase tracking-wider text-zinc-500 font-bold block mb-1.5">Final Snacks Price</label>
+                <label className="text-[9px] sm:text-[10px] uppercase tracking-wider text-zinc-500 font-bold block mb-1 sm:mb-1.5">Final Snacks Price</label>
                 {editPaymentId ? (
                   <input
                     type="number"
@@ -1247,12 +1261,12 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
                     }}
                     disabled={submittingPayment}
                     placeholder="Snacks Price"
-                    className="input-field text-sm font-semibold w-full"
+                    className="input-field text-xs sm:text-sm font-semibold w-full"
                     title="Final Snacks Price"
                   />
                 ) : (
                   <div
-                    className="input-field text-sm font-semibold w-full text-zinc-300 flex items-center"
+                    className="input-field text-xs sm:text-sm font-semibold w-full text-zinc-300 flex items-center"
                     title="Total from the customer's open snack tab(s) selected above. Add snacks to a tab from the Unpaid list itself."
                   >
                     {formatCurrency(snacksVal)}
@@ -1262,21 +1276,21 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
             </div>
 
             <div>
-              <label className="text-[10px] uppercase tracking-wider text-emerald-400 font-bold block mb-1.5">Amount Paying Now</label>
+              <label className="text-[9px] sm:text-[10px] uppercase tracking-wider text-emerald-400 font-bold block mb-1 sm:mb-1.5">Amount Paying Now</label>
               <input
                 type="number"
                 value={amountPayingNowInput}
                 onChange={(e) => setAmountPayingNowInput(e.target.value)}
                 disabled={submittingPayment}
                 placeholder="Total to Pay Today"
-                className="input-field text-lg font-bold text-emerald-400 bg-emerald-400/5 border-emerald-400/30 w-full py-2.5"
+                className="input-field text-base sm:text-lg font-bold text-emerald-400 bg-emerald-400/5 border-emerald-400/30 w-full py-2 sm:py-2.5"
               />
             </div>
 
             {/* Discount */}
             {!editPaymentId && (
-              <div className="space-y-2">
-                <label className="text-xs text-zinc-500 font-medium block">Discount (Coupon)</label>
+              <div className="space-y-1.5 sm:space-y-2">
+                <label className="text-[11px] sm:text-xs text-zinc-500 font-medium block">Discount (Coupon)</label>
                 <select
                   value={selectedCouponCode}
                   onChange={(e) => handleCouponChange(e.target.value)}
@@ -1312,9 +1326,9 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
             )}
 
             {/* Payment Method Selector */}
-            <div className="space-y-2">
-              <label className="text-xs text-zinc-500 font-medium block">Way of Payment</label>
-              <div className="grid grid-cols-3 gap-2">
+            <div className="space-y-1.5 sm:space-y-2">
+              <label className="text-[11px] sm:text-xs text-zinc-500 font-medium block">Way of Payment</label>
+              <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
                 {(["ONLINE", "CASH", "MIXED"] as const).map((method) => (
                   <button
                     key={method}
@@ -1322,7 +1336,7 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
                     onClick={() => setPaymentMethod(method)}
                     disabled={submittingPayment}
                     className={cn(
-                      "py-3 rounded-xl border text-xs font-semibold uppercase transition-all flex flex-col items-center justify-center gap-1.5",
+                      "py-2 sm:py-3 rounded-xl border text-[10px] sm:text-xs font-semibold uppercase transition-all flex flex-col items-center justify-center gap-1.5",
                       paymentMethod === method
                         ? "bg-violet-600/10 border-violet-500 text-violet-400 shadow-md shadow-violet-950/20"
                         : "bg-zinc-800/30 border-zinc-800/60 text-zinc-500 hover:text-zinc-300 hover:border-zinc-700"
@@ -1336,32 +1350,32 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
 
             {/* Mixed payment split input options */}
             {paymentMethod === "MIXED" && (
-              <div className="grid grid-cols-2 gap-4 bg-zinc-950/20 p-4 border border-zinc-800/60 rounded-xl animate-fade-in">
+              <div className="grid grid-cols-2 gap-2.5 sm:gap-4 bg-zinc-950/20 p-2.5 sm:p-4 border border-zinc-800/60 rounded-xl animate-fade-in">
                 <div>
-                  <label className="text-xs text-zinc-500 font-medium block mb-1">Cash Amount</label>
+                  <label className="text-[11px] sm:text-xs text-zinc-500 font-medium block mb-1">Cash Amount</label>
                   <input
                     type="number"
                     value={cashInput}
                     onChange={(e) => setCashInput(e.target.value)}
                     disabled={submittingPayment}
                     placeholder="Cash amount"
-                    className="input-field"
+                    className="input-field text-xs sm:text-sm"
                   />
                 </div>
                 <div>
-                  <label className="text-xs text-zinc-500 font-medium block mb-1">Online Amount</label>
+                  <label className="text-[11px] sm:text-xs text-zinc-500 font-medium block mb-1">Online Amount</label>
                   <input
                     type="number"
                     value={onlineInput}
                     onChange={(e) => setOnlineInput(e.target.value)}
                     disabled={submittingPayment}
                     placeholder="Online amount"
-                    className="input-field"
+                    className="input-field text-xs sm:text-sm"
                   />
                 </div>
 
                 {/* Validation check message */}
-                <div className="col-span-2 flex items-start gap-2 text-[11px] text-amber-500 bg-amber-500/5 border border-amber-500/10 p-2.5 rounded-lg">
+                <div className="col-span-2 flex items-start gap-2 text-[10px] sm:text-[11px] text-amber-500 bg-amber-500/5 border border-amber-500/10 p-2 sm:p-2.5 rounded-lg">
                   <Info className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
                   <p className="leading-relaxed">
                     Note: Combined sum of Cash (₹{cashVal}) + Online (₹{onlineVal}) must exactly equal the Amount Paying Now (₹{amountPayingNowVal}).
@@ -1371,51 +1385,51 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
             )}
 
             {/* Final Amount */}
-            <div className="flex flex-col gap-1.5 bg-zinc-950/20 p-3 border border-zinc-800/60 rounded-xl">
-              <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider mb-1">Final Amount</p>
+            <div className="flex flex-col gap-1 sm:gap-1.5 bg-zinc-950/20 p-2.5 sm:p-3 border border-zinc-800/60 rounded-xl">
+              <p className="text-[9px] sm:text-[10px] font-semibold text-zinc-500 uppercase tracking-wider mb-0.5 sm:mb-1">Final Amount</p>
               {dynamicCouponDiscount > 0 && (
-                <div className="flex items-center justify-between text-xs text-zinc-400">
+                <div className="flex items-center justify-between text-[11px] sm:text-xs text-zinc-400">
                   <span>Games Total:</span>
                   <span className="font-semibold text-zinc-300">{formatCurrency(totalActualGamesAmount)}</span>
                 </div>
               )}
               {dynamicCouponDiscount > 0 && (
-                <div className="flex items-center justify-between text-xs text-emerald-400 font-medium">
+                <div className="flex items-center justify-between text-[11px] sm:text-xs text-emerald-400 font-medium">
                   <span>Coupon Discount{selectedCouponCode ? ` (${selectedCouponCode})` : ""}:</span>
                   <span className="font-semibold">-{formatCurrency(dynamicCouponDiscount)}</span>
                 </div>
               )}
-              <div className="flex items-center justify-between text-xs text-zinc-400">
+              <div className="flex items-center justify-between text-[11px] sm:text-xs text-zinc-400">
                 <span>{isCreditsPayment ? "Credits" : "Games"} Invoice:</span>
                 <span className="font-semibold text-white">{formatCurrency(totalNegotiatedVal)}</span>
               </div>
               {snacksVal > 0 && (
-                <div className="flex items-center justify-between text-xs text-zinc-400">
+                <div className="flex items-center justify-between text-[11px] sm:text-xs text-zinc-400">
                   <span>Snacks Invoice:</span>
                   <span className="font-semibold text-white">{formatCurrency(snacksVal)}</span>
                 </div>
               )}
               {previouslyPaidTotal > 0 && !editPaymentId && (
-                <div className="flex items-center justify-between text-xs text-emerald-400/80">
+                <div className="flex items-center justify-between text-[11px] sm:text-xs text-emerald-400/80">
                   <span>Previously Paid:</span>
                   <span className="font-semibold">-{formatCurrency(previouslyPaidTotal)}</span>
                 </div>
               )}
 
-              <div className="flex items-center justify-between text-xs text-zinc-400 border-t border-zinc-800/40 pt-1.5 mt-0.5">
+              <div className="flex items-center justify-between text-[11px] sm:text-xs text-zinc-400 border-t border-zinc-800/40 pt-1.5 mt-0.5">
                 <span>Balance Due:</span>
                 <span className="font-semibold text-white">
                   {formatCurrency(Math.max(0, totalWithSnacks - (editPaymentId ? 0 : previouslyPaidTotal)))}
                 </span>
               </div>
 
-              <div className="flex items-center justify-between text-xs font-bold text-zinc-300">
+              <div className="flex items-center justify-between text-[11px] sm:text-xs font-bold text-zinc-300">
                 <span>Amount Paying Today:</span>
-                <span className="text-sm text-emerald-400 font-extrabold">{formatCurrency(amountPayingNowVal)}</span>
+                <span className="text-xs sm:text-sm text-emerald-400 font-extrabold">{formatCurrency(amountPayingNowVal)}</span>
               </div>
 
               {amountPayingNowVal > Math.max(0, totalWithSnacks - (editPaymentId ? 0 : previouslyPaidTotal)) && (
-                <div className="flex items-center justify-between text-[11px] text-amber-400 border-t border-amber-500/20 pt-1.5 mt-0.5 bg-amber-500/5 -mx-3 -mb-3 px-3 pb-3 rounded-b-xl">
+                <div className="flex items-center justify-between text-[10px] sm:text-[11px] text-amber-400 border-t border-amber-500/20 pt-1.5 mt-0.5 bg-amber-500/5 -mx-2.5 sm:-mx-3 -mb-2.5 sm:-mb-3 px-2.5 sm:px-3 pb-2.5 sm:pb-3 rounded-b-xl">
                   <span>Excess / Tip (Unallocated Revenue):</span>
                   <span className="font-bold">+{formatCurrency(amountPayingNowVal - Math.max(0, totalWithSnacks - (editPaymentId ? 0 : previouslyPaidTotal)))}</span>
                 </div>
@@ -1424,7 +1438,7 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
 
             {/* Warning alert if sum is wrong */}
             {isSplitInvalid && (
-              <div className="flex items-start gap-2 p-3 bg-red-500/10 border border-red-500/20 text-red-400 rounded-xl text-xs">
+              <div className="flex items-start gap-2 p-2.5 sm:p-3 bg-red-500/10 border border-red-500/20 text-red-400 rounded-xl text-[11px] sm:text-xs">
                 <Info className="w-4 h-4 flex-shrink-0 mt-0.5" />
                 <p>
                   Mathematical error: Cash + Online (₹{(cashVal + onlineVal).toFixed(2)}) does not match Amount Paying Now (₹{amountPayingNowVal.toFixed(2)}).
@@ -1434,12 +1448,12 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
 
 
             {/* Actions */}
-            <div className="flex gap-2 border-t border-zinc-800/60 pt-4">
+            <div className="flex gap-2 border-t border-zinc-800/60 pt-3 sm:pt-4">
               <button
                 type="button"
                 onClick={() => handleClosePayModal()}
                 disabled={submittingPayment}
-                className="flex-1 py-2.5 bg-zinc-800 border border-zinc-700 text-zinc-300 text-sm font-semibold rounded-xl hover:text-white hover:bg-zinc-700 transition-all"
+                className="flex-1 py-2 sm:py-2.5 bg-zinc-800 border border-zinc-700 text-zinc-300 text-xs sm:text-sm font-semibold rounded-xl hover:text-white hover:bg-zinc-700 transition-all"
               >
                 Cancel
               </button>
@@ -1448,7 +1462,7 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
                 onClick={handleConfirmPayment}
                 disabled={isSubmitDisabled}
                 className={cn(
-                  "flex-1 py-2.5 bg-violet-600 hover:bg-violet-500 text-white text-sm font-bold rounded-xl transition-all shadow-lg flex items-center justify-center gap-2",
+                  "flex-1 py-2 sm:py-2.5 bg-violet-600 hover:bg-violet-500 text-white text-xs sm:text-sm font-bold rounded-xl transition-all shadow-lg flex items-center justify-center gap-2",
                   isSubmitDisabled
                     ? "opacity-50 cursor-not-allowed"
                     : "shadow-violet-900/30 hover:shadow-violet-800/40"
@@ -1473,7 +1487,7 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
 
       {/* Payment Details Modal */}
       {selectedPaymentDetail && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4">
           <div
             className="absolute inset-0 bg-black/75 backdrop-blur-sm transition-opacity"
             onClick={() => setSelectedPaymentDetail(null)}
@@ -1486,20 +1500,20 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
             const totalActualGamesPrice = actualGamesList.reduce((sum, b) => sum + Number(b.finalAmount), 0);
 
             return (
-              <div className="relative glass-card bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-2xl overflow-hidden flex flex-col shadow-2xl z-10 p-6 space-y-5 animate-scale-in max-h-[90vh] custom-scroll overflow-y-auto">
+              <div className="relative glass-card bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-2xl overflow-hidden flex flex-col shadow-2xl z-10 p-3 sm:p-6 space-y-3 sm:space-y-5 animate-scale-in max-h-[90vh] custom-scroll overflow-y-auto">
                 {/* Header */}
-                <div className="flex items-center justify-between border-b border-zinc-800/60 pb-3">
-                  <div className="flex items-center gap-2">
-                    <CreditCard className="w-5 h-5 text-violet-400" />
-                    <h3 className="text-lg font-bold text-white font-mono">
+                <div className="flex items-center justify-between border-b border-zinc-800/60 pb-2 sm:pb-3">
+                  <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
+                    <CreditCard className="w-4 h-4 sm:w-5 sm:h-5 text-violet-400 flex-shrink-0" />
+                    <h3 className="text-sm sm:text-lg font-bold text-white font-mono truncate">
                       Payment Details: {selectedPaymentDetail.paymentId.startsWith("LEGACY-") ? "#LEGACY" : selectedPaymentDetail.paymentId}
                     </h3>
                   </div>
                   <button
                     onClick={() => setSelectedPaymentDetail(null)}
-                    className="text-zinc-500 hover:text-white transition-colors"
+                    className="text-zinc-500 hover:text-white transition-colors flex-shrink-0"
                   >
-                    <X className="w-5 h-5" />
+                    <X className="w-4 h-4 sm:w-5 sm:h-5" />
                   </button>
                 </div>
 
@@ -1627,6 +1641,7 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
                           <tr>
                             <th className="p-3">Customer</th>
                             <th className="p-3">Item</th>
+                            <th className="p-3">Date</th>
                             <th className="p-3 text-right">Invoice Price</th>
                             <th className="p-3 text-right">Paid Now</th>
                           </tr>
@@ -1642,6 +1657,9 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
                               </td>
                               <td className="p-3">
                                 <p className="font-medium text-zinc-200">Snacks</p>
+                              </td>
+                              <td className="p-3 text-zinc-500">
+                                {formatDateOnly(sn.startDateTime)}
                               </td>
                               <td className="p-3 text-right text-amber-500 font-medium">
                                 {formatCurrency(Number(sn.finalAmount))}
@@ -1709,21 +1727,32 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
         </div>
       )}
 
-      {/* Quick-add snack for a customer group, no settlement involved */}
-      {snackQuickAddGroup && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      {/* Quick-add snack for a customer group, no settlement involved. Once a
+          tab exists (either it already existed, or the first item above just
+          created one), land on the same Snack Tab popup the Snacks page's
+          Info button opens, instead of a stripped-down one. */}
+      {snackQuickAddGroup && quickAddOrderId && (
+        <SnackTabModal
+          orderId={quickAddOrderId}
+          onClose={() => { handleCloseQuickAddSnack(); fetchBookings(); }}
+          onChanged={fetchBookings}
+        />
+      )}
+
+      {snackQuickAddGroup && !quickAddOrderId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4">
           <div
             className="absolute inset-0 bg-black/75 backdrop-blur-sm transition-opacity"
             onClick={() => handleCloseQuickAddSnack()}
           />
-          <div className="relative glass-card bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-lg overflow-hidden flex flex-col shadow-2xl z-10 p-6 space-y-4 animate-scale-in max-h-[90vh] custom-scroll overflow-y-auto">
-            <div className="flex items-center justify-between border-b border-zinc-800/60 pb-3">
-              <div className="flex items-center gap-2">
-                <Coffee className="w-5 h-5 text-amber-400" />
-                <h3 className="text-lg font-bold text-white">Add Snack to Tab</h3>
+          <div className="relative glass-card bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-lg overflow-hidden flex flex-col shadow-2xl z-10 p-3 sm:p-6 space-y-3 sm:space-y-4 animate-scale-in max-h-[90vh] custom-scroll overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-zinc-800/60 pb-2 sm:pb-3">
+              <div className="flex items-center gap-1.5 sm:gap-2">
+                <Coffee className="w-4 h-4 sm:w-5 sm:h-5 text-amber-400" />
+                <h3 className="text-sm sm:text-lg font-bold text-white">Add Snack to Tab</h3>
               </div>
               <button onClick={() => handleCloseQuickAddSnack()} className="text-zinc-500 hover:text-white transition-colors">
-                <X className="w-5 h-5" />
+                <X className="w-4 h-4 sm:w-5 sm:h-5" />
               </button>
             </div>
 

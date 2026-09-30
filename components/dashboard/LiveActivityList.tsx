@@ -170,28 +170,28 @@ export default function LiveActivityList({
 
   return (
     <div className="glass-card border-zinc-900/50 bg-zinc-950/30">
-      <div className="px-5 py-4 border-b border-zinc-900 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Zap className={cn("w-5 h-5", currentlyPlayingCount > 0 ? "text-violet-400 animate-pulse" : "text-zinc-500")} />
-          <h3 className="text-base font-bold text-white">{title}</h3>
+      <div className="px-3 sm:px-5 py-3 sm:py-4 border-b border-zinc-900 flex items-center justify-between gap-2">
+        <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
+          <Zap className={cn("w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0", currentlyPlayingCount > 0 ? "text-violet-400 animate-pulse" : "text-zinc-500")} />
+          <h3 className="text-sm sm:text-base font-bold text-white truncate">{title}</h3>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
           {overtimeItems.length > 0 && (
             <button
               onClick={handleClearAllOvertime}
               disabled={loading}
-              className="text-xs font-bold text-red-400 hover:text-white px-2.5 py-1 rounded-lg bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 transition-all flex items-center gap-1 active:scale-95 disabled:opacity-50"
+              className="text-[10px] sm:text-xs font-bold text-red-400 hover:text-white px-2 sm:px-2.5 py-1 rounded-lg bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 transition-all flex items-center gap-1 active:scale-95 disabled:opacity-50 whitespace-nowrap"
             >
               Clear Overtime ({overtimeItems.length})
             </button>
           )}
           {loading && <Loader2 className="w-4 h-4 text-zinc-500 animate-spin" />}
-          <span className="text-xs font-bold text-zinc-500 uppercase tracking-widest">
+          <span className="text-[10px] sm:text-xs font-bold text-zinc-500 uppercase tracking-widest whitespace-nowrap">
             {currentlyPlayingCount} active
           </span>
         </div>
       </div>
-      <div className="p-2 space-y-2 max-h-[600px] overflow-y-auto overflow-x-hidden scrollbar-thin scrollbar-thumb-zinc-800">
+      <div className="p-1.5 sm:p-2 space-y-1.5 sm:space-y-2 max-h-[600px] overflow-y-auto overflow-x-hidden scrollbar-thin scrollbar-thumb-zinc-800">
         {activeItems.length > 0 ? (
           activeItems.map(({ b, diffMins, startDiffMins, type }) => {
             const name = b.user?.name ?? b.guestName ?? "Guest";
@@ -232,14 +232,14 @@ export default function LiveActivityList({
               <div
                 key={b.id}
                 className={cn(
-                  "flex items-center justify-between p-4 rounded-xl hover:bg-zinc-900/50 hover:bg-zinc-900/80 transition-colors group border border-transparent",
+                  "flex items-center justify-between p-2.5 sm:p-4 rounded-xl hover:bg-zinc-900/50 hover:bg-zinc-900/80 transition-colors group border border-transparent",
                   cardStyle
                 )}
               >
-                <div className="flex items-center gap-3.5 min-w-0 flex-1">
+                <div className="flex items-center gap-2.5 sm:gap-3.5 min-w-0 flex-1">
                   <div
                     className={cn(
-                      "w-11 h-11 rounded-full flex items-center justify-center text-xs font-bold border flex-shrink-0",
+                      "w-9 h-9 sm:w-11 sm:h-11 rounded-full flex items-center justify-center text-[11px] sm:text-xs font-bold border flex-shrink-0",
                       type === "overtime"
                         ? "bg-red-500/10 border-red-500/20 text-red-400 animate-pulse"
                         : type === "ending-soon"
@@ -249,14 +249,14 @@ export default function LiveActivityList({
                   >
                     {initials}
                   </div>
-                  <div className="min-w-0 flex-1 pr-2 space-y-1">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <p className="text-base font-bold text-zinc-100 truncate">{name}</p>
+                  <div className="min-w-0 flex-1 pr-2 space-y-0.5 sm:space-y-1">
+                    <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+                      <p className="text-sm sm:text-base font-bold text-zinc-100 truncate">{name}</p>
                       {phone && (
                         <a
                           href={`tel:${phone}`}
                           onClick={(e) => e.stopPropagation()}
-                          className="flex items-center gap-1 text-xs text-zinc-500 hover:text-violet-400 font-mono transition-colors"
+                          className="flex items-center gap-1 text-[11px] sm:text-xs text-zinc-500 hover:text-violet-400 font-mono transition-colors"
                           title="Call"
                         >
                           <Phone className="w-3 h-3" />
@@ -264,15 +264,15 @@ export default function LiveActivityList({
                         </a>
                       )}
                     </div>
-                    <p className="text-sm text-zinc-400 font-semibold truncate">
+                    <p className="text-xs sm:text-sm text-zinc-400 font-semibold truncate">
                       {(b.game?.totalUnits ?? 1) > 1 && b.resourceUnit ? b.resourceUnit.unitName : b.game?.name}
                     </p>
-                    <p className="text-xs text-zinc-500 font-mono">
+                    <p className="text-[11px] sm:text-xs text-zinc-500 font-mono">
                       {formatTimeRange(b.startDateTime, b.endDateTime)}
                     </p>
                   </div>
                 </div>
-                <div className="flex items-center gap-2.5 flex-shrink-0">
+                <div className="flex items-center gap-1.5 sm:gap-2.5 flex-shrink-0">
                   {type !== "upcoming" && (
                     <button
                       onClick={(e) => {
@@ -280,13 +280,13 @@ export default function LiveActivityList({
                         setBookingToConfirm(b);
                         setConfirmOpen(true);
                       }}
-                      className="opacity-0 group-hover:opacity-100 transition-opacity p-2 rounded-lg bg-emerald-600/20 text-emerald-400 border border-emerald-600/30 hover:bg-emerald-600/30 hover:text-white flex-shrink-0"
+                      className="sm:opacity-0 sm:group-hover:opacity-100 transition-opacity p-1.5 sm:p-2 rounded-lg bg-emerald-600/20 text-emerald-400 border border-emerald-600/30 hover:bg-emerald-600/30 hover:text-white flex-shrink-0"
                       title="Mark Session Completed"
                     >
-                      <Check className="w-4 h-4" />
+                      <Check className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                     </button>
                   )}
-                  <div className={cn("text-xs font-mono font-bold px-3 py-1.5 rounded-lg border flex-shrink-0 whitespace-nowrap", badgeStyle)}>
+                  <div className={cn("text-[10px] sm:text-xs font-mono font-bold px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg border flex-shrink-0 whitespace-nowrap", badgeStyle)}>
                     {badgeText}
                   </div>
                 </div>

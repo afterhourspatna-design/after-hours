@@ -4,7 +4,7 @@ import { ArrowLeft } from "lucide-react";
 export default async function StaffNewBookingPage({
   searchParams,
 }: {
-  searchParams: Promise<{ start?: string }>;
+  searchParams: Promise<{ start?: string; userId?: string }>;
 }) {
   const params = await searchParams;
   return (
@@ -23,6 +23,7 @@ export default async function StaffNewBookingPage({
         mode="create"
         role="STAFF"
         prefillDate={params.start ? decodeURIComponent(params.start) : undefined}
+        prefillUserId={params.userId}
       />
     </div>
   );

@@ -106,15 +106,15 @@ export default function SnackProductPicker({ onAdd, disabled, addLabel = "Add" }
   };
 
   return (
-    <div className="space-y-2">
-      <div className="flex gap-2">
+    <div className="space-y-1.5 sm:space-y-2">
+      <div className="flex gap-1.5 sm:gap-2">
         <div className="relative flex-1" ref={containerRef}>
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500 pointer-events-none" />
           {selected ? (
             <div className="input-field pl-9 flex items-center justify-between">
-              <span className="text-sm text-white truncate">{selected.name}</span>
+              <span className="text-xs sm:text-sm text-white truncate">{selected.name}</span>
               <button type="button" onClick={handleClearSelection} disabled={submitting || disabled}>
-                <X className="w-4 h-4 text-zinc-500 hover:text-white" />
+                <X className="w-4 h-4 text-zinc-500 hover:text-white flex-shrink-0" />
               </button>
             </div>
           ) : (
@@ -127,7 +127,7 @@ export default function SnackProductPicker({ onAdd, disabled, addLabel = "Add" }
               onFocus={() => setShowResults(true)}
               disabled={submitting || disabled}
               placeholder="Search or type a new item…"
-              className="input-field pl-9 text-sm"
+              className="input-field pl-9 text-xs sm:text-sm"
             />
           )}
           {showResults && !selected && results.length > 0 && (
@@ -137,7 +137,7 @@ export default function SnackProductPicker({ onAdd, disabled, addLabel = "Add" }
                   key={p.id}
                   type="button"
                   onClick={() => handleSelectProduct(p)}
-                  className="w-full px-4 py-2 text-left hover:bg-zinc-800 transition-colors flex items-center justify-between text-sm gap-2"
+                  className="w-full px-3 sm:px-4 py-1.5 sm:py-2 text-left hover:bg-zinc-800 transition-colors flex items-center justify-between text-xs sm:text-sm gap-2"
                 >
                   <span className="flex items-center gap-2 min-w-0">
                     <span className="text-white truncate">{p.name}</span>
@@ -147,7 +147,7 @@ export default function SnackProductPicker({ onAdd, disabled, addLabel = "Add" }
                       </span>
                     )}
                   </span>
-                  <span className="text-xs text-zinc-500 shrink-0">₹{Number(p.price)}</span>
+                  <span className="text-[11px] sm:text-xs text-zinc-500 shrink-0">₹{Number(p.price)}</span>
                 </button>
               ))}
             </div>
@@ -159,32 +159,32 @@ export default function SnackProductPicker({ onAdd, disabled, addLabel = "Add" }
             type="button"
             onClick={() => setQuantity((q) => Math.max(1, q - 1))}
             disabled={submitting || disabled}
-            className="px-2 py-2 text-zinc-400 hover:text-white transition-colors"
+            className="px-1.5 sm:px-2 py-2 text-zinc-400 hover:text-white transition-colors"
           >
-            <Minus className="w-3.5 h-3.5" />
+            <Minus className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
           </button>
-          <span className="w-6 text-center text-sm font-semibold text-white">{quantity}</span>
+          <span className="w-4 sm:w-6 text-center text-xs sm:text-sm font-semibold text-white">{quantity}</span>
           <button
             type="button"
             onClick={() => setQuantity((q) => q + 1)}
             disabled={submitting || disabled}
-            className="px-2 py-2 text-zinc-400 hover:text-white transition-colors"
+            className="px-1.5 sm:px-2 py-2 text-zinc-400 hover:text-white transition-colors"
           >
-            <Plus className="w-3.5 h-3.5" />
+            <Plus className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
           </button>
         </div>
       </div>
 
-      <div className="flex gap-2">
-        <div className="relative w-28 shrink-0">
-          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-zinc-500 font-bold">₹</span>
+      <div className="flex gap-1.5 sm:gap-2">
+        <div className="relative w-16 sm:w-28 shrink-0">
+          <span className="absolute left-2.5 sm:left-3 top-1/2 -translate-y-1/2 text-[11px] sm:text-xs text-zinc-500 font-bold">₹</span>
           <input
             type="number"
             value={unitPriceInput}
             onChange={(e) => setUnitPriceInput(e.target.value)}
             disabled={submitting || disabled}
             placeholder="Price"
-            className="input-field pl-6 text-sm"
+            className="input-field pl-5 sm:pl-6 text-xs sm:text-sm"
           />
         </div>
         <input
@@ -192,14 +192,15 @@ export default function SnackProductPicker({ onAdd, disabled, addLabel = "Add" }
           onChange={(e) => setNotesInput(e.target.value)}
           disabled={submitting || disabled}
           placeholder="Note (optional)"
-          className="input-field text-sm flex-1"
+          className="input-field text-xs sm:text-sm flex-1 min-w-0"
         />
         <button
           type="button"
           onClick={handleAdd}
           disabled={!canAdd}
+          title={addLabel}
           className={cn(
-            "px-3 py-2 bg-violet-600 hover:bg-violet-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-semibold rounded-xl transition-colors shrink-0 flex items-center gap-1.5"
+            "px-2.5 sm:px-3 py-2 bg-violet-600 hover:bg-violet-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-semibold rounded-xl transition-colors shrink-0 flex items-center gap-1.5"
           )}
         >
           {submitting ? (
@@ -207,12 +208,12 @@ export default function SnackProductPicker({ onAdd, disabled, addLabel = "Add" }
           ) : (
             <Plus className="w-3.5 h-3.5" />
           )}
-          {addLabel}
+          <span className="hidden sm:inline">{addLabel}</span>
         </button>
       </div>
 
       {isNewProduct && (
-        <p className="text-[11px] text-amber-500/90">
+        <p className="text-[10px] sm:text-[11px] text-amber-500/90">
           "{query.trim()}" isn't on the menu yet — adding it will create a new item at ₹{unitPriceVal || "…"}.
         </p>
       )}
