@@ -15,7 +15,7 @@ export default function NotFound() {
         </div>
         <Link
           href="/"
-          className="block w-full py-3 bg-violet-600 hover:bg-violet-500 text-white font-bold rounded-xl transition-all"
+          className="block w-full py-3 bg-orange-600 hover:bg-orange-500 text-white font-bold rounded-xl transition-all"
         >
           Return Home
         </Link>

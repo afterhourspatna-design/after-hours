@@ -13,7 +13,7 @@ interface StatCardProps {
 }
 
 export default function StatCard({
-  title, value, subtitle, icon: Icon, iconColor = "text-violet-400",
+  title, value, subtitle, icon: Icon, iconColor = "text-orange-400",
   trend, className, loading = false,
 }: StatCardProps) {
   if (loading) {

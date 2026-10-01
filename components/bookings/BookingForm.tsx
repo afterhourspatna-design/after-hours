@@ -513,7 +513,7 @@ export default function BookingForm({ mode = "create", initialData, prefillDate,
               {/* Header row with mode toggle */}
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2 text-sm font-semibold text-white">
-                  <Users className="w-4 h-4 text-violet-400" />
+                  <Users className="w-4 h-4 text-orange-400" />
                   Customer
                 </div>
                 {/* Mode toggle — disable during wizard steps 2/3 in guest mode */}
@@ -522,14 +522,14 @@ export default function BookingForm({ mode = "create", initialData, prefillDate,
                     onClick={() => setIsGuest(false)}
                     disabled={isPaidLocked}
                     className={cn("px-3 py-1.5 rounded-lg text-xs font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed",
-                      !isGuest ? "bg-violet-600 text-white" : "text-zinc-400 hover:text-zinc-200")}>
+                      !isGuest ? "bg-orange-600 text-white" : "text-zinc-400 hover:text-zinc-200")}>
                     <User className="w-3 h-3 inline mr-1" />Registered
                   </button>
                   <button type="button"
                     onClick={() => setIsGuest(true)}
                     disabled={isPaidLocked}
                     className={cn("px-3 py-1.5 rounded-lg text-xs font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed",
-                      isGuest ? "bg-violet-600 text-white" : "text-zinc-400 hover:text-zinc-200")}>
+                      isGuest ? "bg-orange-600 text-white" : "text-zinc-400 hover:text-zinc-200")}>
                     Guest
                   </button>
                 </div>
@@ -605,7 +605,7 @@ export default function BookingForm({ mode = "create", initialData, prefillDate,
           {/* ── Game / Unit ── */}
           <div className="glass-card p-5 space-y-4">
             <div className="flex items-center gap-2 text-sm font-semibold text-white">
-              <Gamepad2 className="w-4 h-4 text-violet-400" />
+              <Gamepad2 className="w-4 h-4 text-orange-400" />
               Game & Unit
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -686,12 +686,12 @@ export default function BookingForm({ mode = "create", initialData, prefillDate,
                         className={cn(
                           "flex flex-col items-center justify-center p-3.5 rounded-xl border text-center transition-all duration-300",
                           active
-                            ? "bg-gradient-to-br from-violet-600/35 to-fuchsia-600/35 border-violet-500 shadow-lg shadow-violet-500/10 text-white scale-[1.02]"
+                            ? "bg-gradient-to-br from-orange-600/35 to-fuchsia-600/35 border-orange-500 shadow-lg shadow-orange-500/10 text-white scale-[1.02]"
                             : "bg-zinc-900/60 border-zinc-800 hover:border-zinc-700 text-zinc-400 hover:text-zinc-300"
                         )}
                       >
                         <span className="text-xs font-bold tracking-wide">{opt.label}</span>
-                        <span className={cn("text-sm font-black mt-1", active ? "text-violet-400" : "text-zinc-500")}>
+                        <span className={cn("text-sm font-black mt-1", active ? "text-orange-400" : "text-zinc-500")}>
                           ₹{price}
                         </span>
                       </button>
@@ -742,12 +742,12 @@ export default function BookingForm({ mode = "create", initialData, prefillDate,
                         className={cn(
                           "flex flex-col items-center justify-center p-3.5 rounded-xl border text-center transition-all duration-300",
                           active
-                            ? "bg-gradient-to-br from-violet-600/35 to-fuchsia-600/35 border-violet-500 shadow-lg shadow-violet-500/10 text-white scale-[1.02]"
+                            ? "bg-gradient-to-br from-orange-600/35 to-fuchsia-600/35 border-orange-500 shadow-lg shadow-orange-500/10 text-white scale-[1.02]"
                             : "bg-zinc-900/60 border-zinc-800 hover:border-zinc-700 text-zinc-400 hover:text-zinc-300"
                         )}
                       >
                         <span className="text-xs font-bold tracking-wide">{opt.label}</span>
-                        <span className={cn("text-sm font-black mt-1", active ? "text-violet-400" : "text-zinc-500")}>
+                        <span className={cn("text-sm font-black mt-1", active ? "text-orange-400" : "text-zinc-500")}>
                           ₹{price}
                         </span>
                       </button>
@@ -769,12 +769,12 @@ export default function BookingForm({ mode = "create", initialData, prefillDate,
                         className={cn(
                           "flex flex-col items-center justify-center p-3.5 rounded-xl border text-center transition-all duration-300",
                           active
-                            ? "bg-gradient-to-br from-violet-600/35 to-fuchsia-600/35 border-violet-500 shadow-lg shadow-violet-500/10 text-white scale-[1.02]"
+                            ? "bg-gradient-to-br from-orange-600/35 to-fuchsia-600/35 border-orange-500 shadow-lg shadow-orange-500/10 text-white scale-[1.02]"
                             : "bg-zinc-900/60 border-zinc-800 hover:border-zinc-700 text-zinc-400 hover:text-zinc-300"
                         )}
                       >
                         <span className="text-xs font-bold tracking-wide">{opt.label}</span>
-                        <span className={cn("text-sm font-black mt-1", active ? "text-violet-400" : "text-zinc-500")}>
+                        <span className={cn("text-sm font-black mt-1", active ? "text-orange-400" : "text-zinc-500")}>
                           ₹{price}
                         </span>
                       </button>
@@ -788,7 +788,7 @@ export default function BookingForm({ mode = "create", initialData, prefillDate,
           {/* ── Date & Time ── */}
           <div className="glass-card p-5 space-y-4">
             <div className="flex items-center gap-2 text-sm font-semibold text-white">
-              <Clock className="w-4 h-4 text-violet-400" />
+              <Clock className="w-4 h-4 text-orange-400" />
               Date & Time
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -825,7 +825,7 @@ export default function BookingForm({ mode = "create", initialData, prefillDate,
                       disabled={isPaidLocked}
                       className={cn("px-2.5 py-1.5 rounded-lg text-xs font-medium border transition-all disabled:opacity-50 disabled:cursor-not-allowed",
                         durationMinutes === d
-                          ? "bg-violet-600 border-violet-600 text-white"
+                          ? "bg-orange-600 border-orange-600 text-white"
                           : "bg-zinc-800/60 border-zinc-700 text-zinc-400 hover:border-zinc-600")}>
                       {d === 5 ? "5m" : d < 60 ? `${d}m` : d % 60 === 0 ? `${d / 60}h` : `${Math.floor(d / 60)}h ${d % 60}m`}
                     </button>
@@ -957,7 +957,7 @@ export default function BookingForm({ mode = "create", initialData, prefillDate,
                   <button
                     type="button"
                     onClick={() => setShowPromos(!showPromos)}
-                    className="absolute right-24 top-1/2 -translate-y-1/2 text-[10px] font-bold text-violet-400 hover:text-violet-300 transition-colors uppercase tracking-tight"
+                    className="absolute right-24 top-1/2 -translate-y-1/2 text-[10px] font-bold text-orange-400 hover:text-orange-300 transition-colors uppercase tracking-tight"
                   >
                     View Promos
                   </button>
@@ -970,7 +970,7 @@ export default function BookingForm({ mode = "create", initialData, prefillDate,
                     "px-4 py-2 rounded-xl text-xs font-bold transition-all active:scale-95 flex items-center justify-center min-w-[80px] disabled:opacity-50 disabled:cursor-not-allowed",
                     appliedCoupon 
                       ? "bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20" 
-                      : "bg-violet-600 text-white hover:bg-violet-500 shadow-md shadow-violet-950/20"
+                      : "bg-orange-600 text-white hover:bg-orange-500 shadow-md shadow-orange-950/20"
                   )}
                   onClick={() => {
                     if (appliedCoupon) {
@@ -1010,16 +1010,16 @@ export default function BookingForm({ mode = "create", initialData, prefillDate,
                             setShowPromos(false);
                             toast.success(`Promo code ${c.code} selected!`);
                           }}
-                          className="w-full text-left p-2.5 rounded-lg bg-zinc-900/60 hover:bg-zinc-900 hover:border-violet-500/30 border border-zinc-800/80 transition-all flex items-center justify-between gap-3 group"
+                          className="w-full text-left p-2.5 rounded-lg bg-zinc-900/60 hover:bg-zinc-900 hover:border-orange-500/30 border border-zinc-800/80 transition-all flex items-center justify-between gap-3 group"
                         >
                           <div className="min-w-0">
-                            <span className="text-xs font-bold font-mono text-white group-hover:text-violet-400 transition-colors uppercase tracking-wider block truncate">{c.code}</span>
+                            <span className="text-xs font-bold font-mono text-white group-hover:text-orange-400 transition-colors uppercase tracking-wider block truncate">{c.code}</span>
                             <p className="text-[9px] text-zinc-500 mt-0.5 truncate" title={c.discountType === "PERCENTAGE" ? `${Number(c.discountValue)}% off` : `Rs. ${Number(c.discountValue)} off`}>
                               {c.discountType === "PERCENTAGE" ? `${Number(c.discountValue)}% off` : `Rs. ${Number(c.discountValue)} off`}
                               {Number(c.minBookingAmount) > 0 && ` • Min Booking: Rs. ${Number(c.minBookingAmount)}`}
                             </p>
                           </div>
-                          <span className="text-[9px] font-bold text-violet-400 bg-violet-500/5 px-2 py-1 rounded border border-violet-500/10 uppercase group-hover:bg-violet-600 group-hover:text-white transition-all flex-shrink-0">Apply</span>
+                          <span className="text-[9px] font-bold text-orange-400 bg-orange-500/5 px-2 py-1 rounded border border-orange-500/10 uppercase group-hover:bg-orange-600 group-hover:text-white transition-all flex-shrink-0">Apply</span>
                         </button>
                       ))}
                     </div>
@@ -1072,7 +1072,7 @@ export default function BookingForm({ mode = "create", initialData, prefillDate,
                   <div className="flex items-center justify-between bg-zinc-900/50 border border-zinc-800 p-4 rounded-xl">
                     <div>
                       <h4 className="text-sm font-bold text-white flex items-center gap-2">
-                        <Zap className="w-4 h-4 text-violet-400" />
+                        <Zap className="w-4 h-4 text-orange-400" />
                         Prepaid Credits Available
                       </h4>
                       <p className="text-xs text-zinc-400 mt-1">
@@ -1089,7 +1089,7 @@ export default function BookingForm({ mode = "create", initialData, prefillDate,
                     </div>
                     <label className="relative inline-flex items-center cursor-pointer">
                       <input type="checkbox" className="sr-only peer" checked={usePrepaidCredits} onChange={(e) => setUsePrepaidCredits(e.target.checked)} />
-                      <div className="w-11 h-6 bg-zinc-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-zinc-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-violet-600"></div>
+                      <div className="w-11 h-6 bg-zinc-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-zinc-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-orange-600"></div>
                     </label>
                   </div>
                 </div>
@@ -1150,7 +1150,7 @@ export default function BookingForm({ mode = "create", initialData, prefillDate,
         <div className="space-y-4">
           <div className="glass-card p-5 space-y-4 sticky top-20">
             <div className="flex items-center gap-2 text-sm font-semibold text-white">
-              <IndianRupee className="w-4 h-4 text-violet-400" />
+              <IndianRupee className="w-4 h-4 text-orange-400" />
               Price Summary
             </div>
 
@@ -1203,7 +1203,7 @@ export default function BookingForm({ mode = "create", initialData, prefillDate,
                   ) : null}
                   <div className="flex justify-between text-sm font-bold pt-1">
                     <span className="text-white">Total</span>
-                    <span className="text-violet-400">{formatCurrency(pricing.finalAmount)}</span>
+                    <span className="text-orange-400">{formatCurrency(pricing.finalAmount)}</span>
                   </div>
                 </div>
               </div>
@@ -1216,9 +1216,9 @@ export default function BookingForm({ mode = "create", initialData, prefillDate,
               type="submit"
               disabled={submitting || unitAvailability === false}
               className="w-full flex items-center justify-center gap-2 py-3 px-4
-                         bg-violet-600 hover:bg-violet-500 active:bg-violet-700
+                         bg-orange-600 hover:bg-orange-500 active:bg-orange-700
                          text-white text-sm font-semibold rounded-xl
-                         transition-all duration-200 shadow-lg shadow-violet-900/30
+                         transition-all duration-200 shadow-lg shadow-orange-900/30
                          disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {submitting ? (

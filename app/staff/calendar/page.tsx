@@ -7,7 +7,7 @@ const CalendarClient = dynamic(() => import("@/components/bookings/CalendarView"
   ssr: false,
   loading: () => (
     <div className="h-[600px] flex items-center justify-center">
-      <div className="w-6 h-6 rounded-full border-2 border-violet-500 border-t-transparent animate-spin" />
+      <div className="w-6 h-6 rounded-full border-2 border-orange-500 border-t-transparent animate-spin" />
     </div>
   ),
 });
@@ -24,7 +24,7 @@ export default function StaffCalendarPage() {
         </div>
         <div className="flex items-center justify-between sm:justify-start gap-3 w-full sm:w-auto">
           <GameFilterDropdown value={selectedGameTag} onChange={setSelectedGameTag} />
-          <a href="/staff/bookings/new" className="flex items-center gap-2 px-4 py-2 bg-violet-600 hover:bg-violet-500 text-white text-sm font-medium rounded-xl transition-all">
+          <a href="/staff/bookings/new" className="flex items-center gap-2 px-4 py-2 bg-orange-600 hover:bg-orange-500 text-white text-sm font-medium rounded-xl transition-all">
             + New Booking</a>
         </div>
       </div>

@@ -52,7 +52,7 @@ export default function ForcePasswordChangePage() {
   return (
     <div className="min-h-screen relative flex items-center justify-center p-4 overflow-hidden bg-zinc-950">
       <div className="absolute top-0 left-0 w-full h-full overflow-hidden -z-0">
-        <div className="absolute -top-[10%] -left-[10%] w-[40%] h-[40%] bg-violet-600/10 blur-[120px] rounded-full" />
+        <div className="absolute -top-[10%] -left-[10%] w-[40%] h-[40%] bg-orange-600/10 blur-[120px] rounded-full" />
         <div className="absolute -bottom-[10%] -right-[10%] w-[40%] h-[40%] bg-blue-600/10 blur-[120px] rounded-full" />
       </div>
 
@@ -114,9 +114,9 @@ export default function ForcePasswordChangePage() {
               type="submit"
               disabled={isLoading}
               className="w-full flex items-center justify-center gap-2 px-4 py-3 mt-4
-                         bg-violet-600 hover:bg-violet-500 active:scale-[0.98]
+                         bg-orange-600 hover:bg-orange-500 active:scale-[0.98]
                          text-white font-bold text-sm rounded-xl
-                         transition-all duration-200 shadow-lg shadow-violet-900/40
+                         transition-all duration-200 shadow-lg shadow-orange-900/40
                          disabled:opacity-60 disabled:cursor-not-allowed"
             >
               {isLoading ? (

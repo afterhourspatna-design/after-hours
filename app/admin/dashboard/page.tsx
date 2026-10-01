@@ -398,7 +398,7 @@ export default async function AdminDashboard({
       label: "Total Revenue",
       value: formatCurrency(data.periodRevenue),
       icon: IndianRupee,
-      iconColor: "text-violet-400",
+      iconColor: "text-orange-400",
     },
   ];
 
@@ -464,7 +464,7 @@ export default async function AdminDashboard({
             <summary
               className={cn(
                 "list-none cursor-pointer flex items-center gap-2 px-4 py-2.5 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-xs font-bold rounded-xl transition-all select-none",
-                period !== "today" ? "text-violet-300 border-violet-500/40" : "text-zinc-300"
+                period !== "today" ? "text-orange-300 border-orange-500/40" : "text-zinc-300"
               )}
             >
               <Filter className="w-4 h-4" />
@@ -479,14 +479,14 @@ export default async function AdminDashboard({
                   className={cn(
                     "flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all",
                     period === opt.id
-                      ? "bg-violet-600/20 text-violet-300"
+                      ? "bg-orange-600/20 text-orange-300"
                       : "text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200"
                   )}
                 >
                   {opt.label}
                   <span className={cn(
                     "px-1.5 py-0.5 rounded-md text-[10px] font-black",
-                    period === opt.id ? "bg-violet-500/20 text-violet-300" : "bg-zinc-800 text-zinc-600"
+                    period === opt.id ? "bg-orange-500/20 text-orange-300" : "bg-zinc-800 text-zinc-600"
                   )}>
                     {opt.count}
                   </span>
@@ -502,7 +502,7 @@ export default async function AdminDashboard({
                       type="date"
                       name="from"
                       defaultValue={from || ""}
-                      className="flex-1 min-w-0 bg-zinc-950/60 border border-zinc-800 rounded-lg px-2 py-1.5 text-xs text-zinc-300 focus:outline-none focus:ring-1 focus:ring-violet-500/50 [color-scheme:dark]"
+                      className="flex-1 min-w-0 bg-zinc-950/60 border border-zinc-800 rounded-lg px-2 py-1.5 text-xs text-zinc-300 focus:outline-none focus:ring-1 focus:ring-orange-500/50 [color-scheme:dark]"
                       required
                     />
                     <span className="text-zinc-600 text-[10px] font-bold">to</span>
@@ -510,13 +510,13 @@ export default async function AdminDashboard({
                       type="date"
                       name="to"
                       defaultValue={to || ""}
-                      className="flex-1 min-w-0 bg-zinc-950/60 border border-zinc-800 rounded-lg px-2 py-1.5 text-xs text-zinc-300 focus:outline-none focus:ring-1 focus:ring-violet-500/50 [color-scheme:dark]"
+                      className="flex-1 min-w-0 bg-zinc-950/60 border border-zinc-800 rounded-lg px-2 py-1.5 text-xs text-zinc-300 focus:outline-none focus:ring-1 focus:ring-orange-500/50 [color-scheme:dark]"
                       required
                     />
                   </div>
                   <button
                     type="submit"
-                    className="w-full py-1.5 bg-violet-600 hover:bg-violet-500 text-white text-[10px] font-black uppercase tracking-wider rounded-lg transition-all active:scale-95"
+                    className="w-full py-1.5 bg-orange-600 hover:bg-orange-500 text-white text-[10px] font-black uppercase tracking-wider rounded-lg transition-all active:scale-95"
                   >
                     Apply
                   </button>
@@ -528,7 +528,7 @@ export default async function AdminDashboard({
 
           <a
             href="/admin/bookings/new"
-            className="flex items-center gap-2 px-5 py-2.5 bg-violet-600 hover:bg-violet-500 text-white text-xs font-bold rounded-xl transition-all shadow-lg shadow-violet-900/20 active:scale-95"
+            className="flex items-center gap-2 px-5 py-2.5 bg-orange-600 hover:bg-orange-500 text-white text-xs font-bold rounded-xl transition-all shadow-lg shadow-orange-900/20 active:scale-95"
           >
             <Plus className="w-4 h-4" /> New booking
           </a>
@@ -580,16 +580,16 @@ export default async function AdminDashboard({
               return (
                 <div key={b.id} className="flex items-center justify-between gap-2 sm:gap-3 p-2 sm:p-3 rounded-xl hover:bg-zinc-900/50 transition-colors group">
                   <div className="flex items-center gap-2.5 sm:gap-3.5 min-w-0 flex-1">
-                    <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-full flex items-center justify-center text-[11px] sm:text-xs font-bold border bg-violet-500/10 border-violet-500/20 text-violet-400 flex-shrink-0">
+                    <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-full flex items-center justify-center text-[11px] sm:text-xs font-bold border bg-orange-500/10 border-orange-500/20 text-orange-400 flex-shrink-0">
                       {initials}
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
-                        <p className="text-xs sm:text-sm font-bold text-white group-hover:text-violet-400 transition-colors truncate">{name}</p>
+                        <p className="text-xs sm:text-sm font-bold text-white group-hover:text-orange-400 transition-colors truncate">{name}</p>
                         {phone && (
                           <a
                             href={`tel:${phone}`}
-                            className="flex items-center gap-1 text-[11px] sm:text-xs text-zinc-500 hover:text-violet-400 font-mono transition-colors"
+                            className="flex items-center gap-1 text-[11px] sm:text-xs text-zinc-500 hover:text-orange-400 font-mono transition-colors"
                             title="Call"
                           >
                             <Phone className="w-3 h-3" />
@@ -620,15 +620,15 @@ export default async function AdminDashboard({
       <div className="glass-card overflow-hidden border-zinc-900/50 shadow-2xl">
         <div className="px-6 py-5 border-b border-zinc-900 flex items-center justify-between bg-zinc-950/20">
           <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-violet-500/10 border border-violet-500/20">
-              <Gamepad2 className="w-4 h-4 text-violet-400" />
+            <div className="p-2 rounded-lg bg-orange-500/10 border border-orange-500/20">
+              <Gamepad2 className="w-4 h-4 text-orange-400" />
             </div>
             <div>
               <h2 className="text-sm font-bold text-white tracking-tight">Game Performance</h2>
               <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">Booking count and revenue per game</p>
             </div>
           </div>
-          <span className="text-[10px] font-mono font-bold text-violet-400 bg-violet-500/10 px-2.5 py-1 rounded border border-violet-500/20 uppercase tracking-wider">
+          <span className="text-[10px] font-mono font-bold text-orange-400 bg-orange-500/10 px-2.5 py-1 rounded border border-orange-500/20 uppercase tracking-wider">
             {currentPeriodLabel}
           </span>
         </div>
@@ -656,7 +656,7 @@ export default async function AdminDashboard({
 
                   <div className="w-full bg-zinc-900 h-2 rounded-full overflow-hidden border border-zinc-800/40 relative">
                     <div
-                      className="bg-gradient-to-r from-violet-600 to-indigo-500 h-2 rounded-full transition-all duration-500"
+                      className="bg-gradient-to-r from-orange-600 to-indigo-500 h-2 rounded-full transition-all duration-500"
                       style={{ width: `${sharePct}%` }}
                     />
                   </div>
@@ -701,28 +701,28 @@ export default async function AdminDashboard({
                 </div>
                 <div className="absolute -top-16 bg-zinc-900 text-[10px] font-bold text-white px-2 py-1.5 rounded-lg border border-zinc-700 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-20 flex flex-col items-center gap-1 shadow-xl pointer-events-none">
                   <span>Total: ₹{d.amount.toLocaleString()}</span>
-                  {d.gameAmount > 0 && <span className="text-violet-400 text-[9px]">Game: ₹{d.gameAmount.toLocaleString()}</span>}
-                  {d.snacksAmount > 0 && <span className="text-amber-400 text-[9px]">Snacks: ₹{d.snacksAmount.toLocaleString()}</span>}
-                  {d.creditsAmount > 0 && <span className="text-cyan-400 text-[9px]">Prepaid: ₹{d.creditsAmount.toLocaleString()}</span>}
+                  {d.gameAmount > 0 && <span className="text-orange-400 text-[9px]">Game: ₹{d.gameAmount.toLocaleString()}</span>}
+                  {d.snacksAmount > 0 && <span className="text-yellow-400 text-[9px]">Snacks: ₹{d.snacksAmount.toLocaleString()}</span>}
+                  {d.creditsAmount > 0 && <span className="text-blue-400 text-[9px]">Prepaid: ₹{d.creditsAmount.toLocaleString()}</span>}
                 </div>
                 <div className="w-full h-24 flex items-end relative z-10">
                   <div
                     className={cn(
                       "w-full rounded-t-md transition-all duration-500 cursor-help flex flex-col justify-end overflow-hidden",
-                      i === 6 ? "shadow-[0_0_15px_rgba(6,182,212,0.3)]" : ""
+                      i === 6 ? "shadow-[0_0_15px_rgba(37,99,235,0.3)]" : ""
                     )}
                     style={{ height: `${heightPct}%` }}
                   >
                     <div
-                      className={cn("w-full transition-all duration-500", i === 6 ? "bg-cyan-400" : "bg-cyan-500/80 group-hover:bg-cyan-400")}
+                      className={cn("w-full transition-all duration-500 border-b border-zinc-950/50", i === 6 ? "bg-blue-400" : "bg-blue-600 group-hover:bg-blue-400")}
                       style={{ height: `${creditsPct}%` }}
                     />
                     <div
-                      className={cn("w-full transition-all duration-500", i === 6 ? "bg-amber-400" : "bg-amber-500/80 group-hover:bg-amber-400")}
+                      className={cn("w-full transition-all duration-500 border-b border-zinc-950/50", i === 6 ? "bg-yellow-400" : "bg-yellow-600 group-hover:bg-yellow-400")}
                       style={{ height: `${snacksPct}%` }}
                     />
                     <div
-                      className={cn("w-full transition-all duration-500", i === 6 ? "bg-violet-500" : "bg-violet-600/80 group-hover:bg-violet-500")}
+                      className={cn("w-full transition-all duration-500", i === 6 ? "bg-orange-400" : "bg-orange-600 group-hover:bg-orange-400")}
                       style={{ height: `${gamePct}%` }}
                     />
                   </div>

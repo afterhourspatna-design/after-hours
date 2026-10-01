@@ -59,7 +59,7 @@ function GeneratedPasswordPanel({ name, password, onClose }: { name: string; pas
         </div>
         <button
           onClick={onClose}
-          className="w-full py-2.5 rounded-xl bg-violet-600 hover:bg-violet-500 text-white text-sm font-bold transition-all"
+          className="w-full py-2.5 rounded-xl bg-orange-600 hover:bg-orange-500 text-white text-sm font-bold transition-all"
         >
           Done
         </button>
@@ -221,7 +221,7 @@ function UserModal({ user, isAdmin, onClose, onSaved, onToggleActive, onResetPas
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
       <div className="relative glass-card p-4 sm:p-6 w-full max-w-md animate-scale-in max-h-[90vh] overflow-y-auto">
         <h2 className="text-base sm:text-lg font-bold text-white mb-4 sm:mb-6 flex items-center gap-2">
-          {user ? <Edit2 className="w-4 h-4 sm:w-5 sm:h-5 text-violet-400" /> : <Plus className="w-4 h-4 sm:w-5 sm:h-5 text-violet-400" />}
+          {user ? <Edit2 className="w-4 h-4 sm:w-5 sm:h-5 text-orange-400" /> : <Plus className="w-4 h-4 sm:w-5 sm:h-5 text-orange-400" />}
           {user ? "Edit User" : "Add New User"}
         </h2>
 
@@ -287,7 +287,7 @@ function UserModal({ user, isAdmin, onClose, onSaved, onToggleActive, onResetPas
                             onClick={() => { setRole(r); setRoleDropdownOpen(false); }}
                             className={cn(
                               "w-full text-left px-3.5 py-2.5 text-xs sm:text-sm font-bold uppercase tracking-tight transition-colors",
-                              role === r ? "bg-violet-600 text-white" : "text-zinc-300 hover:bg-zinc-800"
+                              role === r ? "bg-orange-600 text-white" : "text-zinc-300 hover:bg-zinc-800"
                             )}
                           >
                             {r}
@@ -389,7 +389,7 @@ function UserModal({ user, isAdmin, onClose, onSaved, onToggleActive, onResetPas
 
               {!user && (
                 <p className="text-[11px] text-zinc-500 bg-zinc-950/40 border border-zinc-900 rounded-xl p-3 flex items-start gap-2">
-                  <KeyRound className="w-3.5 h-3.5 text-violet-400 flex-shrink-0 mt-0.5" />
+                  <KeyRound className="w-3.5 h-3.5 text-orange-400 flex-shrink-0 mt-0.5" />
                   A temporary password will be generated automatically — you'll see it once after creating this account.
                 </p>
               )}
@@ -397,7 +397,7 @@ function UserModal({ user, isAdmin, onClose, onSaved, onToggleActive, onResetPas
               <div className="flex gap-2 sm:gap-3 pt-2 sm:pt-4">
                 <button type="button" onClick={onClose} className="flex-1 py-2.5 sm:py-3 rounded-xl border border-zinc-800 text-zinc-400 text-xs sm:text-sm font-bold hover:bg-zinc-900 transition-all">Cancel</button>
                 <button type="submit" disabled={loading}
-                  className="flex-1 py-2.5 sm:py-3 rounded-xl bg-violet-600 hover:bg-violet-500 text-white text-xs sm:text-sm font-bold transition-all shadow-lg shadow-violet-900/20 active:scale-95 disabled:opacity-50">
+                  className="flex-1 py-2.5 sm:py-3 rounded-xl bg-orange-600 hover:bg-orange-500 text-white text-xs sm:text-sm font-bold transition-all shadow-lg shadow-orange-900/20 active:scale-95 disabled:opacity-50">
                   {loading ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : user ? "Update" : "Add User"}
                 </button>
               </div>
@@ -514,7 +514,7 @@ export default function UserManagementScreen({ viewerRole }: { viewerRole: "ADMI
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500 group-hover:text-zinc-400 transition-colors" />
             <input value={search} onChange={e => { setSearch(e.target.value); setPage(1); }}
               placeholder="Search by name or phone…"
-              className="w-full bg-zinc-900 border border-zinc-800 rounded-xl pl-9 pr-4 py-2 text-sm text-white placeholder-zinc-500 focus:border-violet-500 focus:ring-1 focus:ring-violet-500 transition-all" />
+              className="w-full bg-zinc-900 border border-zinc-800 rounded-xl pl-9 pr-4 py-2 text-sm text-white placeholder-zinc-500 focus:border-orange-500 focus:ring-1 focus:ring-orange-500 transition-all" />
           </div>
           <div className="flex items-center gap-2 w-full md:w-auto">
             <button onClick={fetchUsers}
@@ -522,7 +522,7 @@ export default function UserManagementScreen({ viewerRole }: { viewerRole: "ADMI
               <RefreshCw className="w-4 h-4" />
             </button>
             <button onClick={() => setModalUser(null)}
-              className="flex-1 md:flex-none justify-center bg-violet-600 hover:bg-violet-500 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-lg shadow-violet-900/20 transition-all flex items-center gap-2 active:scale-95">
+              className="flex-1 md:flex-none justify-center bg-orange-600 hover:bg-orange-500 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-lg shadow-orange-900/20 transition-all flex items-center gap-2 active:scale-95">
               <Plus className="w-4 h-4" /> Add User
             </button>
           </div>
@@ -537,7 +537,7 @@ export default function UserManagementScreen({ viewerRole }: { viewerRole: "ADMI
               onClick={() => { setRoleTab(t.value); setPage(1); }}
               className={cn(
                 "px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-lg text-[11px] sm:text-xs font-bold transition-all border flex-shrink-0",
-                roleTab === t.value ? "bg-violet-600 border-violet-500 text-white" : "bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-800"
+                roleTab === t.value ? "bg-orange-600 border-orange-500 text-white" : "bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-800"
               )}
             >
               {t.label}
@@ -550,7 +550,7 @@ export default function UserManagementScreen({ viewerRole }: { viewerRole: "ADMI
         {loading ? <TableSkeleton rows={8} /> : users.length === 0 ? (
           <EmptyState icon={User} title="No users found"
             description={search ? "Try a different search" : "Nothing here yet."}
-            action={<button onClick={() => setModalUser(null)} className="flex items-center gap-2 px-5 py-2.5 bg-violet-600 text-white text-sm font-bold rounded-xl"><Plus className="w-4 h-4" /> Add your first user</button>} />
+            action={<button onClick={() => setModalUser(null)} className="flex items-center gap-2 px-5 py-2.5 bg-orange-600 text-white text-sm font-bold rounded-xl"><Plus className="w-4 h-4" /> Add your first user</button>} />
         ) : (
           <div className="divide-y divide-zinc-900">
             {users.map(u => (
@@ -581,7 +581,7 @@ export default function UserManagementScreen({ viewerRole }: { viewerRole: "ADMI
 
                 <div className="flex-1 min-w-0 pl-0 sm:pl-0">
                   <div className="hidden sm:flex items-center gap-2">
-                    <p className="text-sm font-bold text-white group-hover:text-violet-400 transition-colors duration-300">{u.name}</p>
+                    <p className="text-sm font-bold text-white group-hover:text-orange-400 transition-colors duration-300">{u.name}</p>
                     {isAdmin && (
                       <span className={cn(
                         "text-[9px] font-bold uppercase tracking-tighter px-1.5 py-0.5 rounded",
@@ -597,7 +597,7 @@ export default function UserManagementScreen({ viewerRole }: { viewerRole: "ADMI
                         {u.email && <span className="flex items-center gap-1.5 text-[11px] sm:text-xs text-zinc-500 font-medium truncate"><Mail className="w-3 h-3 text-zinc-600 flex-shrink-0" /> {u.email}</span>}
                       </div>
                       <a href={`/${isAdmin ? "admin" : "staff"}/bookings/new?userId=${u.id}`}
-                        className="sm:hidden text-[11px] font-bold px-3 py-1.5 rounded-xl bg-violet-600/10 text-violet-400 border border-violet-500/10 hover:bg-violet-600 hover:text-white transition-all duration-300 flex-shrink-0">
+                        className="sm:hidden text-[11px] font-bold px-3 py-1.5 rounded-xl bg-orange-600/10 text-orange-400 border border-orange-500/10 hover:bg-orange-600 hover:text-white transition-all duration-300 flex-shrink-0">
                         Book Now
                       </a>
                     </div>
@@ -614,7 +614,7 @@ export default function UserManagementScreen({ viewerRole }: { viewerRole: "ADMI
 
                   <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
                     <a href={`/${isAdmin ? "admin" : "staff"}/bookings/new?userId=${u.id}`}
-                      className="hidden sm:inline-flex text-xs font-bold px-4 py-2 rounded-xl bg-violet-600/10 text-violet-400 border border-violet-500/10 hover:bg-violet-600 hover:text-white transition-all duration-300 flex-shrink-0">
+                      className="hidden sm:inline-flex text-xs font-bold px-4 py-2 rounded-xl bg-orange-600/10 text-orange-400 border border-orange-500/10 hover:bg-orange-600 hover:text-white transition-all duration-300 flex-shrink-0">
                       Book Now
                     </a>
                     {isAdmin && (

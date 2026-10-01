@@ -129,10 +129,10 @@ export default function Sidebar({ role, userName, userEmail }: SidebarProps) {
                         collapsed && "justify-center px-2"
                       )}
                     >
-                      <Icon className={cn("w-4 h-4 flex-shrink-0", isActive ? "text-violet-400" : "text-zinc-500 group-hover:text-zinc-400")} />
+                      <Icon className={cn("w-4 h-4 flex-shrink-0", isActive ? "text-orange-400" : "text-zinc-500 group-hover:text-zinc-400")} />
                       {!collapsed && <span className="text-sm font-medium">{item.label}</span>}
                       {isActive && !collapsed && (
-                         <div className="ml-auto w-1 h-4 rounded-full bg-violet-500 shadow-[0_0_8px_rgba(139,92,246,0.5)]" />
+                         <div className="ml-auto w-1 h-4 rounded-full bg-orange-500 shadow-[0_0_8px_rgba(236,88,0,0.5)]" />
                       )}
                     </Link>
                   );
@@ -149,7 +149,7 @@ export default function Sidebar({ role, userName, userEmail }: SidebarProps) {
           "flex items-center gap-3 p-2 rounded-xl hover:bg-zinc-900 transition-colors cursor-pointer group relative",
           collapsed && "w-9 h-9 p-0 items-center justify-center"
         )}>
-          <div className="w-9 h-9 rounded-xl bg-violet-600/20 border border-violet-500/20 flex items-center justify-center flex-shrink-0 text-xs font-bold text-violet-400 group-hover:bg-violet-600 group-hover:text-white transition-all duration-300">
+          <div className="w-9 h-9 rounded-xl bg-orange-600/20 border border-orange-500/20 flex items-center justify-center flex-shrink-0 text-xs font-bold text-orange-400 group-hover:bg-orange-600 group-hover:text-white transition-all duration-300">
             {userName.substring(0, 1)}
           </div>
           {!collapsed && (

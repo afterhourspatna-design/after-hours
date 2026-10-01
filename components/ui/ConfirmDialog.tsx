@@ -44,12 +44,12 @@ export default function ConfirmDialog({
         {/* Icon */}
         <div className={cn(
           "w-12 h-12 rounded-2xl flex items-center justify-center mb-4",
-          destructive ? "bg-red-500/10" : "bg-violet-500/10"
+          destructive ? "bg-red-500/10" : "bg-orange-500/10"
         )}>
           {destructive ? (
             <AlertTriangle className="w-6 h-6 text-red-400" />
           ) : (
-            <AlertTriangle className="w-6 h-6 text-violet-400" />
+            <AlertTriangle className="w-6 h-6 text-orange-400" />
           )}
         </div>
 
@@ -73,7 +73,7 @@ export default function ConfirmDialog({
               "text-sm font-medium transition-all disabled:opacity-50",
               destructive
                 ? "bg-red-600 hover:bg-red-500 text-white"
-                : "bg-violet-600 hover:bg-violet-500 text-white"
+                : "bg-orange-600 hover:bg-orange-500 text-white"
             )}
           >
             {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}

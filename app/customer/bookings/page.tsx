@@ -29,7 +29,7 @@ export default async function CustomerBookingsPage() {
           <p className="text-sm text-zinc-500 mt-0.5">Welcome, {session.user.name}</p>
         </div>
         <a href="/customer/bookings/new"
-          className="flex items-center gap-2 px-4 py-2 bg-violet-600 hover:bg-violet-500 text-white text-sm font-medium rounded-xl transition-all">
+          className="flex items-center gap-2 px-4 py-2 bg-orange-600 hover:bg-orange-500 text-white text-sm font-medium rounded-xl transition-all">
           <Plus className="w-4 h-4" /> Book Now
         </a>
       </div>
@@ -37,7 +37,7 @@ export default async function CustomerBookingsPage() {
       {bookings.length === 0 ? (
         <div className="glass-card">
           <EmptyState icon={BookOpen} title="No bookings yet" description="Book a gaming session to get started"
-            action={<a href="/customer/bookings/new" className="flex items-center gap-2 px-4 py-2 bg-violet-600 text-white text-sm rounded-xl hover:bg-violet-500 transition-all"><Plus className="w-4 h-4" /> Book Now</a>} />
+            action={<a href="/customer/bookings/new" className="flex items-center gap-2 px-4 py-2 bg-orange-600 text-white text-sm rounded-xl hover:bg-orange-500 transition-all"><Plus className="w-4 h-4" /> Book Now</a>} />
         </div>
       ) : (
         <>

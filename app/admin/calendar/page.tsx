@@ -12,7 +12,7 @@ const CalendarClient = dynamic(
     loading: () => (
       <div className="h-[700px] flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">
-          <div className="w-6 h-6 rounded-full border-2 border-violet-500 border-t-transparent animate-spin" />
+          <div className="w-6 h-6 rounded-full border-2 border-orange-500 border-t-transparent animate-spin" />
           <p className="text-xs text-zinc-500">Loading calendar…</p>
         </div>
       </div>
@@ -34,7 +34,7 @@ export default function AdminCalendarPage() {
           <GameFilterDropdown value={selectedGameTag} onChange={setSelectedGameTag} />
           <a
             href="/admin/bookings/new"
-            className="flex items-center gap-2 px-4 py-2 bg-violet-600 hover:bg-violet-500 text-white text-sm font-medium rounded-xl transition-all"
+            className="flex items-center gap-2 px-4 py-2 bg-orange-600 hover:bg-orange-500 text-white text-sm font-medium rounded-xl transition-all"
           >
             + New Booking
           </a>

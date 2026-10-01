@@ -47,7 +47,7 @@ export default function TopBar({ title, userName, holdCount = 0 }: TopBarProps) 
           placeholder="Search bookings, users…"
           className="w-full bg-zinc-900/60 border border-zinc-800 rounded-xl
                      pl-9 pr-4 py-2 text-sm text-zinc-200 placeholder:text-zinc-600
-                     focus:outline-none focus:ring-2 focus:ring-violet-500/40 focus:border-violet-500/40
+                     focus:outline-none focus:ring-2 focus:ring-orange-500/40 focus:border-orange-500/40
                      transition-all duration-200"
         />
         {searchQuery && (
@@ -76,8 +76,8 @@ export default function TopBar({ title, userName, holdCount = 0 }: TopBarProps) 
         </button>
 
         {/* Avatar */}
-        <div className="w-8 h-8 lg:w-9 lg:h-9 rounded-xl bg-violet-600/20 border border-violet-500/20 flex items-center justify-center flex-shrink-0">
-          <span className="text-xs font-bold text-violet-400">{getInitials(userName)}</span>
+        <div className="w-8 h-8 lg:w-9 lg:h-9 rounded-xl bg-orange-600/20 border border-orange-500/20 flex items-center justify-center flex-shrink-0">
+          <span className="text-xs font-bold text-orange-400">{getInitials(userName)}</span>
         </div>
       </div>
     </header>

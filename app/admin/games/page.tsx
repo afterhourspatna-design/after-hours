@@ -74,17 +74,17 @@ function GameRow({ game, onUpdate, onDelete }: { game: Game; onUpdate: () => voi
             <div className="text-center">
               <label className="text-[10px] text-zinc-500 block mb-0.5">Rs/hr</label>
               <input value={basePrice} onChange={e => setBasePrice(e.target.value)} type="number"
-                className="w-24 bg-zinc-800 border border-zinc-700 rounded-lg px-2 py-1.5 text-sm text-white text-center focus:outline-none focus:ring-1 focus:ring-violet-500" />
+                className="w-24 bg-zinc-800 border border-zinc-700 rounded-lg px-2 py-1.5 text-sm text-white text-center focus:outline-none focus:ring-1 focus:ring-orange-500" />
             </div>
             <div className="text-center">
               <label className="text-[10px] text-zinc-500 block mb-0.5">Min (min)</label>
               <input value={minTime} onChange={e => setMinTime(e.target.value)} type="number"
-                className="w-16 bg-zinc-800 border border-zinc-700 rounded-lg px-2 py-1.5 text-sm text-white text-center focus:outline-none focus:ring-1 focus:ring-violet-500" />
+                className="w-16 bg-zinc-800 border border-zinc-700 rounded-lg px-2 py-1.5 text-sm text-white text-center focus:outline-none focus:ring-1 focus:ring-orange-500" />
             </div>
             <div className="text-center">
               <label className="text-[10px] text-zinc-500 block mb-0.5">Max (min)</label>
               <input value={maxTime} onChange={e => setMaxTime(e.target.value)} type="number"
-                className="w-16 bg-zinc-800 border border-zinc-700 rounded-lg px-2 py-1.5 text-sm text-white text-center focus:outline-none focus:ring-1 focus:ring-violet-500" />
+                className="w-16 bg-zinc-800 border border-zinc-700 rounded-lg px-2 py-1.5 text-sm text-white text-center focus:outline-none focus:ring-1 focus:ring-orange-500" />
             </div>
             <button onClick={saveChanges} disabled={saving}
               className="p-2 rounded-lg bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600/30 border border-emerald-600/20 transition-all">
@@ -175,7 +175,7 @@ export default function GamesPage() {
         </div>
         <button 
           onClick={() => setIsAdding(!isAdding)}
-          className="flex items-center gap-2 px-4 py-2 bg-violet-600 hover:bg-violet-500 text-white text-sm font-bold rounded-xl transition-all shadow-lg shadow-violet-900/20 active:scale-95"
+          className="flex items-center gap-2 px-4 py-2 bg-orange-600 hover:bg-orange-500 text-white text-sm font-bold rounded-xl transition-all shadow-lg shadow-orange-900/20 active:scale-95"
         >
           {isAdding ? <X className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
           {isAdding ? "Cancel" : "Add Game"}
@@ -185,7 +185,7 @@ export default function GamesPage() {
       {isAdding ? (
         <div className="glass-card p-6 max-w-2xl mx-auto animate-in fade-in slide-in-from-top-4 duration-300">
            <h2 className="text-lg font-bold text-white mb-6 flex items-center gap-2">
-              <Gamepad2 className="w-5 h-5 text-violet-400" />
+              <Gamepad2 className="w-5 h-5 text-orange-400" />
               Add New Game
            </h2>
            <form onSubmit={handleAddGame} className="space-y-6">
@@ -220,7 +220,7 @@ export default function GamesPage() {
                  </div>
               </div>
               <div className="pt-2">
-                 <button type="submit" className="w-full py-3 bg-violet-600 text-white rounded-xl font-bold hover:bg-violet-500 transition-all shadow-lg shadow-violet-900/20 active:scale-95">
+                 <button type="submit" className="w-full py-3 bg-orange-600 text-white rounded-xl font-bold hover:bg-orange-500 transition-all shadow-lg shadow-orange-900/20 active:scale-95">
                     Save Game Configuration
                  </button>
                  <div className="flex items-center gap-2 mt-4 p-3 rounded-lg bg-zinc-900/50 border border-zinc-800">

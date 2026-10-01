@@ -46,9 +46,9 @@
            transition-all duration-200 cursor-pointer;
   }
   .sidebar-link.active {
-    @apply text-white bg-violet-600/20 border border-violet-600/30;
+    @apply text-white bg-orange-600/20 border border-orange-600/30;
   }
-  .sidebar-link.active svg { @apply text-violet-400; }
+  .sidebar-link.active svg { @apply text-orange-400; }
 
   /* Cards */
   .glass-card {
@@ -76,7 +76,7 @@
   .input-field {
     @apply bg-zinc-800/60 border border-zinc-700 rounded-xl px-3.5 py-2.5
            text-sm text-white placeholder:text-zinc-500
-           focus:outline-none focus:ring-2 focus:ring-violet-500/50 focus:border-violet-500/50
+           focus:outline-none focus:ring-2 focus:ring-orange-500/50 focus:border-orange-500/50
            transition-all duration-200 w-full;
   }
 
@@ -90,16 +90,16 @@
 /* FullCalendar dark theme overrides */
 .fc {
   --fc-border-color: hsl(240 6% 14%);
-  --fc-today-bg-color: rgba(124, 58, 237, 0.06);
-  --fc-now-indicator-color: #7c3aed;
+  --fc-today-bg-color: rgba(236, 88, 0, 0.06);
+  --fc-now-indicator-color: #EC5800;
   --fc-bg-event-opacity: 0.85;
-  --fc-highlight-color: rgba(124, 58, 237, 0.12);
+  --fc-highlight-color: rgba(236, 88, 0, 0.12);
   --fc-button-bg-color: #3f3f46;
   --fc-button-border-color: #52525b;
   --fc-button-hover-bg-color: #52525b;
   --fc-button-hover-border-color: #71717a;
-  --fc-button-active-bg-color: #7c3aed;
-  --fc-button-active-border-color: #7c3aed;
+  --fc-button-active-bg-color: #EC5800;
+  --fc-button-active-border-color: #EC5800;
   font-family: 'Inter', sans-serif;
   font-size: 14px;
   font-weight: 500;
@@ -139,8 +139,8 @@
 .fc .fc-button { border-radius: 8px; font-size: 0.9rem; padding: 6px 14px; font-weight: 600; }
 .fc .fc-scrollgrid { border-color: hsl(240 6% 14%); }
 .fc-theme-standard td, .fc-theme-standard th { border-color: hsl(240 6% 14%); }
-.fc .fc-now-indicator-line { border-color: #7c3aed; border-width: 2px; }
-.fc .fc-now-indicator-arrow { border-top-color: #7c3aed; border-bottom-color: #7c3aed; }
+.fc .fc-now-indicator-line { border-color: #EC5800; border-width: 2px; }
+.fc .fc-now-indicator-arrow { border-top-color: #EC5800; border-bottom-color: #EC5800; }
 .fc .fc-non-business { background: rgba(0,0,0,0.15); }
 
 /* Mobile: today + day/week share one row (opposite ends); the date chunk

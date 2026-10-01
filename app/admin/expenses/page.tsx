@@ -398,7 +398,7 @@ export default function ExpensesManagementPage() {
                 setIsAdding(true);
               }
             }}
-            className="flex items-center gap-2 px-4 py-2 bg-violet-600 hover:bg-violet-500 text-white text-sm font-bold rounded-xl transition-all shadow-lg shadow-violet-900/20 active:scale-95"
+            className="flex items-center gap-2 px-4 py-2 bg-orange-600 hover:bg-orange-500 text-white text-sm font-bold rounded-xl transition-all shadow-lg shadow-orange-900/20 active:scale-95"
           >
             {isAdding ? <Receipt className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
             {isAdding ? "View Expenses" : "Add Expense"}
@@ -417,7 +417,7 @@ export default function ExpensesManagementPage() {
                 className={cn(
                   "px-3 py-1.5 rounded-lg text-xs font-bold transition-all border",
                   datePreset === p.value
-                    ? "bg-violet-600 border-violet-500 text-white"
+                    ? "bg-orange-600 border-orange-500 text-white"
                     : "bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-800"
                 )}
               >
@@ -495,7 +495,7 @@ export default function ExpensesManagementPage() {
               {activeCategories.length === 0 ? (
                 <div className="text-xs text-zinc-500 bg-zinc-950/40 border border-zinc-900 rounded-xl p-3">
                   No categories yet.{" "}
-                  <button type="button" onClick={() => setManagingCategories(true)} className="text-violet-400 font-bold hover:underline">
+                  <button type="button" onClick={() => setManagingCategories(true)} className="text-orange-400 font-bold hover:underline">
                     Add one first
                   </button>
                 </div>
@@ -556,7 +556,7 @@ export default function ExpensesManagementPage() {
               <button
                 type="submit"
                 disabled={activeCategories.length === 0}
-                className="w-1/2 py-3 bg-violet-600 text-white rounded-xl font-bold hover:bg-violet-500 transition-all shadow-lg shadow-violet-900/20 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
+                className="w-1/2 py-3 bg-orange-600 text-white rounded-xl font-bold hover:bg-orange-500 transition-all shadow-lg shadow-orange-900/20 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 {editingExpense ? "Save Changes" : "Add Expense"}
               </button>
@@ -614,7 +614,7 @@ export default function ExpensesManagementPage() {
                   {loading ? (
                     <tr>
                       <td colSpan={6} className="px-5 py-20 text-center">
-                        <Loader2 className="w-8 h-8 text-violet-500 animate-spin mx-auto mb-2" />
+                        <Loader2 className="w-8 h-8 text-orange-500 animate-spin mx-auto mb-2" />
                         <p className="text-sm text-zinc-500">Loading expenses...</p>
                       </td>
                     </tr>
@@ -635,7 +635,7 @@ export default function ExpensesManagementPage() {
                             {new Date(e.date).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}
                           </td>
                           <td className="px-5 py-4">
-                            <span className="px-2 py-1 rounded-lg text-xs font-bold text-violet-400 bg-violet-500/5 border border-violet-500/10">
+                            <span className="px-2 py-1 rounded-lg text-xs font-bold text-orange-400 bg-orange-500/5 border border-orange-500/10">
                               {e.category.name}
                             </span>
                           </td>
@@ -697,7 +697,7 @@ export default function ExpensesManagementPage() {
               <button
                 type="submit"
                 disabled={addingCategory || !newCategoryName.trim()}
-                className="px-4 py-2 bg-violet-600 hover:bg-violet-500 text-white text-sm font-bold rounded-xl transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center"
+                className="px-4 py-2 bg-orange-600 hover:bg-orange-500 text-white text-sm font-bold rounded-xl transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center"
               >
                 {addingCategory ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
               </button>
@@ -763,7 +763,7 @@ function BreakdownPieCard({ title, data, total }: { title: string; data: Breakdo
   return (
     <div className="glass-card p-5 border-zinc-800/80 bg-zinc-950/40">
       <h3 className="text-sm font-bold text-white flex items-center gap-2 mb-4">
-        <PieChartIcon className="w-4 h-4 text-violet-400" />
+        <PieChartIcon className="w-4 h-4 text-orange-400" />
         {title}
       </h3>
       {data.length === 0 ? (

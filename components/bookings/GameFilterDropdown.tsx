@@ -76,7 +76,7 @@ export default function GameFilterDropdown({ value, onChange }: GameFilterDropdo
             }}
             className="w-full flex items-center gap-2 px-3.5 py-2.5 text-sm font-medium text-zinc-200 hover:bg-zinc-900/80 transition-colors"
           >
-            <Check className={cn("w-4 h-4 flex-shrink-0", value === null ? "opacity-100 text-violet-400" : "opacity-0")} />
+            <Check className={cn("w-4 h-4 flex-shrink-0", value === null ? "opacity-100 text-orange-400" : "opacity-0")} />
             All Games
           </button>
           {games.map((g) => {
@@ -91,7 +91,7 @@ export default function GameFilterDropdown({ value, onChange }: GameFilterDropdo
                 }}
                 className="w-full flex items-center gap-2 px-3.5 py-2.5 text-sm font-medium text-zinc-200 hover:bg-zinc-900/80 transition-colors"
               >
-                <Check className={cn("w-4 h-4 flex-shrink-0", isSelected ? "opacity-100 text-violet-400" : "opacity-0")} />
+                <Check className={cn("w-4 h-4 flex-shrink-0", isSelected ? "opacity-100 text-orange-400" : "opacity-0")} />
                 <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: gameColor }} />
                 <span className="truncate">{g.name}</span>
               </button>

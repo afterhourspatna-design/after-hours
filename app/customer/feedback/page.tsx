@@ -60,7 +60,7 @@ export default function CustomerFeedbackPage() {
 
       <form onSubmit={handleSubmit} className="glass-card p-5 space-y-5">
         <div className="flex items-center gap-2 text-sm font-semibold text-white">
-          <MessageSquare className="w-4 h-4 text-violet-400" />
+          <MessageSquare className="w-4 h-4 text-orange-400" />
           Feedback Details
         </div>
 
@@ -106,7 +106,7 @@ export default function CustomerFeedbackPage() {
         <button
           type="submit"
           disabled={submitting}
-          className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-violet-600 hover:bg-violet-500 active:bg-violet-700 text-white text-sm font-semibold rounded-xl transition-all duration-200 shadow-lg shadow-violet-900/30 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-orange-600 hover:bg-orange-500 active:bg-orange-700 text-white text-sm font-semibold rounded-xl transition-all duration-200 shadow-lg shadow-orange-900/30 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {submitting ? (
             <>

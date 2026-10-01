@@ -172,7 +172,7 @@ export default function LiveActivityList({
     <div className="glass-card border-zinc-900/50 bg-zinc-950/30">
       <div className="px-3 sm:px-5 py-3 sm:py-4 border-b border-zinc-900 flex items-center justify-between gap-2">
         <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
-          <Zap className={cn("w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0", currentlyPlayingCount > 0 ? "text-violet-400 animate-pulse" : "text-zinc-500")} />
+          <Zap className={cn("w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0", currentlyPlayingCount > 0 ? "text-orange-400 animate-pulse" : "text-zinc-500")} />
           <h3 className="text-sm sm:text-base font-bold text-white truncate">{title}</h3>
         </div>
         <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
@@ -219,8 +219,8 @@ export default function LiveActivityList({
               badgeStyle = "bg-emerald-500/10 border-emerald-500/20 text-emerald-400";
             } else if (type === "ending-soon") {
               badgeText = `${diffMins}m left`;
-              badgeStyle = "bg-orange-500/20 border-orange-500/40 text-orange-400 animate-pulse";
-              cardStyle = "border-l-2 border-l-orange-500 bg-orange-500/5";
+              badgeStyle = "bg-rose-500/20 border-rose-500/40 text-rose-400 animate-pulse";
+              cardStyle = "border-l-2 border-l-rose-500 bg-rose-500/5";
             } else if (type === "overtime") {
               const overtimeMins = Math.abs(diffMins);
               badgeText = overtimeMins === 0 ? "OVERTIME" : `OVERTIME +${overtimeMins}m`;
@@ -243,8 +243,8 @@ export default function LiveActivityList({
                       type === "overtime"
                         ? "bg-red-500/10 border-red-500/20 text-red-400 animate-pulse"
                         : type === "ending-soon"
-                        ? "bg-orange-500/10 border-orange-500/20 text-orange-400"
-                        : "bg-violet-500/10 border-violet-500/20 text-violet-400"
+                        ? "bg-rose-500/10 border-rose-500/20 text-rose-400"
+                        : "bg-orange-500/10 border-orange-500/20 text-orange-400"
                     )}
                   >
                     {initials}
@@ -256,7 +256,7 @@ export default function LiveActivityList({
                         <a
                           href={`tel:${phone}`}
                           onClick={(e) => e.stopPropagation()}
-                          className="flex items-center gap-1 text-[11px] sm:text-xs text-zinc-500 hover:text-violet-400 font-mono transition-colors"
+                          className="flex items-center gap-1 text-[11px] sm:text-xs text-zinc-500 hover:text-orange-400 font-mono transition-colors"
                           title="Call"
                         >
                           <Phone className="w-3 h-3" />

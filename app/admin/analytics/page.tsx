@@ -420,7 +420,7 @@ export default function AnalyticsPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-zinc-800/80 pb-5">
         <div>
           <h1 className="text-xl font-bold text-white tracking-tight flex items-center gap-2">
-            <LineChartIcon className="w-6 h-6 text-violet-400" />
+            <LineChartIcon className="w-6 h-6 text-orange-400" />
             Analytics Projections & Query Studio
           </h1>
           <p className="text-sm text-zinc-500 mt-1">
@@ -434,7 +434,7 @@ export default function AnalyticsPage() {
             onClick={() => setActiveTab("projections")}
             className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 ${
               activeTab === "projections"
-                ? "bg-violet-600 text-white shadow-lg shadow-violet-900/30"
+                ? "bg-orange-600 text-white shadow-lg shadow-orange-900/30"
                 : "text-zinc-400 hover:text-white"
             }`}
           >
@@ -444,7 +444,7 @@ export default function AnalyticsPage() {
             onClick={() => setActiveTab("sql")}
             className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 ${
               activeTab === "sql"
-                ? "bg-violet-600 text-white shadow-lg shadow-violet-900/30"
+                ? "bg-orange-600 text-white shadow-lg shadow-orange-900/30"
                 : "text-zinc-400 hover:text-white"
             }`}
           >
@@ -461,7 +461,7 @@ export default function AnalyticsPage() {
           ) : !projectionsData ? (
             <div className="p-8 text-center glass-card">
               <p className="text-zinc-400 text-sm">Failed to load projections data</p>
-              <button onClick={fetchProjections} className="mt-3 px-4 py-2 bg-violet-600 text-white text-xs font-bold rounded-xl">
+              <button onClick={fetchProjections} className="mt-3 px-4 py-2 bg-orange-600 text-white text-xs font-bold rounded-xl">
                 Retry
               </button>
             </div>
@@ -471,7 +471,7 @@ export default function AnalyticsPage() {
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div className="glass-card p-4 space-y-1">
                   <p className="text-[11px] font-bold uppercase tracking-wider text-zinc-500">Repeat Customer Rate</p>
-                  <p className="text-2xl font-extrabold text-violet-400">{projectionsData.repeatRate}%</p>
+                  <p className="text-2xl font-extrabold text-orange-400">{projectionsData.repeatRate}%</p>
                   <p className="text-[10px] text-zinc-500">Customers with &gt; 1 booking</p>
                 </div>
                 <div className="glass-card p-4 space-y-1">
@@ -533,7 +533,7 @@ export default function AnalyticsPage() {
                         key={r}
                         onClick={() => setTrendRange(r)}
                         className={`px-3 py-1 rounded-md capitalize transition-all ${
-                          trendRange === r ? "bg-violet-600 text-white" : "text-zinc-400 hover:text-white"
+                          trendRange === r ? "bg-orange-600 text-white" : "text-zinc-400 hover:text-white"
                         }`}
                       >
                         {r}
@@ -568,7 +568,7 @@ export default function AnalyticsPage() {
                 <div className="glass-card p-5 space-y-3">
                   <div className="flex items-center justify-between">
                     <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                      <Trophy className="w-4 h-4 text-violet-400" /> Top Customers by Revenue (RFM)
+                      <Trophy className="w-4 h-4 text-orange-400" /> Top Customers by Revenue (RFM)
                     </h3>
                   </div>
                   <div className="overflow-x-auto">
@@ -616,7 +616,7 @@ export default function AnalyticsPage() {
                           <tr key={i} className="hover:bg-zinc-900/40">
                             <td className="py-2.5 font-medium text-white">{u.name}</td>
                             <td className="py-2.5 text-right text-zinc-400">{u.bookings}</td>
-                            <td className="py-2.5 text-right font-bold text-violet-400">{formatCurrency(u.lifetime_value)}</td>
+                            <td className="py-2.5 text-right font-bold text-orange-400">{formatCurrency(u.lifetime_value)}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -689,7 +689,7 @@ export default function AnalyticsPage() {
                 {/* Peak Hours Distribution */}
                 <div className="glass-card p-5 space-y-3">
                   <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                    <Clock className="w-4 h-4 text-violet-400" /> Peak Hours (Hour of Day)
+                    <Clock className="w-4 h-4 text-orange-400" /> Peak Hours (Hour of Day)
                   </h3>
                   <div className="h-48 w-full">
                     <ResponsiveContainer width="100%" height="100%">
@@ -744,13 +744,13 @@ export default function AnalyticsPage() {
               {/* Preset Selector */}
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-zinc-900 p-3 rounded-xl border border-zinc-800">
                 <div className="flex items-center gap-2">
-                  <Database className="w-4 h-4 text-violet-400 flex-shrink-0" />
+                  <Database className="w-4 h-4 text-orange-400 flex-shrink-0" />
                   <span className="text-xs font-bold text-white">Preset SQL Library:</span>
                 </div>
                 <select
                   value={selectedPresetId}
                   onChange={(e) => handleSelectPreset(e.target.value)}
-                  className="bg-zinc-950 text-white text-xs border border-zinc-700 rounded-lg px-3 py-1.5 focus:outline-none focus:border-violet-500 max-w-full sm:max-w-md"
+                  className="bg-zinc-950 text-white text-xs border border-zinc-700 rounded-lg px-3 py-1.5 focus:outline-none focus:border-orange-500 max-w-full sm:max-w-md"
                 >
                   {PRESET_QUERIES.map((preset) => (
                     <option key={preset.id} value={preset.id}>
@@ -774,7 +774,7 @@ export default function AnalyticsPage() {
                     <button
                       onClick={executeSqlQuery}
                       disabled={queryLoading}
-                      className="px-4 py-1.5 bg-violet-600 hover:bg-violet-500 text-white text-xs font-bold rounded-lg shadow-lg shadow-violet-900/30 transition-all flex items-center gap-1.5 disabled:opacity-50"
+                      className="px-4 py-1.5 bg-orange-600 hover:bg-orange-500 text-white text-xs font-bold rounded-lg shadow-lg shadow-orange-900/30 transition-all flex items-center gap-1.5 disabled:opacity-50"
                     >
                       {queryLoading ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5 fill-current" />}
                       Execute SQL
@@ -792,7 +792,7 @@ export default function AnalyticsPage() {
                     }
                   }}
                   rows={9}
-                  className="w-full bg-zinc-950 text-emerald-400 font-mono text-xs p-4 rounded-xl border border-zinc-800 focus:outline-none focus:border-violet-500 leading-relaxed custom-scroll"
+                  className="w-full bg-zinc-950 text-emerald-400 font-mono text-xs p-4 rounded-xl border border-zinc-800 focus:outline-none focus:border-orange-500 leading-relaxed custom-scroll"
                   placeholder="Enter PostgreSQL query..."
                 />
                 <p className="text-[10px] text-zinc-500">Shortcut: Press <kbd className="px-1 bg-zinc-800 rounded">Cmd</kbd> + <kbd className="px-1 bg-zinc-800 rounded">Enter</kbd> to run query</p>
@@ -869,7 +869,7 @@ export default function AnalyticsPage() {
             <div className="space-y-4">
               <div className="glass-card p-4 space-y-3">
                 <h3 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
-                  <HelpCircle className="w-4 h-4 text-violet-400" /> Database Schema Helper
+                  <HelpCircle className="w-4 h-4 text-orange-400" /> Database Schema Helper
                 </h3>
                 <p className="text-[11px] text-zinc-400 leading-relaxed">
                   PostgreSQL relational tables available for custom reporting & JOIN queries:
@@ -878,7 +878,7 @@ export default function AnalyticsPage() {
                 <div className="space-y-3 pt-2 text-xs">
                   {TABLE_SCHEMAS.map((item) => (
                     <div key={item.table} className="p-2.5 bg-zinc-950 rounded-lg border border-zinc-800/80 space-y-1">
-                      <p className="font-bold text-violet-300 font-mono">{item.table}</p>
+                      <p className="font-bold text-orange-300 font-mono">{item.table}</p>
                       <div className="flex flex-wrap gap-1">
                         {item.cols.map((col) => (
                           <span key={col} className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-900 text-zinc-400 border border-zinc-800 font-mono">

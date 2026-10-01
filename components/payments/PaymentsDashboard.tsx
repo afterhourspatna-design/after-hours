@@ -683,7 +683,7 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
             className={cn(
               "px-4 py-2 text-sm font-medium rounded-lg transition-all",
               activeTab === "UNPAID"
-                ? "bg-violet-600 text-white shadow-lg shadow-violet-900/20"
+                ? "bg-orange-600 text-white shadow-lg shadow-orange-900/20"
                 : "text-zinc-400 hover:text-zinc-200"
             )}
           >
@@ -694,7 +694,7 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
             className={cn(
               "px-4 py-2 text-sm font-medium rounded-lg transition-all",
               activeTab === "PAID"
-                ? "bg-violet-600 text-white shadow-lg shadow-violet-900/20"
+                ? "bg-orange-600 text-white shadow-lg shadow-orange-900/20"
                 : "text-zinc-400 hover:text-zinc-200"
             )}
           >
@@ -813,7 +813,7 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
                     type="checkbox"
                     checked={bookings.length > 0 && selectedIds.size === bookings.length}
                     onChange={handleSelectAll}
-                    className="rounded border-zinc-700 text-violet-600 focus:ring-violet-500 bg-zinc-900 h-4 w-4"
+                    className="rounded border-zinc-700 text-orange-600 focus:ring-orange-500 bg-zinc-900 h-4 w-4"
                   />
                 </div>
                 <div className="text-xs font-medium text-zinc-500 uppercase tracking-wider py-3 px-4 text-center">Game / Unit</div>
@@ -837,7 +837,7 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
                           checked={groupChecked}
                           ref={(el) => { if (el) el.indeterminate = groupPartiallyChecked; }}
                           onChange={() => handleSelectGroup(group)}
-                          className="rounded border-zinc-700 text-violet-600 focus:ring-violet-500 bg-zinc-900 h-4 w-4"
+                          className="rounded border-zinc-700 text-orange-600 focus:ring-orange-500 bg-zinc-900 h-4 w-4"
                           title="Select all for this customer"
                         />
                       </div>
@@ -883,7 +883,7 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
                         const isChecked = selectedIds.has(b.id);
                         const cell = cn(
                           "border-t border-zinc-800/60 py-3 px-4 flex items-center justify-center text-center",
-                          isChecked && "bg-violet-900/10"
+                          isChecked && "bg-orange-900/10"
                         );
 
                         return (
@@ -893,7 +893,7 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
                                 type="checkbox"
                                 checked={isChecked}
                                 onChange={() => handleSelectRow(b.id)}
-                                className="rounded border-zinc-700 text-violet-600 focus:ring-violet-500 bg-zinc-900 h-4 w-4"
+                                className="rounded border-zinc-700 text-orange-600 focus:ring-orange-500 bg-zinc-900 h-4 w-4"
                               />
                             </div>
                             <div className={cn(cell, "group-hover:bg-zinc-800/30 flex-col gap-0")}>
@@ -987,7 +987,7 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
                         className="cursor-pointer hover:bg-zinc-800/30 transition-colors"
                       >
                         <td className="text-center">
-                          <p className="font-bold text-violet-400 font-mono" title={p.paymentId}>
+                          <p className="font-bold text-orange-400 font-mono" title={p.paymentId}>
                             {p.paymentId.startsWith("LEGACY-")
                               ? "#LEGACY"
                               : `#${p.paymentId.substring(0, 8).toUpperCase()}`}
@@ -1046,7 +1046,7 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
                             </button>
                             <button
                               onClick={() => handleOpenEditModal(p)}
-                              className="p-1.5 bg-violet-600 hover:bg-violet-500 text-white rounded-lg transition-colors flex-shrink-0"
+                              className="p-1.5 bg-orange-600 hover:bg-orange-500 text-white rounded-lg transition-colors flex-shrink-0"
                               title="Edit"
                             >
                               <Pencil className="w-3.5 h-3.5" />
@@ -1091,7 +1091,7 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
       {/* Floating checkout banner for unpaid selection */}
       {activeTab === "UNPAID" && selectedIds.size > 0 && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 max-w-2xl w-full px-4 z-40 animate-slide-in-right">
-          <div className="bg-zinc-900 border border-violet-500/30 shadow-2xl rounded-2xl p-4 flex flex-col sm:flex-row items-stretch sm:items-center sm:justify-between gap-3 sm:gap-4 backdrop-blur-md bg-opacity-95">
+          <div className="bg-zinc-900 border border-orange-500/30 shadow-2xl rounded-2xl p-4 flex flex-col sm:flex-row items-stretch sm:items-center sm:justify-between gap-3 sm:gap-4 backdrop-blur-md bg-opacity-95">
             <div className="flex items-center justify-between sm:contents">
               <div>
                 <p className="text-xs text-zinc-400">Selected</p>
@@ -1102,7 +1102,7 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
 
               <div className="text-right sm:text-left">
                 <p className="text-xs text-zinc-400">Total Amount</p>
-                <p className="text-base font-extrabold text-violet-400">
+                <p className="text-base font-extrabold text-orange-400">
                   {formatCurrency(totalActualAmount)}
                 </p>
               </div>
@@ -1110,7 +1110,7 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
 
             <button
               onClick={handleOpenPayModal}
-              className="flex items-center justify-center gap-2 px-6 py-2.5 w-full sm:w-auto bg-violet-600 hover:bg-violet-500 text-white rounded-xl font-bold shadow-lg shadow-violet-900/30 hover:shadow-violet-800/40 transition-all text-sm"
+              className="flex items-center justify-center gap-2 px-6 py-2.5 w-full sm:w-auto bg-orange-600 hover:bg-orange-500 text-white rounded-xl font-bold shadow-lg shadow-orange-900/30 hover:shadow-orange-800/40 transition-all text-sm"
             >
               <CreditCard className="w-4 h-4" />
               Settle Payment ({selectedIds.size})
@@ -1133,7 +1133,7 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
             {/* Header */}
             <div className="flex items-center justify-between border-b border-zinc-800/60 pb-2 sm:pb-3">
               <div className="flex items-center gap-1.5 sm:gap-2">
-                <Coins className="w-4 h-4 sm:w-5 sm:h-5 text-violet-400" />
+                <Coins className="w-4 h-4 sm:w-5 sm:h-5 text-orange-400" />
                 <h3 className="text-sm sm:text-lg font-bold text-white">{editPaymentId ? "Edit Payment" : "Settle Payment"}</h3>
               </div>
               <button
@@ -1175,7 +1175,7 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
                                 {b.game.name}
                                 {b.resourceUnit && <span className="text-zinc-600"> ({b.resourceUnit.unitName})</span>}
                               </span>
-                              {b.couponId && <span className="flex-shrink-0 bg-violet-500/20 text-violet-400 text-[9px] px-1.5 py-0.5 rounded font-bold uppercase border border-violet-500/30">Coupon</span>}
+                              {b.couponId && <span className="flex-shrink-0 bg-orange-500/20 text-orange-400 text-[9px] px-1.5 py-0.5 rounded font-bold uppercase border border-orange-500/30">Coupon</span>}
                             </span>
                             {bookingInitial(b) - bookingCurrent(b) > 0.009 ? (
                               <span className="whitespace-nowrap flex-shrink-0">
@@ -1338,7 +1338,7 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
                     className={cn(
                       "py-2 sm:py-3 rounded-xl border text-[10px] sm:text-xs font-semibold uppercase transition-all flex flex-col items-center justify-center gap-1.5",
                       paymentMethod === method
-                        ? "bg-violet-600/10 border-violet-500 text-violet-400 shadow-md shadow-violet-950/20"
+                        ? "bg-orange-600/10 border-orange-500 text-orange-400 shadow-md shadow-orange-950/20"
                         : "bg-zinc-800/30 border-zinc-800/60 text-zinc-500 hover:text-zinc-300 hover:border-zinc-700"
                     )}
                   >
@@ -1462,10 +1462,10 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
                 onClick={handleConfirmPayment}
                 disabled={isSubmitDisabled}
                 className={cn(
-                  "flex-1 py-2 sm:py-2.5 bg-violet-600 hover:bg-violet-500 text-white text-xs sm:text-sm font-bold rounded-xl transition-all shadow-lg flex items-center justify-center gap-2",
+                  "flex-1 py-2 sm:py-2.5 bg-orange-600 hover:bg-orange-500 text-white text-xs sm:text-sm font-bold rounded-xl transition-all shadow-lg flex items-center justify-center gap-2",
                   isSubmitDisabled
                     ? "opacity-50 cursor-not-allowed"
-                    : "shadow-violet-900/30 hover:shadow-violet-800/40"
+                    : "shadow-orange-900/30 hover:shadow-orange-800/40"
                 )}
               >
                 {submittingPayment ? (
@@ -1504,7 +1504,7 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
                 {/* Header */}
                 <div className="flex items-center justify-between border-b border-zinc-800/60 pb-2 sm:pb-3">
                   <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
-                    <CreditCard className="w-4 h-4 sm:w-5 sm:h-5 text-violet-400 flex-shrink-0" />
+                    <CreditCard className="w-4 h-4 sm:w-5 sm:h-5 text-orange-400 flex-shrink-0" />
                     <h3 className="text-sm sm:text-lg font-bold text-white font-mono truncate">
                       Payment Details: {selectedPaymentDetail.paymentId.startsWith("LEGACY-") ? "#LEGACY" : selectedPaymentDetail.paymentId}
                     </h3>
@@ -1540,14 +1540,14 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
                     </div>
                   )}
                   <div>
-                    <p className="text-[10px] text-violet-400 font-bold uppercase tracking-wider">{isCreditsModal ? "Credits" : "Games"} Invoice</p>
+                    <p className="text-[10px] text-orange-400 font-bold uppercase tracking-wider">{isCreditsModal ? "Credits" : "Games"} Invoice</p>
                     <p className="text-xs font-bold text-zinc-200 mt-1">
                       {formatCurrency(selectedPaymentDetail.totalNegotiated)}
                     </p>
                   </div>
                   {!isCreditsModal && (
                     <div>
-                      <p className="text-[10px] text-violet-400 font-bold uppercase tracking-wider">Snacks Invoice</p>
+                      <p className="text-[10px] text-orange-400 font-bold uppercase tracking-wider">Snacks Invoice</p>
                       <p className="text-xs font-bold text-zinc-200 mt-1">
                         {formatCurrency(selectedPaymentDetail.totalSnacks)}
                       </p>
@@ -1697,7 +1697,7 @@ export default function PaymentsDashboard({ role }: PaymentsDashboardProps) {
                                   <p className="font-semibold text-white">{cr.guestName ?? "Customer"}</p>
                                 </td>
                                 <td className="p-3">
-                                  <p className="font-medium text-violet-300">Prepaid Credit Top-up</p>
+                                  <p className="font-medium text-orange-300">Prepaid Credit Top-up</p>
                                 </td>
                                 <td className="p-3 text-right text-emerald-400 font-semibold">
                                   {formatCurrency(Number(cr.finalAmount))}

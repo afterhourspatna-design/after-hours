@@ -10,7 +10,7 @@ export default function StatTable({ items, className }: StatTableProps) {
   return (
     <div className={cn("grid grid-cols-2 sm:grid-cols-4 gap-2", className)}>
       {items.map((item) => {
-        const accent = accentFor(item.iconColor ?? "text-violet-400");
+        const accent = accentFor(item.iconColor ?? "text-orange-400");
         const Icon = item.icon;
         return (
           <div

@@ -103,7 +103,7 @@ export default function ReferralsDashboard({ role = "ADMIN" }: ReferralsDashboar
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold text-white tracking-tight flex items-center gap-2">
-            <Award className="w-6 h-6 text-violet-400" />
+            <Award className="w-6 h-6 text-orange-400" />
             Referrals
           </h1>
           <p className="text-sm text-zinc-500 mt-0.5 font-medium">
@@ -153,13 +153,13 @@ export default function ReferralsDashboard({ role = "ADMIN" }: ReferralsDashboar
                     className="flex flex-col sm:flex-row sm:items-center gap-4 px-4 sm:px-6 py-5 hover:bg-zinc-900/40 cursor-pointer transition-colors group"
                   >
                     <div className="flex items-center gap-4 flex-1 min-w-0 w-full">
-                      <div className="w-10 h-10 rounded-xl bg-violet-600/10 border border-violet-500/10 flex items-center justify-center flex-shrink-0 group-hover:bg-violet-600/20 group-hover:border-violet-500/30 transition-all duration-300">
-                        <Gift className="w-5 h-5 text-violet-400" />
+                      <div className="w-10 h-10 rounded-xl bg-orange-600/10 border border-orange-500/10 flex items-center justify-center flex-shrink-0 group-hover:bg-orange-600/20 group-hover:border-orange-500/30 transition-all duration-300">
+                        <Gift className="w-5 h-5 text-orange-400" />
                       </div>
 
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
-                          <p className="text-sm font-bold text-white group-hover:text-violet-400 transition-colors duration-300">
+                          <p className="text-sm font-bold text-white group-hover:text-orange-400 transition-colors duration-300">
                             {r.name}
                           </p>
                         </div>
@@ -186,7 +186,7 @@ export default function ReferralsDashboard({ role = "ADMIN" }: ReferralsDashboar
                           <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block">Unclaimed</span>
                           <span className={cn(
                             "text-sm font-bold", 
-                            canAvail ? "text-emerald-400" : "text-violet-400"
+                            canAvail ? "text-emerald-400" : "text-orange-400"
                           )}>
                             {r.unclaimedReferrals}
                           </span>

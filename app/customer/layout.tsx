@@ -22,7 +22,7 @@ export default async function CustomerLayout({ children }: { children: React.Rea
       </main>
       <Link
         href="/customer/feedback"
-        className="fixed bottom-5 right-5 z-40 flex items-center gap-2 rounded-full bg-violet-600 px-4 py-3 text-sm font-semibold text-white shadow-xl shadow-violet-950/40 transition-all hover:bg-violet-500 active:scale-95"
+        className="fixed bottom-5 right-5 z-40 flex items-center gap-2 rounded-full bg-orange-600 px-4 py-3 text-sm font-semibold text-white shadow-xl shadow-orange-950/40 transition-all hover:bg-orange-500 active:scale-95"
       >
         <MessageSquare className="w-4 h-4" />
         Feedback

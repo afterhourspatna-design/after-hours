@@ -62,7 +62,7 @@ export default function SettingsPage() {
       {/* Venue info */}
       <div className="glass-card p-5 space-y-4">
         <div className="flex items-center gap-2 text-sm font-semibold text-white mb-1">
-          <Building2 className="w-4 h-4 text-violet-400" /> Venue Information
+          <Building2 className="w-4 h-4 text-orange-400" /> Venue Information
         </div>
         {[
           { key: "venue_name", label: "Venue Name" },
@@ -99,7 +99,7 @@ export default function SettingsPage() {
         </div>
 
         <button onClick={saveSettings} disabled={loading}
-          className="flex items-center gap-2 px-4 py-2.5 bg-violet-600 hover:bg-violet-500 text-white text-sm font-medium rounded-xl transition-all disabled:opacity-50">
+          className="flex items-center gap-2 px-4 py-2.5 bg-orange-600 hover:bg-orange-500 text-white text-sm font-medium rounded-xl transition-all disabled:opacity-50">
           <Save className="w-4 h-4" /> {loading ? "Saving…" : "Save Settings"}
         </button>
       </div>
@@ -107,7 +107,7 @@ export default function SettingsPage() {
       {/* Password change */}
       <div className="glass-card p-5 space-y-4">
         <div className="flex items-center gap-2 text-sm font-semibold text-white mb-1">
-          <Shield className="w-4 h-4 text-violet-400" /> Change Password
+          <Shield className="w-4 h-4 text-orange-400" /> Change Password
         </div>
         <div>
           <label className="text-xs text-zinc-400 mb-1 block">Current Password</label>
@@ -141,7 +141,7 @@ export default function SettingsPage() {
             <p className="text-xs text-zinc-600">Allow customers to self-register and book</p>
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-xs text-zinc-500">Set via <code className="text-violet-400 bg-zinc-800 px-1 py-0.5 rounded">.env.local</code></span>
+            <span className="text-xs text-zinc-500">Set via <code className="text-orange-400 bg-zinc-800 px-1 py-0.5 rounded">.env.local</code></span>
             <span className={`badge ${process.env.NEXT_PUBLIC_FEATURE_CUSTOMER_PORTAL === "true" ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/25" : "bg-zinc-800 text-zinc-500 border-zinc-700"}`}>
               {process.env.NEXT_PUBLIC_FEATURE_CUSTOMER_PORTAL === "true" ? "ON" : "OFF"}
             </span>

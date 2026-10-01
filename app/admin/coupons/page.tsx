@@ -238,7 +238,7 @@ export default function CouponsManagementPage() {
               setIsAdding(true);
             }
           }}
-          className="flex items-center gap-2 px-4 py-2 bg-violet-600 hover:bg-violet-500 text-white text-sm font-bold rounded-xl transition-all shadow-lg shadow-violet-900/20 active:scale-95 animate-in fade-in"
+          className="flex items-center gap-2 px-4 py-2 bg-orange-600 hover:bg-orange-500 text-white text-sm font-bold rounded-xl transition-all shadow-lg shadow-orange-900/20 active:scale-95 animate-in fade-in"
         >
           {isAdding ? <Tag className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
           {isAdding ? "View Coupons" : "Create Coupon"}
@@ -354,10 +354,10 @@ export default function CouponsManagementPage() {
                         key={role}
                         type="button"
                         onClick={() => handleRoleToggle(role)}
-                        className="flex items-center gap-2 text-xs font-bold text-white hover:text-violet-400 transition-colors"
+                        className="flex items-center gap-2 text-xs font-bold text-white hover:text-orange-400 transition-colors"
                       >
                         {isChecked ? (
-                          <CheckSquare className="w-4 h-4 text-violet-500" />
+                          <CheckSquare className="w-4 h-4 text-orange-500" />
                         ) : (
                           <Square className="w-4 h-4 text-zinc-700" />
                         )}
@@ -380,7 +380,7 @@ export default function CouponsManagementPage() {
                   className="text-zinc-400 hover:text-white transition-colors"
                 >
                   {form.isActive ? (
-                    <ToggleRight className="w-10 h-10 text-violet-500" />
+                    <ToggleRight className="w-10 h-10 text-orange-500" />
                   ) : (
                     <ToggleLeft className="w-10 h-10 text-zinc-700" />
                   )}
@@ -402,7 +402,7 @@ export default function CouponsManagementPage() {
               </button>
               <button 
                 type="submit" 
-                className="w-1/2 py-3 bg-violet-600 text-white rounded-xl font-bold hover:bg-violet-500 transition-all shadow-lg shadow-violet-900/20 active:scale-95"
+                className="w-1/2 py-3 bg-orange-600 text-white rounded-xl font-bold hover:bg-orange-500 transition-all shadow-lg shadow-orange-900/20 active:scale-95"
               >
                 {editingCoupon ? "Save Changes" : "Create Coupon"}
               </button>
@@ -438,7 +438,7 @@ export default function CouponsManagementPage() {
                   {loading ? (
                     <tr>
                       <td colSpan={6} className="px-5 py-20 text-center">
-                        <Loader2 className="w-8 h-8 text-violet-500 animate-spin mx-auto mb-2" />
+                        <Loader2 className="w-8 h-8 text-orange-500 animate-spin mx-auto mb-2" />
                         <p className="text-sm text-zinc-500">Loading coupons...</p>
                       </td>
                     </tr>
@@ -457,13 +457,13 @@ export default function CouponsManagementPage() {
                             <div className={cn(
                               "w-9 h-9 rounded-xl flex items-center justify-center border",
                               c.isActive 
-                                ? "bg-violet-600/10 border-violet-500/20 text-violet-400"
+                                ? "bg-orange-600/10 border-orange-500/20 text-orange-400"
                                 : "bg-zinc-900 border-zinc-800 text-zinc-600"
                             )}>
                               <Tag className="w-4 h-4" />
                             </div>
                             <div>
-                              <p className="text-sm font-bold font-mono text-white uppercase tracking-wider group-hover:text-violet-400 transition-colors">
+                              <p className="text-sm font-bold font-mono text-white uppercase tracking-wider group-hover:text-orange-400 transition-colors">
                                 {c.code}
                               </p>
                               <span className="text-[9px] font-bold text-zinc-600 uppercase tracking-tighter">

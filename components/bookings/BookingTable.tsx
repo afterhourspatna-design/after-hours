@@ -195,7 +195,7 @@ function BookingTableInner({ role = "ADMIN" }: BookingTableProps) {
                   onClick={() => { setStatusFilter(s); setPage(1); setStatusDropdownOpen(false); }}
                   className={cn(
                     "w-full text-left px-3.5 py-2.5 text-xs font-medium transition-colors",
-                    statusFilter === s ? "bg-violet-600 text-white" : "text-zinc-300 hover:bg-zinc-800"
+                    statusFilter === s ? "bg-orange-600 text-white" : "text-zinc-300 hover:bg-zinc-800"
                   )}
                 >
                   {s === "ALL" ? "All Statuses" : BOOKING_STATUS_CONFIG[s as keyof typeof BOOKING_STATUS_CONFIG]?.label ?? s}
@@ -265,7 +265,7 @@ function BookingTableInner({ role = "ADMIN" }: BookingTableProps) {
             <Download className="w-4 h-4" />
           </button>
           <a href={role === "ADMIN" ? "/admin/bookings/new" : "/staff/bookings/new"}
-            className="flex items-center gap-1.5 px-3 py-2 bg-violet-600 hover:bg-violet-500 text-white text-xs font-medium rounded-xl transition-all shadow-lg shadow-violet-900/20">
+            className="flex items-center gap-1.5 px-3 py-2 bg-orange-600 hover:bg-orange-500 text-white text-xs font-medium rounded-xl transition-all shadow-lg shadow-orange-900/20">
             <Plus className="w-3.5 h-3.5" /> New
           </a>
         </div>
@@ -281,7 +281,7 @@ function BookingTableInner({ role = "ADMIN" }: BookingTableProps) {
             description={search ? "Try a different search term" : "Create your first booking to get started"}
             action={
               <a href={role === "ADMIN" ? "/admin/bookings/new" : "/staff/bookings/new"}
-                className="flex items-center gap-2 px-4 py-2 bg-violet-600 text-white text-sm rounded-xl hover:bg-violet-500 transition-all">
+                className="flex items-center gap-2 px-4 py-2 bg-orange-600 text-white text-sm rounded-xl hover:bg-orange-500 transition-all">
                 <Plus className="w-4 h-4" /> New Booking
               </a>
             }

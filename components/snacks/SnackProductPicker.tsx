@@ -142,7 +142,7 @@ export default function SnackProductPicker({ onAdd, disabled, addLabel = "Add" }
                   <span className="flex items-center gap-2 min-w-0">
                     <span className="text-white truncate">{p.name}</span>
                     {p.category && (
-                      <span className="shrink-0 text-[9px] font-bold uppercase tracking-wider text-violet-400 bg-violet-500/10 border border-violet-500/20 px-1.5 py-0.5 rounded">
+                      <span className="shrink-0 text-[9px] font-bold uppercase tracking-wider text-orange-400 bg-orange-500/10 border border-orange-500/20 px-1.5 py-0.5 rounded">
                         {p.category.name}
                       </span>
                     )}
@@ -200,7 +200,7 @@ export default function SnackProductPicker({ onAdd, disabled, addLabel = "Add" }
           disabled={!canAdd}
           title={addLabel}
           className={cn(
-            "px-2.5 sm:px-3 py-2 bg-violet-600 hover:bg-violet-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-semibold rounded-xl transition-colors shrink-0 flex items-center gap-1.5"
+            "px-2.5 sm:px-3 py-2 bg-orange-600 hover:bg-orange-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-semibold rounded-xl transition-colors shrink-0 flex items-center gap-1.5"
           )}
         >
           {submitting ? (

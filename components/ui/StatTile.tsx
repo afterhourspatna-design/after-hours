@@ -14,7 +14,7 @@ export const ACCENTS: Record<string, { iconBg: string; glow: string; bar: string
   zinc:    { iconBg: "bg-zinc-800/60 border-zinc-700/50",     glow: "bg-zinc-500",    bar: "bg-zinc-600" },
   emerald: { iconBg: "bg-emerald-500/10 border-emerald-500/25", glow: "bg-emerald-500", bar: "bg-emerald-500" },
   amber:   { iconBg: "bg-amber-500/10 border-amber-500/25",     glow: "bg-amber-500",   bar: "bg-amber-500" },
-  violet:  { iconBg: "bg-violet-500/10 border-violet-500/25",   glow: "bg-violet-500",  bar: "bg-violet-500" },
+  orange:  { iconBg: "bg-orange-500/10 border-orange-500/25",   glow: "bg-orange-500",  bar: "bg-orange-500" },
   indigo:  { iconBg: "bg-indigo-500/10 border-indigo-500/25",   glow: "bg-indigo-500",  bar: "bg-indigo-500" },
   blue:    { iconBg: "bg-blue-500/10 border-blue-500/25",       glow: "bg-blue-500",    bar: "bg-blue-500" },
   rose:    { iconBg: "bg-rose-500/10 border-rose-500/25",       glow: "bg-rose-500",    bar: "bg-rose-500" },
@@ -22,12 +22,12 @@ export const ACCENTS: Record<string, { iconBg: string; glow: string; bar: string
 
 export function accentFor(iconColor: string) {
   const match = iconColor.match(/text-(\w+)-\d+/);
-  const name = match?.[1] ?? "violet";
-  return ACCENTS[name] ?? ACCENTS.violet;
+  const name = match?.[1] ?? "orange";
+  return ACCENTS[name] ?? ACCENTS.orange;
 }
 
 export default function StatTile({
-  label, value, icon: Icon, iconColor = "text-violet-400", muted = false, className,
+  label, value, icon: Icon, iconColor = "text-orange-400", muted = false, className,
 }: StatTileProps) {
   const accent = accentFor(iconColor);
 

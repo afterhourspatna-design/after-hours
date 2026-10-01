@@ -271,7 +271,7 @@ export default function ManageSnackProductsModal({ onClose }: { onClose: () => v
             onClick={() => setActiveTab("products")}
             className={cn(
               "px-3 py-1.5 rounded-lg text-xs font-medium transition-all",
-              activeTab === "products" ? "bg-violet-600 text-white" : "text-zinc-400 hover:text-zinc-200"
+              activeTab === "products" ? "bg-orange-600 text-white" : "text-zinc-400 hover:text-zinc-200"
             )}
           >
             Products
@@ -281,7 +281,7 @@ export default function ManageSnackProductsModal({ onClose }: { onClose: () => v
             onClick={() => setActiveTab("categories")}
             className={cn(
               "px-3 py-1.5 rounded-lg text-xs font-medium transition-all",
-              activeTab === "categories" ? "bg-violet-600 text-white" : "text-zinc-400 hover:text-zinc-200"
+              activeTab === "categories" ? "bg-orange-600 text-white" : "text-zinc-400 hover:text-zinc-200"
             )}
           >
             Categories
@@ -314,7 +314,7 @@ export default function ManageSnackProductsModal({ onClose }: { onClose: () => v
                 <button
                   onClick={handleCreate}
                   disabled={creating || !newName.trim() || !newPrice}
-                  className="px-3 py-2 bg-violet-600 hover:bg-violet-500 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl transition-colors shrink-0"
+                  className="px-3 py-2 bg-orange-600 hover:bg-orange-500 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl transition-colors shrink-0"
                 >
                   <Plus className="w-4 h-4" />
                 </button>
@@ -337,7 +337,7 @@ export default function ManageSnackProductsModal({ onClose }: { onClose: () => v
                 type="checkbox"
                 checked={showInactive}
                 onChange={(e) => setShowInactive(e.target.checked)}
-                className="rounded border-zinc-700 text-violet-600 focus:ring-violet-500 bg-zinc-900 h-3.5 w-3.5"
+                className="rounded border-zinc-700 text-orange-600 focus:ring-orange-500 bg-zinc-900 h-3.5 w-3.5"
               />
               Show deactivated items
             </label>
@@ -444,7 +444,7 @@ export default function ManageSnackProductsModal({ onClose }: { onClose: () => v
               <button
                 onClick={handleCreateCategory}
                 disabled={creatingCategory || !newCategoryName.trim()}
-                className="px-3 py-2 bg-violet-600 hover:bg-violet-500 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl transition-colors shrink-0"
+                className="px-3 py-2 bg-orange-600 hover:bg-orange-500 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl transition-colors shrink-0"
               >
                 <Plus className="w-4 h-4" />
               </button>

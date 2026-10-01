@@ -60,6 +60,20 @@ module.exports = {
           900: "#4c1d95",
           950: "#2e1065",
         },
+        // Brand color, built around the logo's #EC5800.
+        orange: {
+          50: "#fff5f0",
+          100: "#ffece0",
+          200: "#ffd2b8",
+          300: "#ffb185",
+          400: "#ff843d",
+          500: "#ff640a",
+          600: "#EC5800",
+          700: "#c24700",
+          800: "#a33c00",
+          900: "#8a3200",
+          950: "#521e00",
+        },
       },
       borderRadius: {
         lg: "var(--radius)",

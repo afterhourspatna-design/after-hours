@@ -152,7 +152,7 @@ function BalanceModal({ user, games, onClose, onSaved }: BalanceModalProps) {
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
       <div className="relative glass-card p-6 w-full max-w-sm animate-scale-in max-h-[90vh] overflow-y-auto">
         <h2 className="text-lg font-bold text-white mb-2 flex items-center gap-2">
-          <Zap className="w-5 h-5 text-violet-400" />
+          <Zap className="w-5 h-5 text-orange-400" />
           Add Credits
         </h2>
         <p className="text-sm text-zinc-400 mb-6">
@@ -181,7 +181,7 @@ function BalanceModal({ user, games, onClose, onSaved }: BalanceModalProps) {
                 value={creditsReceived} 
                 onChange={e => setCreditsReceived(e.target.value)} 
                 placeholder="e.g. 1200" 
-                className="input-field border-violet-500/30" 
+                className="input-field border-orange-500/30" 
                 required
               />
             </div>
@@ -281,7 +281,7 @@ function BalanceModal({ user, games, onClose, onSaved }: BalanceModalProps) {
                   setIsAllGames(e.target.checked);
                   if (e.target.checked) setSelectedGames([]);
                 }}
-                className="w-4 h-4 rounded border-zinc-700 bg-zinc-900 text-violet-500"
+                className="w-4 h-4 rounded border-zinc-700 bg-zinc-900 text-orange-500"
               />
               <label htmlFor="allGames" className="text-sm text-zinc-300">All Games (General Wallet)</label>
             </div>
@@ -294,7 +294,7 @@ function BalanceModal({ user, games, onClose, onSaved }: BalanceModalProps) {
                       type="checkbox"
                       checked={selectedGames.includes(g.id)}
                       onChange={() => toggleGame(g.id)}
-                      className="w-4 h-4 rounded border-zinc-700 bg-zinc-900 text-violet-500"
+                      className="w-4 h-4 rounded border-zinc-700 bg-zinc-900 text-orange-500"
                     />
                     <span className="text-sm text-zinc-400 group-hover:text-zinc-200">{g.name}</span>
                   </label>
@@ -317,7 +317,7 @@ function BalanceModal({ user, games, onClose, onSaved }: BalanceModalProps) {
           <div className="flex gap-3 pt-4">
             <button type="button" onClick={onClose} className="flex-1 py-3 rounded-xl border border-zinc-800 text-zinc-400 text-sm font-bold hover:bg-zinc-900 transition-all">Cancel</button>
             <button type="submit" disabled={loading}
-              className="flex-1 py-3 rounded-xl bg-violet-600 hover:bg-violet-500 text-white text-sm font-bold transition-all shadow-lg shadow-violet-900/20 active:scale-95 disabled:opacity-50">
+              className="flex-1 py-3 rounded-xl bg-orange-600 hover:bg-orange-500 text-white text-sm font-bold transition-all shadow-lg shadow-orange-900/20 active:scale-95 disabled:opacity-50">
               {loading ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : "Confirm"}
             </button>
           </div>
@@ -381,7 +381,7 @@ export default function PrepaidBalancesPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold text-white tracking-tight flex items-center gap-2">
-            <Zap className="w-6 h-6 text-violet-400" />
+            <Zap className="w-6 h-6 text-orange-400" />
             Prepaid Credits
           </h1>
           <p className="text-sm text-zinc-500 mt-0.5 font-medium">Manage user credit balances and wallets</p>
@@ -410,11 +410,11 @@ export default function PrepaidBalancesPage() {
               <div key={u.id} className="flex flex-col group border-b border-zinc-900 last:border-0">
                 <div className="flex flex-col sm:flex-row sm:items-start gap-3 sm:gap-4 px-4 sm:px-6 py-4 hover:bg-zinc-900/40 transition-colors">
                   <div className="flex items-center gap-3 w-full sm:w-auto">
-                    <div className="w-10 h-10 rounded-xl bg-violet-600/10 border border-violet-500/10 flex items-center justify-center flex-shrink-0 group-hover:bg-violet-600/20 group-hover:border-violet-500/30 transition-all duration-300">
-                      <span className="text-sm font-bold text-violet-400">{getInitials(u.name)}</span>
+                    <div className="w-10 h-10 rounded-xl bg-orange-600/10 border border-orange-500/10 flex items-center justify-center flex-shrink-0 group-hover:bg-orange-600/20 group-hover:border-orange-500/30 transition-all duration-300">
+                      <span className="text-sm font-bold text-orange-400">{getInitials(u.name)}</span>
                     </div>
                     <div className="flex-1 sm:hidden">
-                      <p className="text-sm font-bold text-white group-hover:text-violet-400 transition-colors duration-300">{u.name}</p>
+                      <p className="text-sm font-bold text-white group-hover:text-orange-400 transition-colors duration-300">{u.name}</p>
                       <p className="text-xs text-zinc-500">+91 {u.phone}</p>
                     </div>
                     <div className="flex flex-wrap gap-2 sm:hidden">
@@ -428,7 +428,7 @@ export default function PrepaidBalancesPage() {
                   </div>
   
                   <div className="flex-1 min-w-0 pl-14 sm:pl-0">
-                    <p className="hidden sm:block text-sm font-bold text-white group-hover:text-violet-400 transition-colors duration-300">{u.name}</p>
+                    <p className="hidden sm:block text-sm font-bold text-white group-hover:text-orange-400 transition-colors duration-300">{u.name}</p>
                     <p className="hidden sm:block text-xs text-zinc-500 mt-0.5">+91 {u.phone}</p>
                     
                     <div className="mt-3 flex flex-wrap gap-2">
@@ -436,7 +436,7 @@ export default function PrepaidBalancesPage() {
                         const isExpired = cb.expiresAt && new Date(cb.expiresAt) < new Date();
                         return (
                           <div key={cb.id} className={cn("px-2.5 py-1 rounded-md border text-xs", isExpired ? "bg-red-900/20 border-red-500/30" : "bg-zinc-900/80 border-zinc-800")}>
-                            <span className={cn("font-bold", isExpired ? "text-red-400" : "text-violet-400")}>₹{Number(cb.balance)}</span>
+                            <span className={cn("font-bold", isExpired ? "text-red-400" : "text-orange-400")}>₹{Number(cb.balance)}</span>
                             <span className={cn("ml-1.5", isExpired ? "text-red-500/70" : "text-zinc-500")}>
                               {cb.isAllGames ? "All Games" : cb.applicableGames.map(g => g.name).join(", ")}
                             </span>

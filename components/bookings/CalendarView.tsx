@@ -112,7 +112,7 @@ export default function CalendarView({
       <div className="relative">
         {loading && (
           <div className="absolute top-4 right-4 z-10">
-            <div className="w-4 h-4 rounded-full border-2 border-violet-500 border-t-transparent animate-spin" />
+            <div className="w-4 h-4 rounded-full border-2 border-orange-500 border-t-transparent animate-spin" />
           </div>
         )}
         <FullCalendar
@@ -148,7 +148,7 @@ export default function CalendarView({
                 )}
                 <p className="text-[11.5px] font-semibold opacity-80 truncate">{statusLabel}</p>
                 {Number(booking.usedCreditAmount) > 0 && (
-                  <p className="text-[9px] uppercase tracking-wider font-bold text-violet-200 mt-0.5 truncate bg-violet-500/30 px-1 py-0.5 rounded w-max">
+                  <p className="text-[9px] uppercase tracking-wider font-bold text-orange-200 mt-0.5 truncate bg-orange-500/30 px-1 py-0.5 rounded w-max">
                     Paid via Credits
                   </p>
                 )}
@@ -226,7 +226,7 @@ export default function CalendarView({
                 <div className="grid grid-cols-2 gap-3 text-xs">
                   <div className="bg-zinc-900/60 p-3 rounded-xl border border-zinc-800/80 space-y-1">
                     <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 flex items-center gap-1">
-                      <Gamepad2 className="w-3.5 h-3.5 text-violet-400" /> Game / Unit
+                      <Gamepad2 className="w-3.5 h-3.5 text-orange-400" /> Game / Unit
                     </p>
                     <p className="font-bold text-zinc-200 text-sm truncate">{selectedBooking.game.name}</p>
                     <p className="text-xs font-semibold text-zinc-400 truncate">{selectedBooking.resourceUnit?.unitName ?? "Unassigned"}</p>
@@ -271,7 +271,7 @@ export default function CalendarView({
                         : `/staff/bookings/${selectedBooking.id}/edit`;
                       router.push(editPath);
                     }}
-                    className="px-4 py-1.5 rounded-lg bg-violet-600 hover:bg-violet-500 text-white text-xs font-bold transition-all flex items-center gap-1.5 shadow-lg shadow-violet-900/20 active:scale-95"
+                    className="px-4 py-1.5 rounded-lg bg-orange-600 hover:bg-orange-500 text-white text-xs font-bold transition-all flex items-center gap-1.5 shadow-lg shadow-orange-900/20 active:scale-95"
                   >
                     <Edit3 className="w-3.5 h-3.5" />
                     Edit Booking

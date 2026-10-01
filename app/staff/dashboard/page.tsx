@@ -108,7 +108,7 @@ export default async function StaffDashboard() {
         </div>
         <div className="flex items-center gap-3">
            <Users className="w-4 h-4 text-zinc-600" />
-           <div className="w-8 h-8 rounded-full bg-violet-900/50 border border-violet-500/50 flex items-center justify-center text-[10px] font-bold text-violet-200">
+           <div className="w-8 h-8 rounded-full bg-orange-900/50 border border-orange-500/50 flex items-center justify-center text-[10px] font-bold text-orange-200">
               {session.user.name?.substring(0, 2).toUpperCase()}
            </div>
         </div>
@@ -122,7 +122,7 @@ export default async function StaffDashboard() {
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <a href="/staff/bookings/new"
-            className="flex items-center gap-2 px-5 py-2.5 bg-violet-600 hover:bg-violet-500 text-white text-xs font-bold rounded-xl transition-all shadow-lg shadow-violet-900/20 active:scale-95">
+            className="flex items-center gap-2 px-5 py-2.5 bg-orange-600 hover:bg-orange-500 text-white text-xs font-bold rounded-xl transition-all shadow-lg shadow-orange-900/20 active:scale-95">
             <Plus className="w-4 h-4" /> New booking
           </a>
         </div>
@@ -166,16 +166,16 @@ export default async function StaffDashboard() {
               return (
                 <div key={b.id} className="flex items-center justify-between gap-2 sm:gap-3 p-2 sm:p-3 rounded-xl hover:bg-zinc-900/50 transition-colors group">
                   <div className="flex items-center gap-2.5 sm:gap-3.5 min-w-0 flex-1">
-                    <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-full flex items-center justify-center text-[11px] sm:text-xs font-bold border bg-violet-500/10 border-violet-500/20 text-violet-400 flex-shrink-0">
+                    <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-full flex items-center justify-center text-[11px] sm:text-xs font-bold border bg-orange-500/10 border-orange-500/20 text-orange-400 flex-shrink-0">
                       {initials}
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
-                        <p className="text-xs sm:text-sm font-bold text-white group-hover:text-violet-400 transition-colors truncate">{name}</p>
+                        <p className="text-xs sm:text-sm font-bold text-white group-hover:text-orange-400 transition-colors truncate">{name}</p>
                         {phone && (
                           <a
                             href={`tel:${phone}`}
-                            className="flex items-center gap-1 text-[11px] sm:text-xs text-zinc-500 hover:text-violet-400 font-mono transition-colors"
+                            className="flex items-center gap-1 text-[11px] sm:text-xs text-zinc-500 hover:text-orange-400 font-mono transition-colors"
                             title="Call"
                           >
                             <Phone className="w-3 h-3" />

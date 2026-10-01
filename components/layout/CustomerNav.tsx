@@ -11,7 +11,7 @@ export default function CustomerNav({ userName }: CustomerNavProps) {
   return (
     <header className="h-14 flex items-center px-4 gap-3 border-b border-zinc-800/60 bg-zinc-950/80 backdrop-blur-sm sticky top-0 z-30">
       <div className="flex items-center gap-2">
-        <Gamepad2 className="w-5 h-5 text-violet-400" />
+        <Gamepad2 className="w-5 h-5 text-orange-400" />
         <span className="text-sm font-bold text-white">After Hours</span>
       </div>
       <span className="text-xs text-zinc-600 ml-1">/ My Bookings</span>

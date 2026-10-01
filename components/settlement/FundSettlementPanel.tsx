@@ -202,7 +202,7 @@ export default function FundSettlementPanel({ date }: { date: string }) {
       {/* Fund Source Cards */}
       <div>
         <h2 className="text-sm font-bold text-white uppercase tracking-wider mb-4 flex items-center gap-2">
-          <ArrowRightLeft className="w-4 h-4 text-violet-400" />
+          <ArrowRightLeft className="w-4 h-4 text-orange-400" />
           Fund Sources
         </h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
@@ -264,7 +264,7 @@ export default function FundSettlementPanel({ date }: { date: string }) {
                       <button
                         onClick={saveActual}
                         disabled={savingActual}
-                        className="flex-1 py-1.5 text-xs font-bold text-white bg-violet-600 hover:bg-violet-500 rounded-lg transition-all flex items-center justify-center gap-1.5 disabled:opacity-50"
+                        className="flex-1 py-1.5 text-xs font-bold text-white bg-orange-600 hover:bg-orange-500 rounded-lg transition-all flex items-center justify-center gap-1.5 disabled:opacity-50"
                       >
                         {savingActual && <Loader2 className="w-3 h-3 animate-spin" />}
                         Save
@@ -334,7 +334,7 @@ export default function FundSettlementPanel({ date }: { date: string }) {
         <div className="px-6 py-4 border-b border-zinc-800/80 flex items-center justify-between flex-wrap gap-2">
           <div>
             <h2 className="text-sm font-bold text-white flex items-center gap-2">
-              <ArrowRightLeft className="w-4 h-4 text-violet-400" />
+              <ArrowRightLeft className="w-4 h-4 text-orange-400" />
               Fund Transfers
             </h2>
             <p className="text-xs text-zinc-500 mt-0.5">Money moved between sources on {date}</p>
@@ -349,7 +349,7 @@ export default function FundSettlementPanel({ date }: { date: string }) {
                 setIsAddingTx(true);
               }
             }}
-            className="flex items-center gap-2 px-3.5 py-2 bg-violet-600 hover:bg-violet-500 text-white text-xs font-bold rounded-xl transition-all shadow-lg shadow-violet-900/20 active:scale-95"
+            className="flex items-center gap-2 px-3.5 py-2 bg-orange-600 hover:bg-orange-500 text-white text-xs font-bold rounded-xl transition-all shadow-lg shadow-orange-900/20 active:scale-95"
           >
             {isAddingTx ? <X className="w-3.5 h-3.5" /> : <Plus className="w-3.5 h-3.5" />}
             {isAddingTx ? "Cancel" : "Add Transfer"}
@@ -415,7 +415,7 @@ export default function FundSettlementPanel({ date }: { date: string }) {
               </div>
             </div>
             <div className="flex justify-end">
-              <button type="submit" className="px-5 py-2 bg-violet-600 hover:bg-violet-500 text-white text-sm font-bold rounded-xl transition-all shadow-lg shadow-violet-900/20 active:scale-95">
+              <button type="submit" className="px-5 py-2 bg-orange-600 hover:bg-orange-500 text-white text-sm font-bold rounded-xl transition-all shadow-lg shadow-orange-900/20 active:scale-95">
                 {editingTx ? "Save Changes" : "Add Transfer"}
               </button>
             </div>
@@ -424,7 +424,7 @@ export default function FundSettlementPanel({ date }: { date: string }) {
 
         {loading ? (
           <div className="py-16 text-center">
-            <Loader2 className="w-8 h-8 text-violet-500 animate-spin mx-auto mb-2" />
+            <Loader2 className="w-8 h-8 text-orange-500 animate-spin mx-auto mb-2" />
             <p className="text-sm text-zinc-500">Loading transfers...</p>
           </div>
         ) : transactions.length === 0 ? (

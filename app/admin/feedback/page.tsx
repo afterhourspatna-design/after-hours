@@ -41,7 +41,7 @@ export default async function AdminFeedbackPage() {
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div className="space-y-1 min-w-0">
                   <div className="flex items-center gap-2 text-sm font-semibold text-white">
-                    <MessageSquare className="w-4 h-4 text-violet-400 flex-shrink-0" />
+                    <MessageSquare className="w-4 h-4 text-orange-400 flex-shrink-0" />
                     <h2 className="truncate">{item.title}</h2>
                   </div>
                   <div className="flex flex-wrap items-center gap-3 text-xs text-zinc-500">

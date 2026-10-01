@@ -171,7 +171,7 @@ export default async function DailySettlementPage({
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-zinc-800/80 pb-6">
         <div>
           <div className="flex items-center gap-2 text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-1">
-            <Landmark className="w-3.5 h-3.5 text-violet-400" />
+            <Landmark className="w-3.5 h-3.5 text-orange-400" />
             <span>Financials & Shift Closing</span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-tight">
@@ -209,7 +209,7 @@ export default async function DailySettlementPage({
               type="date"
               name="date"
               defaultValue={selectedDateStr}
-              className="bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-zinc-300 focus:outline-none focus:border-violet-500 [color-scheme:dark]"
+              className="bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-zinc-300 focus:outline-none focus:border-orange-500 [color-scheme:dark]"
             />
             <button
               type="submit"
@@ -222,7 +222,7 @@ export default async function DailySettlementPage({
           {!isToday && (
             <a
               href="/admin/daily-settlement"
-              className="px-3 py-2 bg-violet-600/20 hover:bg-violet-600/30 text-violet-300 text-xs font-bold rounded-xl border border-violet-500/30 transition-all flex items-center gap-1"
+              className="px-3 py-2 bg-orange-600/20 hover:bg-orange-600/30 text-orange-300 text-xs font-bold rounded-xl border border-orange-500/30 transition-all flex items-center gap-1"
             >
               <Calendar className="w-3.5 h-3.5" />
               Today
@@ -271,12 +271,12 @@ export default async function DailySettlementPage({
           </div>
         </div>
 
-        <div className="glass-card p-6 border-violet-500/30 bg-gradient-to-br from-violet-950/30 to-zinc-900/80 relative overflow-hidden shadow-xl">
+        <div className="glass-card p-6 border-orange-500/30 bg-gradient-to-br from-orange-950/30 to-zinc-900/80 relative overflow-hidden shadow-xl">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-violet-300">
+            <span className="text-xs font-bold uppercase tracking-wider text-orange-300">
               Net Total Collection
             </span>
-            <div className="p-2.5 rounded-xl bg-violet-500/20 border border-violet-500/40 text-violet-300">
+            <div className="p-2.5 rounded-xl bg-orange-500/20 border border-orange-500/40 text-orange-300">
               <Wallet className="w-5 h-5" />
             </div>
           </div>
@@ -284,7 +284,7 @@ export default async function DailySettlementPage({
             <p className="text-3xl font-black text-white tracking-tight">
               {formatCurrency(netCollection)}
             </p>
-            <p className="text-xs text-violet-300/80 mt-1">
+            <p className="text-xs text-orange-300/80 mt-1">
               Combined Cash + Online collection for {selectedDateStr}
             </p>
           </div>
@@ -297,7 +297,7 @@ export default async function DailySettlementPage({
       {/* Stream Breakdown */}
       <div className="glass-card p-6 border-zinc-800/80 bg-zinc-950/40">
         <h2 className="text-sm font-bold text-white uppercase tracking-wider mb-4 flex items-center gap-2">
-          <Landmark className="w-4 h-4 text-violet-400" />
+          <Landmark className="w-4 h-4 text-orange-400" />
           Revenue Stream Breakdown
         </h2>
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
@@ -380,7 +380,7 @@ export default async function DailySettlementPage({
                   return (
                     <tr key={p.id} className="hover:bg-zinc-900/40 transition-colors">
                       <td className="py-3 px-4 text-zinc-400 font-mono">{timeStr}</td>
-                      <td className="py-3 px-4 font-mono font-semibold text-violet-400">
+                      <td className="py-3 px-4 font-mono font-semibold text-orange-400">
                         #{p.id.substring(0, 8).toUpperCase()}
                       </td>
                       <td className="py-3 px-4">
@@ -392,7 +392,7 @@ export default async function DailySettlementPage({
                           "px-2 py-0.5 rounded text-[10px] font-bold uppercase border",
                           p.paymentMethod === "CASH" ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" :
                           p.paymentMethod === "ONLINE" ? "bg-sky-500/10 text-sky-400 border-sky-500/20" :
-                          "bg-violet-500/10 text-violet-300 border-violet-500/20"
+                          "bg-orange-500/10 text-orange-300 border-orange-500/20"
                         )}>
                           {p.paymentMethod}
                         </span>

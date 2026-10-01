@@ -98,7 +98,7 @@ export default function ReportsPage() {
         <div className="flex items-center gap-2">
           {PERIODS.map(p => (
             <button key={p.days} onClick={() => setPeriod(p.days)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-medium border transition-all ${period === p.days ? "bg-violet-600 border-violet-600 text-white" : "bg-zinc-900 border-zinc-800 text-zinc-400 hover:border-zinc-700"}`}>
+              className={`px-3 py-1.5 rounded-xl text-xs font-medium border transition-all ${period === p.days ? "bg-orange-600 border-orange-600 text-white" : "bg-zinc-900 border-zinc-800 text-zinc-400 hover:border-zinc-700"}`}>
               {p.label}
             </button>
           ))}
@@ -112,7 +112,7 @@ export default function ReportsPage() {
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         {[
           { icon: TrendingUp, label: "Net Revenue", value: formatCurrency(data.netRevenue), iconColor: "text-emerald-400" },
-          { icon: Trophy, label: "Avg Order Value", value: formatCurrency(data.aov), iconColor: "text-violet-400" },
+          { icon: Trophy, label: "Avg Order Value", value: formatCurrency(data.aov), iconColor: "text-orange-400" },
           { icon: Clock, label: "Avg Session", value: `${data.avgDuration} min`, iconColor: "text-blue-400" },
           { icon: Users, label: "Total Bookings", value: totalBookings, iconColor: "text-amber-400" },
         ].map(card => (
@@ -132,7 +132,7 @@ export default function ReportsPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="glass-card p-5 lg:col-span-2">
           <h2 className="text-sm font-semibold text-white mb-4 flex items-center gap-2">
-            <Calendar className="w-4 h-4 text-violet-400" /> Daily Revenue
+            <Calendar className="w-4 h-4 text-orange-400" /> Daily Revenue
           </h2>
           <ResponsiveContainer width="100%" height={240}>
             <BarChart data={data.daily} margin={{ top: 4, right: 4, left: 0, bottom: 4 }}>
@@ -165,7 +165,7 @@ export default function ReportsPage() {
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-sm text-zinc-400">Pending Dues</span>
-                <span className="text-sm text-orange-400">-{formatCurrency(data.pendingDues)}</span>
+                <span className="text-sm text-amber-400">-{formatCurrency(data.pendingDues)}</span>
               </div>
               <div className="h-px bg-zinc-800 w-full" />
               <div className="flex justify-between items-center">
@@ -293,7 +293,7 @@ export default function ReportsPage() {
                 {data.topSpenders.map((user, i) => (
                   <div key={i} className="flex items-center justify-between p-3 hover:bg-zinc-800/30 rounded-xl transition-colors">
                     <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-violet-500/20 text-violet-400 flex items-center justify-center font-bold text-xs">
+                      <div className="w-8 h-8 rounded-full bg-orange-500/20 text-orange-400 flex items-center justify-center font-bold text-xs">
                         #{i + 1}
                       </div>
                       <div>

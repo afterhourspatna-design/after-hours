@@ -59,9 +59,8 @@ function LoginForm() {
     <div className="min-h-screen relative flex items-center justify-center p-4 overflow-hidden bg-zinc-950">
       {/* Background Decor */}
       <div className="absolute top-0 left-0 w-full h-full overflow-hidden -z-0">
-        <div className="absolute -top-[10%] -left-[10%] w-[40%] h-[40%] bg-violet-600/10 blur-[120px] rounded-full" />
+        <div className="absolute -top-[10%] -left-[10%] w-[40%] h-[40%] bg-orange-600/10 blur-[120px] rounded-full" />
         <div className="absolute -bottom-[10%] -right-[10%] w-[40%] h-[40%] bg-blue-600/10 blur-[120px] rounded-full" />
-        <div className="absolute top-[8%] left-1/2 -translate-x-1/2 w-[22%] h-[22%] bg-orange-500/10 blur-[100px] rounded-full" />
       </div>
 
       <div className="relative z-10 w-full max-w-md animate-in fade-in zoom-in-95 duration-500">
@@ -90,7 +89,7 @@ function LoginForm() {
                 value={identifier}
                 onChange={(e) => setIdentifier(e.target.value)}
                 placeholder="Enter your email or phone number"
-                className="input-field focus:ring-orange-500/50 focus:border-orange-500/50"
+                className="input-field"
                 disabled={isLoading}
               />
             </div>
@@ -112,7 +111,7 @@ function LoginForm() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
-                  className="input-field pr-11 focus:ring-orange-500/50 focus:border-orange-500/50"
+                  className="input-field pr-11"
                   disabled={isLoading}
                 />
                 <button
@@ -166,7 +165,7 @@ export default function LoginPage() {
   return (
     <Suspense fallback={
       <div className="flex items-center justify-center min-h-screen bg-zinc-950">
-        <Loader2 className="w-6 h-6 text-violet-400 animate-spin" />
+        <Loader2 className="w-6 h-6 text-orange-400 animate-spin" />
       </div>
     }>
       <LoginForm />

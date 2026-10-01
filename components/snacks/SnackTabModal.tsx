@@ -139,7 +139,7 @@ export default function SnackTabModal({ orderId, onClose, onChanged }: SnackTabM
       <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4">
         <div className="absolute inset-0 bg-black/75 backdrop-blur-sm" onClick={onClose} />
         <div className="relative glass-card bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-2xl p-6 animate-scale-in flex items-center justify-center min-h-[160px]">
-          <span className="w-6 h-6 border-2 border-zinc-700 border-t-violet-500 rounded-full animate-spin" />
+          <span className="w-6 h-6 border-2 border-zinc-700 border-t-orange-500 rounded-full animate-spin" />
         </div>
       </div>
     );
@@ -229,7 +229,7 @@ export default function SnackTabModal({ orderId, onClose, onChanged }: SnackTabM
                       <>
                         <button
                           onClick={() => setEditingItem(item)}
-                          className="p-1 sm:p-1.5 text-zinc-400 hover:text-violet-400 hover:bg-violet-500/10 rounded-lg transition-colors"
+                          className="p-1 sm:p-1.5 text-zinc-400 hover:text-orange-400 hover:bg-orange-500/10 rounded-lg transition-colors"
                           title="Edit quantity / price"
                         >
                           <Pencil className="w-3.5 h-3.5" />
@@ -257,7 +257,7 @@ export default function SnackTabModal({ orderId, onClose, onChanged }: SnackTabM
           <div className="flex items-center justify-end gap-3 border-t border-zinc-800/60 pt-4 mt-4 flex-shrink-0">
             <button
               onClick={onClose}
-              className="px-6 py-2.5 bg-violet-600 hover:bg-violet-500 text-white text-sm font-bold rounded-xl transition-all"
+              className="px-6 py-2.5 bg-orange-600 hover:bg-orange-500 text-white text-sm font-bold rounded-xl transition-all"
             >
               Save
             </button>
