@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
 import { cn } from "@/lib/utils";
 import {
-  Gamepad2, LayoutDashboard, CalendarDays, BookOpen,
+  LayoutDashboard, CalendarDays, BookOpen,
   Users, Trophy, BarChart3, LineChart, Database, Settings, LogOut, ChevronLeft, Menu, X, Zap, MessageSquare, Tag, CreditCard, Award, Coffee, Flame, Landmark, Receipt
 } from "lucide-react";
 import { useState } from "react";
@@ -84,13 +84,11 @@ export default function Sidebar({ role, userName, userEmail }: SidebarProps) {
     <div className="flex flex-col h-full">
       {/* Logo */}
       <div className={cn("flex items-center gap-3 px-4 py-5 border-b border-zinc-800/60", collapsed && "px-3 justify-center")}>
-        <div className="flex-shrink-0 w-9 h-9 rounded-xl bg-violet-600/20 border border-violet-500/30 flex items-center justify-center">
-          <Gamepad2 className="w-5 h-5 text-violet-400" />
-        </div>
+        <img src="/logo-icon.svg" alt="After Hours" className="w-12 h-12 rounded-xl flex-shrink-0" />
         {!collapsed && (
           <div>
-            <p className="text-sm font-bold text-white leading-tight">After Hours</p>
-            <p className="text-[10px] text-zinc-600">Gaming Parlour</p>
+            <p className="text-base font-bold text-white leading-tight">After Hours</p>
+            <p className="text-xs text-zinc-500">Gaming Cafe</p>
           </div>
         )}
         <button
@@ -183,8 +181,8 @@ export default function Sidebar({ role, userName, userEmail }: SidebarProps) {
           <Menu className="w-5 h-5" />
         </button>
         <div className="flex items-center gap-2">
-          <Gamepad2 className="w-5 h-5 text-violet-400" />
-          <span className="text-sm font-bold text-white">After Hours</span>
+          <img src="/logo-icon.svg" alt="After Hours" className="w-9 h-9 rounded-lg" />
+          <span className="text-base font-bold text-white">After Hours</span>
         </div>
       </div>
 

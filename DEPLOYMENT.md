@@ -1,6 +1,6 @@
 # Deployment Checklist & Guide
 
-Follow these steps to deploy the **After Hours Gaming Parlour** application to a production environment.
+Follow these steps to deploy the **After Hours Gaming Cafe** application to a production environment.
 
 ## 1. Database Provisioning
 You need a PostgreSQL database. You can use:

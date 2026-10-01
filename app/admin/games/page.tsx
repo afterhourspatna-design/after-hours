@@ -171,7 +171,7 @@ export default function GamesPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold text-white tracking-tight">Games & Pricing</h1>
-          <p className="text-sm text-zinc-500 mt-0.5 font-medium">Manage your parlour games and their hourly rates</p>
+          <p className="text-sm text-zinc-500 mt-0.5 font-medium">Manage your cafe's games and their hourly rates</p>
         </div>
         <button 
           onClick={() => setIsAdding(!isAdding)}

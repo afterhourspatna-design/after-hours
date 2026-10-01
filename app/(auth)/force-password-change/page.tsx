@@ -130,7 +130,7 @@ export default function ForcePasswordChangePage() {
 
         <p className="text-center text-[10px] font-bold text-zinc-700 uppercase tracking-[0.2em] mt-8">
           <Gamepad2 className="w-3 h-3 inline mr-1 -mt-0.5" />
-          After Hours Gaming Parlour
+          After Hours Gaming Cafe
         </p>
       </div>
     </div>

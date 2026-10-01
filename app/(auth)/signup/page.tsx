@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Gamepad2, MessageCircleOff, ArrowRight } from "lucide-react";
+import { MessageCircleOff, ArrowRight } from "lucide-react";
 
 export default function SignupPage() {
   return (
@@ -11,9 +11,7 @@ export default function SignupPage() {
 
       <div className="relative z-10 w-full max-w-md animate-in fade-in zoom-in-95 duration-500">
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-violet-600/20 border border-violet-500/30 mb-4 shadow-lg shadow-violet-900/30">
-            <Gamepad2 className="w-8 h-8 text-violet-400" />
-          </div>
+          <img src="/logo-icon.svg" alt="After Hours" className="w-24 h-24 mx-auto mb-4 rounded-2xl shadow-lg shadow-violet-900/30" />
           <h1 className="text-2xl font-bold text-white tracking-tight">After Hours</h1>
         </div>
 

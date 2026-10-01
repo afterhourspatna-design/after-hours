@@ -25,7 +25,7 @@ async function main() {
   await prisma.settings.createMany({
     data: [
       { key: "currency_symbol", value: "Rs" },
-      { key: "venue_name", value: "After Hours Gaming Parlour" },
+      { key: "venue_name", value: "After Hours Gaming Cafe" },
       { key: "venue_phone", value: "+91-300-0000000" },
       { key: "venue_email", value: "info@afterhours.in" },
       { key: "operating_hours_start", value: "10:00" },

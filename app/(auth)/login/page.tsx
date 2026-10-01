@@ -5,7 +5,7 @@ import { useState, useEffect } from "react";
 import { signIn } from "next-auth/react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Gamepad2, Eye, EyeOff, Loader2, Zap } from "lucide-react";
+import { Eye, EyeOff, Loader2, Zap } from "lucide-react";
 
 function LoginForm() {
   const searchParams = useSearchParams();
@@ -61,16 +61,13 @@ function LoginForm() {
       <div className="absolute top-0 left-0 w-full h-full overflow-hidden -z-0">
         <div className="absolute -top-[10%] -left-[10%] w-[40%] h-[40%] bg-violet-600/10 blur-[120px] rounded-full" />
         <div className="absolute -bottom-[10%] -right-[10%] w-[40%] h-[40%] bg-blue-600/10 blur-[120px] rounded-full" />
+        <div className="absolute top-[8%] left-1/2 -translate-x-1/2 w-[22%] h-[22%] bg-orange-500/10 blur-[100px] rounded-full" />
       </div>
 
       <div className="relative z-10 w-full max-w-md animate-in fade-in zoom-in-95 duration-500">
         {/* Logo */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-violet-600/20 border border-violet-500/30 mb-4 shadow-lg shadow-violet-900/30">
-            <Gamepad2 className="w-8 h-8 text-violet-400" />
-          </div>
-          <h1 className="text-2xl font-bold text-white tracking-tight">After Hours</h1>
-          <p className="text-zinc-500 text-sm mt-1 font-medium">Gaming Parlour Admin</p>
+          <img src="/logo.svg" alt="After Hours Gaming Cafe" className="w-48 h-48 mx-auto rounded-2xl shadow-lg shadow-orange-900/30" />
         </div>
 
         {/* Card */}
@@ -93,7 +90,7 @@ function LoginForm() {
                 value={identifier}
                 onChange={(e) => setIdentifier(e.target.value)}
                 placeholder="Enter your email or phone number"
-                className="input-field"
+                className="input-field focus:ring-orange-500/50 focus:border-orange-500/50"
                 disabled={isLoading}
               />
             </div>
@@ -103,7 +100,7 @@ function LoginForm() {
                 <label htmlFor="password" className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider">
                   Password
                 </label>
-                <a href="/forgot-password" className="text-[11px] font-bold text-violet-400 hover:text-violet-300">
+                <a href="/forgot-password" className="text-[11px] font-bold text-orange-400 hover:text-orange-300">
                   Forgot password?
                 </a>
               </div>
@@ -115,7 +112,7 @@ function LoginForm() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
-                  className="input-field pr-11"
+                  className="input-field pr-11 focus:ring-orange-500/50 focus:border-orange-500/50"
                   disabled={isLoading}
                 />
                 <button
@@ -133,9 +130,9 @@ function LoginForm() {
               type="submit"
               disabled={isLoading}
               className="w-full flex items-center justify-center gap-2 px-4 py-3 mt-4
-                         bg-violet-600 hover:bg-violet-500 active:scale-[0.98]
+                         bg-orange-600 hover:bg-orange-500 active:scale-[0.98]
                          text-white font-bold text-sm rounded-xl
-                         transition-all duration-200 shadow-lg shadow-violet-900/40
+                         transition-all duration-200 shadow-lg shadow-orange-900/40
                          disabled:opacity-60 disabled:cursor-not-allowed"
             >
               {isLoading ? (
@@ -150,7 +147,7 @@ function LoginForm() {
           <div className="mt-8 text-center pt-6 border-t border-zinc-900">
             <p className="text-sm text-zinc-500 font-medium">
               Don't have an account?{" "}
-              <a href="/signup" className="text-violet-400 hover:text-violet-300 font-bold">
+              <a href="/signup" className="text-orange-400 hover:text-orange-300 font-bold">
                 Sign Up
               </a>
             </p>
@@ -158,7 +155,7 @@ function LoginForm() {
         </div>
 
         <p className="text-center text-[10px] font-bold text-zinc-700 uppercase tracking-[0.2em] mt-8">
-          After Hours Gaming Parlour — Internal Use Only
+          After Hours Gaming Cafe — Internal Use Only
         </p>
       </div>
     </div>

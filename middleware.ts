@@ -85,5 +85,5 @@ export default auth(async (req: NextRequest & { auth: any }) => {
 });
 
 export const config = {
-  matcher: ["/((?!api|_next/static|_next/image|favicon.ico|icons|manifest.json|sw.js).*)"],
+  matcher: ["/((?!api|_next/static|_next/image|favicon.ico|icons|manifest.json|sw.js|logo.svg|logo-icon.svg).*)"],
 };

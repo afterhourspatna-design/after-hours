@@ -1,6 +1,6 @@
-# Project Init: After Hours Gaming Parlour
+# Project Init: After Hours Gaming Cafe
 
-The **After Hours Gaming Parlour** management system is a premium, high-performance web application designed for gaming parlours. It features a multi-role layout (Admin, Staff, Customer), real-time booking calendars, custom progressive-style pricing calculations, database tracking, and automatic resource unit assignment.
+The **After Hours Gaming Cafe** management system is a premium, high-performance web application designed for gaming cafes. It features a multi-role layout (Admin, Staff, Customer), real-time booking calendars, custom progressive-style pricing calculations, database tracking, and automatic resource unit assignment.
 
 ---
 

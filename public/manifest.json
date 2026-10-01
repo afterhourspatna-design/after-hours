@@ -1,7 +1,7 @@
 {
   "name": "After Hours Gaming Admin",
   "short_name": "After Hours",
-  "description": "Internal admin app for After Hours Gaming Parlour",
+  "description": "Internal admin app for After Hours Gaming Cafe",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#09090b",

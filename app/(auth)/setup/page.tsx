@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Gamepad2, User, Phone, Mail, Lock, Loader2, ArrowRight, AlertCircle, ShieldCheck } from "lucide-react";
+import { User, Phone, Mail, Lock, Loader2, ArrowRight, AlertCircle, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 
@@ -107,9 +107,7 @@ export default function SetupPage() {
 
       <div className="relative z-10 w-full max-w-md animate-in fade-in zoom-in-95 duration-500">
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-violet-600/20 border border-violet-500/30 mb-4 shadow-lg shadow-violet-900/30">
-            <Gamepad2 className="w-8 h-8 text-violet-400" />
-          </div>
+          <img src="/logo-icon.svg" alt="After Hours" className="w-24 h-24 mx-auto mb-4 rounded-2xl shadow-lg shadow-violet-900/30" />
           <h1 className="text-2xl font-bold text-white tracking-tight">Welcome to After Hours</h1>
           <p className="text-zinc-500 text-sm mt-1 font-medium">Create the first admin account to get started</p>
         </div>

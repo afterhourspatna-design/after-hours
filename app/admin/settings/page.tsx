@@ -19,7 +19,7 @@ export default function SettingsPage() {
   useEffect(() => {
     // Load from env defaults shown as placeholders — in production, fetch from /api/settings
     setSettings({
-      venue_name: "After Hours Gaming Parlour",
+      venue_name: "After Hours Gaming Cafe",
       venue_phone: "+91-300-0000000",
       venue_email: "info@afterhours.in",
       currency_symbol: "Rs",

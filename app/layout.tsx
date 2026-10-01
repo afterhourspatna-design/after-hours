@@ -9,7 +9,7 @@ const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 
 export const metadata: Metadata = {
   title: { default: "After Hours Admin", template: "%s | After Hours" },
-  description: "Internal admin panel for After Hours Gaming Parlour",
+  description: "Internal admin panel for After Hours Gaming Cafe",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,

@@ -1,4 +1,4 @@
-# After Hours Gaming Parlour — Management System
+# After Hours Gaming Cafe — Management System
 
 A premium, high-performance PWA for managing gaming parlour operations. Built with **Next.js 15**, **Prisma**, **PostgreSQL**, and **NextAuth.js**.
 
